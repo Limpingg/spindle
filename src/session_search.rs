@@ -26,29 +26,68 @@ pub async fn search(
 ) -> anyhow::Result<SearchResults> {
     let login = session.login5().auth_token().await?;
     let client_token = session.spclient().client_token().await?;
-    let request = serde_json::json!({
-        "operationName": "searchDesktop",
-        "variables": {
-            "searchTerm": query,
-            "offset": 0,
-            "limit": LIMIT,
-            "numberOfTopResults": 5,
-            "includeAudiobooks": false,
-            "includeArtistHasConcertsField": false,
-            "includePreReleases": true,
-            "includeAlbumPreReleases": false,
-            "includeAuthors": false,
-            "includeEpisodeContentRatingsV2": false,
-            "isPrefix": null,
-            "sectionFilters": ["GENERIC"]
-        },
-        "extensions": {
-            "persistedQuery": {"version": 1, "sha256Hash": SEARCH_DESKTOP_HASH}
-        }
+    // The web player's variables first; then the smaller set other clients
+    // send, in case Spotify refuses a flag this account's build lacks.
+    let full = serde_json::json!({
+        "searchTerm": query,
+        "offset": 0,
+        "limit": LIMIT,
+        "numberOfTopResults": 5,
+        "includeAudiobooks": false,
+        "includeArtistHasConcertsField": false,
+        "includePreReleases": true,
+        "includeAlbumPreReleases": false,
+        "includeAuthors": false,
+        "includeEpisodeContentRatingsV2": false,
+        "isPrefix": null,
+        "sectionFilters": ["GENERIC"]
     });
-    let body = web
-        .partner_request(&login.access_token, &client_token, &request)
-        .await?;
+    let small = serde_json::json!({
+        "searchTerm": query,
+        "offset": 0,
+        "limit": LIMIT,
+        "numberOfTopResults": 5,
+        "includeAudiobooks": true,
+        "includeArtistHasConcertsField": false,
+        "includePreReleases": true,
+        "includeLocalConcertsField": false
+    });
+    let mut body = None;
+    let mut last_error = None;
+    for variables in [full, small] {
+        let request = serde_json::json!({
+            "operationName": "searchDesktop",
+            "variables": variables,
+            "extensions": {
+                "persistedQuery": {"version": 1, "sha256Hash": SEARCH_DESKTOP_HASH}
+            }
+        });
+        match web
+            .partner_request(&login.access_token, &client_token, &request)
+            .await
+        {
+            Ok(answer) if answer.pointer("/data/searchV2").is_some() => {
+                body = Some(answer);
+                break;
+            }
+            Ok(answer) => {
+                let message = answer
+                    .pointer("/errors/0/message")
+                    .and_then(Value::as_str)
+                    .unwrap_or("no results")
+                    .to_string();
+                log::warn!("session search answered: {message}");
+                last_error = Some(anyhow::anyhow!("Spotify's search answered: {message}"));
+            }
+            Err(error) => {
+                log::warn!("session search refused: {error}");
+                last_error = Some(anyhow::anyhow!("{error}"));
+            }
+        }
+    }
+    let Some(body) = body else {
+        return Err(last_error.unwrap_or_else(|| anyhow::anyhow!("Spotify's search failed")));
+    };
     if let Some(error) = body
         .pointer("/errors/0/message")
         .and_then(Value::as_str)

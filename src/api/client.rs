@@ -496,9 +496,17 @@ impl ApiClient {
             return Err(ApiError::RateLimited);
         }
         if !status.is_success() {
+            // Spindle: say what Spotify answered, so a refused internal
+            // query can be told apart from an outage in the log.
+            let body = response.text().await.unwrap_or_default();
+            let snippet: String = body.chars().take(300).collect();
+            let operation = query
+                .get("operationName")
+                .and_then(|name| name.as_str())
+                .unwrap_or("request");
             return Err(ApiError::Status {
                 status: status.as_u16(),
-                message: "Spotify upcoming-album request failed".into(),
+                message: format!("Spotify {operation} failed (HTTP {}): {snippet}", status.as_u16()),
             });
         }
         response.json().await.map_err(ApiError::from)
