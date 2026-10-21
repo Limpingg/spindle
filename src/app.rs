@@ -2633,10 +2633,7 @@ impl App {
                                 self.dialog = None;
                             }
                             // Translators: {name} is a folder name.
-                            self.toast(
-                                gettext(self.locale, "Made the folder “{name}”")
-                                    .replace("{name}", &name),
-                            );
+                            self.toast(gettext(self.locale, "Made the folder “{name}”").replace("{name}", &name));
                             self.read_rootlist();
                         }
                         Err(message) => self.toast_error(message),
@@ -4497,9 +4494,7 @@ impl App {
         let mut playing = self.now_playing().is_some_and(|now| now.playing);
         for command in commands {
             let action = match command {
-                MediaCommand::Play
-                | MediaCommand::Pause
-                | MediaCommand::Stop
+                MediaCommand::Play | MediaCommand::Pause | MediaCommand::Stop
                 | MediaCommand::PlayPause => {
                     let toggle = media_toggles(&command, playing);
                     playing ^= toggle;
@@ -5960,10 +5955,7 @@ impl App {
     pub fn can_remove_from_queue(&self, index: usize) -> bool {
         // Spindle: Next up rows too; librespot takes any upcoming row out.
         self.queue_locally_reorderable()
-            && self
-                .queue
-                .get()
-                .is_some_and(|queue| index < queue.queue.len())
+            && self.queue.get().is_some_and(|queue| index < queue.queue.len())
     }
 
     /// Moves a Next up row; see `Action::ArrangeNextUp`. The rows that leave
@@ -5981,31 +5973,29 @@ impl App {
         if from < queued_len || from >= len || to > len || queue.queue[from].uri() != uri {
             return;
         }
-        let (taken, ordered, position): (Vec<usize>, Vec<PlayableItem>, usize) = if to <= queued_len
-        {
-            (vec![from], vec![queue.queue[from].clone()], to)
-        } else {
-            if to == from || to == from + 1 {
-                return;
-            }
-            let end = (from + 1).max(to).min(len);
-            if end - queued_len > ARRANGE_NEXT_UP_LIMIT {
-                self.toast(gettext(
-                    self.locale,
-                    "Move it into Playing next first, then drag it from there",
-                ));
-                return;
-            }
-            let taken: Vec<usize> = (queued_len..end).collect();
-            let mut ordered: Vec<PlayableItem> = taken
-                .iter()
-                .map(|&index| queue.queue[index].clone())
-                .collect();
-            let moved = ordered.remove(from - queued_len);
-            let at = if to > from { to - 1 } else { to } - queued_len;
-            ordered.insert(at.min(ordered.len()), moved);
-            (taken, ordered, queued_len)
-        };
+        let (taken, ordered, position): (Vec<usize>, Vec<PlayableItem>, usize) =
+            if to <= queued_len {
+                (vec![from], vec![queue.queue[from].clone()], to)
+            } else {
+                if to == from || to == from + 1 {
+                    return;
+                }
+                let end = (from + 1).max(to).min(len);
+                if end - queued_len > ARRANGE_NEXT_UP_LIMIT {
+                    self.toast(gettext(
+                        self.locale,
+                        "Move it into Playing next first, then drag it from there",
+                    ));
+                    return;
+                }
+                let taken: Vec<usize> = (queued_len..end).collect();
+                let mut ordered: Vec<PlayableItem> =
+                    taken.iter().map(|&index| queue.queue[index].clone()).collect();
+                let moved = ordered.remove(from - queued_len);
+                let at = if to > from { to - 1 } else { to } - queued_len;
+                ordered.insert(at.min(ordered.len()), moved);
+                (taken, ordered, queued_len)
+            };
         let removals: Vec<(usize, String)> = taken
             .iter()
             .rev()
@@ -12723,11 +12713,7 @@ impl App {
 
         if !self.toasts.is_empty() {
             // Spindle: a toast's countdown needs no 30 fps while a game has the focus.
-            let frame = if self.window_focused {
-                TOAST_FRAME
-            } else {
-                Duration::from_millis(250)
-            };
+            let frame = if self.window_focused { TOAST_FRAME } else { Duration::from_millis(250) };
             ctx.request_repaint_after(frame);
         }
         self.theme_transition.paint(ctx);
@@ -18585,7 +18571,10 @@ mod tests {
             &ctx,
         );
         assert_eq!(app.manual_queue, ["spotify:track:a", "spotify:track:a"]);
-        assert_eq!(queue_uris(&app).1, ["spotify:track:a", "spotify:track:a"]);
+        assert_eq!(
+            queue_uris(&app).1,
+            ["spotify:track:a", "spotify:track:a"]
+        );
         assert_eq!(app.queued_rows_len(), 2);
         assert_eq!(
             app.pending_queue_adds[0].manual_index, 1,
@@ -19780,7 +19769,8 @@ mod tests {
     }
 
     fn test_app(name: &str) -> App {
-        let root = std::env::temp_dir().join(format!("spindle-{name}-test-{}", std::process::id()));
+        let root =
+            std::env::temp_dir().join(format!("spindle-{name}-test-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&root);
         let mut app = App::new(
             &Waker::default(),
@@ -21471,8 +21461,10 @@ mod tests {
     /// Closing and reopening restores queue rows and their manual split.
     #[test]
     fn the_queue_comes_back_after_a_restart() {
-        let root =
-            std::env::temp_dir().join(format!("spindle-queue-restart-test-{}", std::process::id()));
+        let root = std::env::temp_dir().join(format!(
+            "spindle-queue-restart-test-{}",
+            std::process::id()
+        ));
         let _ = std::fs::remove_dir_all(&root);
         let dirs = AppDirs {
             config: root.join("config"),
@@ -23015,7 +23007,8 @@ mod tests {
     }
 
     fn headless_app() -> App {
-        let root = std::env::temp_dir().join(format!("spindle-volume-test-{}", std::process::id()));
+        let root =
+            std::env::temp_dir().join(format!("spindle-volume-test-{}", std::process::id()));
         let dirs = AppDirs {
             config: root.join("config"),
             state: root.join("state"),
@@ -29500,8 +29493,10 @@ mod tests {
         use std::time::{Duration, Instant};
         const CHILD: &str = "SPINDLE_SEARCH_PRIVATE_BUS";
         if std::env::var_os(CHILD).is_none() {
-            let root = std::env::temp_dir()
-                .join(format!("spindle-search-bus-{:016x}", rand::random::<u64>()));
+            let root = std::env::temp_dir().join(format!(
+                "spindle-search-bus-{:016x}",
+                rand::random::<u64>()
+            ));
             std::fs::create_dir(&root).unwrap();
             let config = root.join("session.conf");
             std::fs::write(&config, r#"<busconfig><type>session</type><listen>unix:tmpdir=/tmp</listen><auth>EXTERNAL</auth><policy context="default"><allow own="*"/><allow send_destination="*"/><allow receive_sender="*"/></policy></busconfig>"#).unwrap();
@@ -30501,7 +30496,10 @@ mod tests {
             "pause must not replace the pick with the previous run's song: {:?}",
             app.queued_play
         );
-        assert!(app.queued_play.is_none(), "pause takes the held pick back");
+        assert!(
+            app.queued_play.is_none(),
+            "pause takes the held pick back"
+        );
         assert!(
             !app.now_playing().is_some_and(|now| now.playing),
             "the bar shows paused"
@@ -30541,7 +30539,8 @@ mod tests {
         app.toggle_play();
 
         assert!(
-            !app.backend
+            !app
+                .backend
                 .take_player_commands()
                 .contains(&PlayerCommand::Toggle),
             "the old song must not start playing under a paused bar"
@@ -30676,22 +30675,10 @@ mod tests {
             }
             (toggles, playing)
         };
-        assert_eq!(
-            run(&[MediaCommand::Pause, MediaCommand::Pause], true),
-            (1, false)
-        );
-        assert_eq!(
-            run(&[MediaCommand::Play, MediaCommand::Play], false),
-            (1, true)
-        );
-        assert_eq!(
-            run(&[MediaCommand::Play, MediaCommand::Pause], false),
-            (2, false)
-        );
-        assert_eq!(
-            run(&[MediaCommand::PlayPause, MediaCommand::PlayPause], true),
-            (2, true)
-        );
+        assert_eq!(run(&[MediaCommand::Pause, MediaCommand::Pause], true), (1, false));
+        assert_eq!(run(&[MediaCommand::Play, MediaCommand::Play], false), (1, true));
+        assert_eq!(run(&[MediaCommand::Play, MediaCommand::Pause], false), (2, false));
+        assert_eq!(run(&[MediaCommand::PlayPause, MediaCommand::PlayPause], true), (2, true));
         assert_eq!(run(&[MediaCommand::Stop], false), (0, false));
         assert!(!media_toggles(&MediaCommand::Next, true));
     }
@@ -30727,9 +30714,7 @@ mod tests {
 
         let sent = app.backend.take_player_commands();
         assert_eq!(
-            sent.iter()
-                .filter(|command| **command == PlayerCommand::Toggle)
-                .count(),
+            sent.iter().filter(|command| **command == PlayerCommand::Toggle).count(),
             1,
             "{sent:?}"
         );
@@ -30750,18 +30735,12 @@ mod tests {
         app.backend.take_player_commands();
 
         app.toggle_play();
-        assert!(
-            !app.now_playing().is_some_and(|now| now.playing),
-            "paused at once"
-        );
+        assert!(!app.now_playing().is_some_and(|now| now.playing), "paused at once");
         app.toggle_play();
 
         let sent = app.backend.take_player_commands();
         assert_eq!(sent, [PlayerCommand::Toggle, PlayerCommand::Toggle]);
-        assert!(
-            app.now_playing().is_some_and(|now| now.playing),
-            "playing again"
-        );
+        assert!(app.now_playing().is_some_and(|now| now.playing), "playing again");
 
         // The engine's late reports of the pause and the play leave the
         // bar playing.
@@ -30827,43 +30806,22 @@ mod tests {
     /// at the drop slot; the rest of Next up keeps its order.
     #[test]
     fn a_next_up_row_dropped_into_playing_next_plays_there() {
-        let mut app = arranging_app(
-            &["spotify:track:q1"],
-            &["spotify:track:c1", "spotify:track:c2", "spotify:track:c3"],
-        );
+        let mut app = arranging_app(&["spotify:track:q1"], &["spotify:track:c1", "spotify:track:c2", "spotify:track:c3"]);
         assert!(app.queue_locally_reorderable());
         let ctx = egui::Context::default();
         app.apply(
-            Action::ArrangeNextUp {
-                from: 3,
-                uri: "spotify:track:c3".into(),
-                to: 0,
-            },
+            Action::ArrangeNextUp { from: 3, uri: "spotify:track:c3".into(), to: 0 },
             &ctx,
         );
         let sent = app.backend.take_player_commands();
         assert_eq!(removals(&sent), [(3, "spotify:track:c3")]);
-        let removal_at = sent
-            .iter()
-            .position(|c| matches!(c, PlayerCommand::RemoveNextTrack { .. }))
-            .unwrap();
-        let clear_at = sent
-            .iter()
-            .position(|c| *c == PlayerCommand::ClearQueue)
-            .expect("queue rewritten");
-        assert!(
-            removal_at < clear_at,
-            "the row leaves the context before the queue is rewritten"
-        );
+        let removal_at = sent.iter().position(|c| matches!(c, PlayerCommand::RemoveNextTrack { .. })).unwrap();
+        let clear_at = sent.iter().position(|c| *c == PlayerCommand::ClearQueue).expect("queue rewritten");
+        assert!(removal_at < clear_at, "the row leaves the context before the queue is rewritten");
         assert_eq!(app.manual_queue, ["spotify:track:c3", "spotify:track:q1"]);
         assert_eq!(
             queue_uris(&app).1,
-            [
-                "spotify:track:c3",
-                "spotify:track:q1",
-                "spotify:track:c1",
-                "spotify:track:c2"
-            ]
+            ["spotify:track:c3", "spotify:track:q1", "spotify:track:c1", "spotify:track:c2"]
         );
         app.backend.shutdown();
     }
@@ -30872,46 +30830,22 @@ mod tests {
     /// the new order, so what plays is what was drawn.
     #[test]
     fn a_next_up_row_dragged_within_next_up_plays_in_the_drawn_order() {
-        let mut app = arranging_app(
-            &[],
-            &[
-                "spotify:track:c1",
-                "spotify:track:c2",
-                "spotify:track:c3",
-                "spotify:track:c4",
-            ],
-        );
+        let mut app = arranging_app(&[], &["spotify:track:c1", "spotify:track:c2", "spotify:track:c3", "spotify:track:c4"]);
         let ctx = egui::Context::default();
         // c3 dropped between c1 and c2.
         app.apply(
-            Action::ArrangeNextUp {
-                from: 2,
-                uri: "spotify:track:c3".into(),
-                to: 1,
-            },
+            Action::ArrangeNextUp { from: 2, uri: "spotify:track:c3".into(), to: 1 },
             &ctx,
         );
         let sent = app.backend.take_player_commands();
         assert_eq!(
             removals(&sent),
-            [
-                (2, "spotify:track:c3"),
-                (1, "spotify:track:c2"),
-                (0, "spotify:track:c1")
-            ]
+            [(2, "spotify:track:c3"), (1, "spotify:track:c2"), (0, "spotify:track:c1")]
         );
-        assert_eq!(
-            app.manual_queue,
-            ["spotify:track:c1", "spotify:track:c3", "spotify:track:c2"]
-        );
+        assert_eq!(app.manual_queue, ["spotify:track:c1", "spotify:track:c3", "spotify:track:c2"]);
         assert_eq!(
             queue_uris(&app).1,
-            [
-                "spotify:track:c1",
-                "spotify:track:c3",
-                "spotify:track:c2",
-                "spotify:track:c4"
-            ]
+            ["spotify:track:c1", "spotify:track:c3", "spotify:track:c2", "spotify:track:c4"]
         );
 
         // Moving one later: c1 dropped after c3 of the new order is handled
@@ -30920,24 +30854,13 @@ mod tests {
         app.backend.take_player_commands();
         let mut app = arranging_app(&[], &["spotify:track:c1", "spotify:track:c2"]);
         app.apply(
-            Action::ArrangeNextUp {
-                from: 1,
-                uri: "spotify:track:c2".into(),
-                to: 2,
-            },
+            Action::ArrangeNextUp { from: 1, uri: "spotify:track:c2".into(), to: 2 },
             &ctx,
         );
-        assert!(
-            app.backend.take_player_commands().is_empty(),
-            "dropped on its own edge"
-        );
+        assert!(app.backend.take_player_commands().is_empty(), "dropped on its own edge");
         // c1 dropped below c2.
         app.apply(
-            Action::ArrangeNextUp {
-                from: 0,
-                uri: "spotify:track:c1".into(),
-                to: 2,
-            },
+            Action::ArrangeNextUp { from: 0, uri: "spotify:track:c1".into(), to: 2 },
             &ctx,
         );
         assert_eq!(app.manual_queue, ["spotify:track:c2", "spotify:track:c1"]);
@@ -30950,11 +30873,7 @@ mod tests {
         let mut app = arranging_app(&[], &["spotify:track:c1", "spotify:track:c2"]);
         let ctx = egui::Context::default();
         app.apply(
-            Action::ArrangeNextUp {
-                from: 1,
-                uri: "spotify:track:gone".into(),
-                to: 0,
-            },
+            Action::ArrangeNextUp { from: 1, uri: "spotify:track:gone".into(), to: 0 },
             &ctx,
         );
         assert!(app.backend.take_player_commands().is_empty());
@@ -30966,32 +30885,19 @@ mod tests {
     /// upcoming list without rewriting the user's own queue.
     #[test]
     fn removing_a_next_up_row_takes_it_out_of_the_engine_only() {
-        let mut app = arranging_app(
-            &["spotify:track:q1"],
-            &["spotify:track:c1", "spotify:track:c2"],
-        );
+        let mut app = arranging_app(&["spotify:track:q1"], &["spotify:track:c1", "spotify:track:c2"]);
         assert!(app.can_remove_from_queue(2), "Next up rows can be removed");
         let ctx = egui::Context::default();
         app.apply(
-            Action::RemoveFromQueue {
-                rows: vec![
-                    (2, "spotify:track:c2".into()),
-                    (1, "spotify:track:c1".into()),
-                ],
-            },
+            Action::RemoveFromQueue { rows: vec![(2, "spotify:track:c2".into()), (1, "spotify:track:c1".into())] },
             &ctx,
         );
         let sent = app.backend.take_player_commands();
-        assert_eq!(
-            removals(&sent),
-            [(2, "spotify:track:c2"), (1, "spotify:track:c1")]
-        );
-        assert!(
-            !sent.contains(&PlayerCommand::ClearQueue),
-            "the user's queue is not rewritten"
-        );
+        assert_eq!(removals(&sent), [(2, "spotify:track:c2"), (1, "spotify:track:c1")]);
+        assert!(!sent.contains(&PlayerCommand::ClearQueue), "the user's queue is not rewritten");
         assert_eq!(app.manual_queue, ["spotify:track:q1"]);
         assert_eq!(queue_uris(&app).1, ["spotify:track:q1"]);
         app.backend.shutdown();
     }
+
 }

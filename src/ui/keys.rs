@@ -518,8 +518,10 @@ mod tests {
 
     #[test]
     fn b_toggles_the_playing_song_in_liked_songs() {
-        let root =
-            std::env::temp_dir().join(format!("spindle-like-shortcut-test-{}", std::process::id()));
+        let root = std::env::temp_dir().join(format!(
+            "spindle-like-shortcut-test-{}",
+            std::process::id()
+        ));
         let dirs = AppDirs {
             config: root.join("config"),
             state: root.join("state"),

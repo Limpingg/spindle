@@ -973,10 +973,7 @@ fn extras(app: &mut App, ui: &mut egui::Ui, now: Option<&NowPlaying>, transport_
         let handle = if name == "volume" {
             egui::Rect::from_min_size(
                 rect.min,
-                egui::vec2(
-                    (18.0 + theme::ICON_BUTTON_PAD).min(rect.width()),
-                    rect.height(),
-                ),
+                egui::vec2((18.0 + theme::ICON_BUTTON_PAD).min(rect.width()), rect.height()),
             )
         } else {
             rect
@@ -1000,9 +997,8 @@ fn extras(app: &mut App, ui: &mut egui::Ui, now: Option<&NowPlaying>, transport_
     // (the button pressed, whether the press has moved far enough to be a
     // drag). Kept across frames: on the frame the button comes up, egui no
     // longer reports where the press began.
-    let mut dragging: Option<(&'static str, bool)> = ui
-        .ctx()
-        .data(|data| data.get_temp::<(&'static str, bool)>(drag_id));
+    let mut dragging: Option<(&'static str, bool)> =
+        ui.ctx().data(|data| data.get_temp::<(&'static str, bool)>(drag_id));
     if pressed {
         dragging = origin.and_then(|origin| {
             slots
@@ -1236,16 +1232,8 @@ mod bar_order_tests {
     #[test]
     fn the_bar_keeps_every_button_and_moves_one_where_it_is_dropped() {
         assert_eq!(bar_order(&[]), DEFAULT_ORDER);
-        let saved = vec![
-            "volume".into(),
-            "bogus".into(),
-            "lyrics".into(),
-            "volume".into(),
-        ];
-        assert_eq!(
-            bar_order(&saved),
-            ["volume", "lyrics", "friends", "queue", "devices"]
-        );
+        let saved = vec!["volume".into(), "bogus".into(), "lyrics".into(), "volume".into()];
+        assert_eq!(bar_order(&saved), ["volume", "lyrics", "friends", "queue", "devices"]);
         let mut order = bar_order(&[]);
         move_slot(&mut order, "volume", "friends");
         assert_eq!(order, ["volume", "friends", "lyrics", "queue", "devices"]);

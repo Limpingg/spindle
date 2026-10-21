@@ -1332,8 +1332,10 @@ mod tests {
 
     #[test]
     fn artwork_cache_write_failure_keeps_download_usable() {
-        let dir =
-            std::env::temp_dir().join(format!("spindle-art-write-failure-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!(
+            "spindle-art-write-failure-{}",
+            std::process::id()
+        ));
         let runtime = artwork_test_runtime();
         let loader = artwork_test_loader(&runtime, dir.clone());
         let (bytes, path) = runtime.block_on(async {
@@ -1361,7 +1363,8 @@ mod tests {
 
     #[test]
     fn rejected_artwork_responses_do_not_create_cache_files() {
-        let dir = std::env::temp_dir().join(format!("spindle-art-rejected-{}", std::process::id()));
+        let dir =
+            std::env::temp_dir().join(format!("spindle-art-rejected-{}", std::process::id()));
         let runtime = artwork_test_runtime();
         let loader = artwork_test_loader(&runtime, dir.clone());
         runtime.block_on(async {
@@ -2525,7 +2528,8 @@ mod tests {
         assert_eq!(state.workers, 0, "the worker is done");
         drop(state);
 
-        let dir = std::env::temp_dir().join(format!("spindle-asked-again-{}", std::process::id()));
+        let dir =
+            std::env::temp_dir().join(format!("spindle-asked-again-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         let loader = artwork_test_loader(&runtime, dir.clone());
         ctx.add_bytes_loader(Arc::new(loader.clone()));

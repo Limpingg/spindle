@@ -541,7 +541,9 @@ fn contents(app: &mut App, ui: &mut egui::Ui, compact: bool) {
             {
                 match track.from.as_ref() {
                     // Spindle: a Next up row dropped into Playing next.
-                    Some((origin, from)) if origin == "queue" && (*from as usize) >= queued_len => {
+                    Some((origin, from))
+                        if origin == "queue" && (*from as usize) >= queued_len =>
+                    {
                         app.actions.push(Action::ArrangeNextUp {
                             from: *from as usize,
                             uri: track.items[0].uri().to_string(),

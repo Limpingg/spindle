@@ -692,8 +692,7 @@ mod tests {
         server.await.unwrap();
     }
 
-    const DOWN: &str =
-        "HTTP/1.1 503 Service Unavailable\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
+    const DOWN: &str = "HTTP/1.1 503 Service Unavailable\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
 
     /// Spindle: one 503 is a moment's overload, asked again a second later.
     #[tokio::test]
@@ -714,10 +713,7 @@ mod tests {
         let error = get_from::<Vec<Record>>(&http, &api, "/search", &[])
             .await
             .expect_err("still down");
-        assert!(
-            error.to_string().contains("lyrics service is down"),
-            "{error}"
-        );
+        assert!(error.to_string().contains("lyrics service is down"), "{error}");
         assert!(!error.to_string().contains("503"), "{error}");
         server.await.unwrap();
     }
