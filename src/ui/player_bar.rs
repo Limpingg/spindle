@@ -908,166 +908,275 @@ fn transport(app: &mut App, ui: &mut egui::Ui, now: Option<&NowPlaying>, region:
     );
 }
 
-fn extras(app: &mut App, ui: &mut egui::Ui, now: Option<&NowPlaying>, transport_right: f32) {
-    let palette = app.palette;
-    ui.spacing_mut().item_spacing.x = 6.0;
-    let volume = now
-        .map(|now| now.volume_percent)
-        .unwrap_or_else(|| crate::app::volume_to_percent(app.local.volume));
-    let shown = match app.volume_preview {
-        Some(fraction) => (fraction * 100.0).round() as u8,
-        None => volume,
-    };
-    // Some remote devices, such as a phone playing over Bluetooth, refuse
-    // volume changes from other apps: show their volume but don't offer to
-    // change it.
-    let adjustable = now.is_none_or(|now| now.can_set_volume);
-    let controls = ui.add_enabled_ui(adjustable, |ui| {
-        match thin_slider(
-            ui,
-            &palette,
-            egui::Id::new("volume-slider"),
-            &gettext(app.locale, "Volume (%)"),
-            shown as f32 / 100.0,
-            92.0,
-            Some(0.05),
-        ) {
-            SliderEvent::Dragging(value) => {
-                app.volume_preview = Some(value);
-                // Local volume is cheap to apply continuously; remote goes on release.
-                if now.is_none_or(|now| now.local) {
-                    app.actions
-                        .push(Action::PreviewVolume((value * 100.0).round() as u8));
-                }
-            }
-            SliderEvent::Committed(value) => {
-                app.volume_preview = None;
-                app.actions
-                    .push(Action::SetVolume((value * 100.0).round() as u8));
-            }
-            SliderEvent::None => {}
-        }
-        let volume_icon = match shown {
-            0 => Icon::VolumeX,
-            1..=33 => Icon::Volume,
-            34..=66 => Icon::Volume1,
-            _ => Icon::Volume2,
-        };
-        if theme::icon_button(
-            ui,
-            volume_icon,
-            18.0,
-            palette.secondary,
-            palette.text,
-            &if shown == 0 {
-                gettext(app.locale, "Unmute")
-            } else {
-                gettext(app.locale, "Mute")
-            },
-        )
-        .clicked()
+/// Spindle: the player bar's right-hand buttons, left to right, before
+/// Nick arranges them.
+pub const DEFAULT_ORDER: [&str; 5] = ["friends", "lyrics", "queue", "devices", "volume"];
+
+/// Spindle: a right-hand button being dragged to a new place, by name.
+#[derive(Clone, Debug)]
+struct BarSlot(&'static str);
+
+/// The arranged order, left to right: the saved names that are known, then
+/// any known name the saved list lacks.
+pub fn bar_order(saved: &[String]) -> Vec<&'static str> {
+    let mut order: Vec<&'static str> = Vec::new();
+    for name in saved {
+        if let Some(known) = DEFAULT_ORDER.iter().find(|known| **known == name.as_str())
+            && !order.contains(known)
         {
-            app.actions.push(Action::ToggleMute);
+            order.push(known);
         }
-    });
-    if !adjustable {
-        ui.interact(
-            controls.response.rect,
-            egui::Id::new("volume-fixed"),
-            egui::Sense::hover(),
-        )
-        .on_hover_text(gettext(
-            app.locale,
-            "This device's volume can't be changed from Spindle",
-        ));
     }
-    ui.add_space(4.0);
-    let remote = now.is_some_and(|now| !now.local);
-    // Playing elsewhere, the button shows that device's own icon.
-    let icon = now
-        .filter(|now| !now.local)
-        .and_then(|now| now.device_kind.as_deref())
-        .map_or(Icon::Speaker, super::devices::device_icon);
-    let devices = theme::icon_button(
-        ui,
-        icon,
-        18.0,
-        if remote {
-            palette.accent
-        } else {
-            palette.secondary
-        },
-        palette.text,
-        &gettext(app.locale, "Connect to a device"),
-    );
-    ui.ctx().data_mut(|data| {
-        data.insert_temp(egui::Id::new(super::devices::BUTTON_RECT_ID), devices.rect)
-    });
-    if devices.clicked() {
-        app.actions.push(Action::ToggleDevicesPopup);
+    for known in DEFAULT_ORDER {
+        if !order.contains(&known) {
+            order.push(known);
+        }
     }
-    let queue_open = app.show_queue_panel || matches!(app.page(), Page::Queue);
-    let queue_button = theme::icon_button(
-        ui,
-        Icon::ListVideo,
-        18.0,
-        if queue_open {
-            palette.accent
-        } else {
-            palette.secondary
-        },
-        palette.text,
-        &gettext(app.locale, "Queue"),
-    );
-    if queue_button.clicked() {
-        app.actions.push(Action::ToggleQueuePanel);
+    order
+}
+
+/// Moves `dragged` to where `target` is, shifting the rest.
+pub fn move_slot(order: &mut Vec<&'static str>, dragged: &str, target: &str) {
+    let (Some(from), Some(to)) = (
+        order.iter().position(|name| *name == dragged),
+        order.iter().position(|name| *name == target),
+    ) else {
+        return;
+    };
+    if from != to {
+        let item = order.remove(from);
+        order.insert(to, item);
     }
-    // A dragged song dropped on the queue button queues it, same as the
-    // "Add to queue" menu item.
-    if let Some(track) = queue_button.dnd_release_payload::<DragTrack>() {
-        app.actions.push(Action::QueueMany {
-            songs: track
-                .items
-                .iter()
-                .map(|item| (item.uri().to_string(), item.name().to_string()))
-                .collect(),
+}
+
+fn extras(app: &mut App, ui: &mut egui::Ui, now: Option<&NowPlaying>, transport_right: f32) {
+    ui.spacing_mut().item_spacing.x = 6.0;
+    let order = bar_order(&app.settings.player_bar_order);
+    let mut moved: Option<(&'static str, &'static str)> = None;
+    // The layout runs right to left, so the rightmost button goes first.
+    for name in order.iter().rev().copied() {
+        // Listening activity is the first to go in a narrow window, so it
+        // never crowds the transport.
+        if name == "friends" {
+            let left = ui.min_rect().left()
+                - ui.spacing().item_spacing.x
+                - (18.0 + theme::ICON_BUTTON_PAD);
+            if left - transport_right < TRANSPORT_GAP {
+                continue;
+            }
+        }
+        let id = egui::Id::new(("player-bar-slot", name));
+        let slot = ui.dnd_drag_source(id, BarSlot(name), |ui| {
+            ui.spacing_mut().item_spacing.x = 6.0;
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                bar_button(app, ui, now, name);
+            });
         });
+        if let Some(dragged) = slot.response.dnd_release_payload::<BarSlot>() {
+            moved = Some((dragged.0, name));
+        }
+        if slot.response.dnd_hover_payload::<BarSlot>().is_some() {
+            ui.painter().rect_stroke(
+                slot.response.rect.expand(2.0),
+                6.0,
+                egui::Stroke::new(1.0, app.palette.accent),
+                egui::StrokeKind::Outside,
+            );
+        }
     }
-    if theme::icon_button(
-        ui,
-        Icon::Mic,
-        18.0,
-        if app.show_lyrics_panel {
-            palette.accent
-        } else {
-            palette.secondary
-        },
-        palette.text,
-        &gettext(app.locale, "Lyrics"),
-    )
-    .clicked()
-    {
-        app.actions.push(Action::ToggleLyricsPanel);
+    if let Some((dragged, target)) = moved {
+        let mut order = order;
+        move_slot(&mut order, dragged, target);
+        app.settings.player_bar_order = order.iter().map(|name| name.to_string()).collect();
+        app.mark_settings_dirty();
     }
-    // The Listening activity button is the first to go in a narrow window,
-    // so it never crowds the transport.
-    let left = ui.min_rect().left() - ui.spacing().item_spacing.x - (18.0 + theme::ICON_BUTTON_PAD);
-    if left - transport_right >= TRANSPORT_GAP
-        && theme::icon_button(
-            ui,
-            Icon::Users,
-            18.0,
-            if app.show_friends_panel {
-                palette.accent
-            } else {
-                palette.secondary
-            },
-            palette.text,
-            &gettext(app.locale, "Listening activity"),
-        )
-        .clicked()
-    {
-        app.actions.push(Action::ToggleFriendsPanel);
+}
+
+/// One of the player bar's right-hand buttons, by name.
+fn bar_button(app: &mut App, ui: &mut egui::Ui, now: Option<&NowPlaying>, name: &str) {
+    let palette = app.palette;
+    match name {
+        "volume" => {
+            let volume = now
+                .map(|now| now.volume_percent)
+                .unwrap_or_else(|| crate::app::volume_to_percent(app.local.volume));
+            let shown = match app.volume_preview {
+                Some(fraction) => (fraction * 100.0).round() as u8,
+                None => volume,
+            };
+            // Some remote devices, such as a phone playing over Bluetooth, refuse
+            // volume changes from other apps: show their volume but don't offer to
+            // change it.
+            let adjustable = now.is_none_or(|now| now.can_set_volume);
+            let controls = ui.add_enabled_ui(adjustable, |ui| {
+                match thin_slider(
+                    ui,
+                    &palette,
+                    egui::Id::new("volume-slider"),
+                    &gettext(app.locale, "Volume (%)"),
+                    shown as f32 / 100.0,
+                    92.0,
+                    Some(0.05),
+                ) {
+                    SliderEvent::Dragging(value) => {
+                        app.volume_preview = Some(value);
+                        // Local volume is cheap to apply continuously; remote goes on release.
+                        if now.is_none_or(|now| now.local) {
+                            app.actions
+                                .push(Action::PreviewVolume((value * 100.0).round() as u8));
+                        }
+                    }
+                    SliderEvent::Committed(value) => {
+                        app.volume_preview = None;
+                        app.actions
+                            .push(Action::SetVolume((value * 100.0).round() as u8));
+                    }
+                    SliderEvent::None => {}
+                }
+                let volume_icon = match shown {
+                    0 => Icon::VolumeX,
+                    1..=33 => Icon::Volume,
+                    34..=66 => Icon::Volume1,
+                    _ => Icon::Volume2,
+                };
+                if theme::icon_button(
+                    ui,
+                    volume_icon,
+                    18.0,
+                    palette.secondary,
+                    palette.text,
+                    &if shown == 0 {
+                        gettext(app.locale, "Unmute")
+                    } else {
+                        gettext(app.locale, "Mute")
+                    },
+                )
+                .clicked()
+                {
+                    app.actions.push(Action::ToggleMute);
+                }
+            });
+            if !adjustable {
+                ui.interact(
+                    controls.response.rect,
+                    egui::Id::new("volume-fixed"),
+                    egui::Sense::hover(),
+                )
+                .on_hover_text(gettext(
+                    app.locale,
+                    "This device's volume can't be changed from Spindle",
+                ));
+            }
+        }
+        "devices" => {
+            let remote = now.is_some_and(|now| !now.local);
+            // Playing elsewhere, the button shows that device's own icon.
+            let icon = now
+                .filter(|now| !now.local)
+                .and_then(|now| now.device_kind.as_deref())
+                .map_or(Icon::Speaker, super::devices::device_icon);
+            let devices = theme::icon_button(
+                ui,
+                icon,
+                18.0,
+                if remote {
+                    palette.accent
+                } else {
+                    palette.secondary
+                },
+                palette.text,
+                &gettext(app.locale, "Connect to a device"),
+            );
+            ui.ctx().data_mut(|data| {
+                data.insert_temp(egui::Id::new(super::devices::BUTTON_RECT_ID), devices.rect)
+            });
+            if devices.clicked() {
+                app.actions.push(Action::ToggleDevicesPopup);
+            }
+        }
+        "queue" => {
+            let queue_open = app.show_queue_panel || matches!(app.page(), Page::Queue);
+            let queue_button = theme::icon_button(
+                ui,
+                Icon::ListVideo,
+                18.0,
+                if queue_open {
+                    palette.accent
+                } else {
+                    palette.secondary
+                },
+                palette.text,
+                &gettext(app.locale, "Queue"),
+            );
+            if queue_button.clicked() {
+                app.actions.push(Action::ToggleQueuePanel);
+            }
+            // A dragged song dropped on the queue button queues it, same as the
+            // "Add to queue" menu item.
+            if let Some(track) = queue_button.dnd_release_payload::<DragTrack>() {
+                app.actions.push(Action::QueueMany {
+                    songs: track
+                        .items
+                        .iter()
+                        .map(|item| (item.uri().to_string(), item.name().to_string()))
+                        .collect(),
+                });
+            }
+        }
+        "lyrics" => {
+            if theme::icon_button(
+                ui,
+                Icon::Mic,
+                18.0,
+                if app.show_lyrics_panel {
+                    palette.accent
+                } else {
+                    palette.secondary
+                },
+                palette.text,
+                &gettext(app.locale, "Lyrics"),
+            )
+            .clicked()
+            {
+                app.actions.push(Action::ToggleLyricsPanel);
+            }
+        }
+        "friends" => {
+            if theme::icon_button(
+                ui,
+                Icon::Users,
+                18.0,
+                if app.show_friends_panel {
+                    palette.accent
+                } else {
+                    palette.secondary
+                },
+                palette.text,
+                &gettext(app.locale, "Listening activity"),
+            )
+            .clicked()
+            {
+                app.actions.push(Action::ToggleFriendsPanel);
+            }
+        }
+        _ => {}
+    }
+}
+
+#[cfg(test)]
+mod bar_order_tests {
+    use super::*;
+
+    #[test]
+    fn the_bar_keeps_every_button_and_moves_one_where_it_is_dropped() {
+        assert_eq!(bar_order(&[]), DEFAULT_ORDER);
+        let saved = vec!["volume".into(), "bogus".into(), "lyrics".into(), "volume".into()];
+        assert_eq!(bar_order(&saved), ["volume", "lyrics", "friends", "queue", "devices"]);
+        let mut order = bar_order(&[]);
+        move_slot(&mut order, "volume", "friends");
+        assert_eq!(order, ["volume", "friends", "lyrics", "queue", "devices"]);
+        move_slot(&mut order, "friends", "devices");
+        assert_eq!(order, ["volume", "lyrics", "queue", "devices", "friends"]);
     }
 }
 

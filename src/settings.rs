@@ -342,7 +342,8 @@ pub struct Settings {
     /// macOS: keep Spindle in the Dock and Cmd-Tab. Off makes it a
     /// menu-bar app, whose menu-bar icon is the way back (#837).
     pub mac_show_in_dock: bool,
-    /// Ask GitHub once a day whether a newer release exists.
+    /// Ask GitHub at launch whether a newer release exists (Spindle: not
+    /// again while the app stays open; the button still checks).
     pub check_for_updates: bool,
     pub download_updates_automatically: bool,
     /// Context URIs and the local Liked Songs key, in pin order.
@@ -352,6 +353,11 @@ pub struct Settings {
     /// The sidebar's own playlist order, set by dragging rows. Kept while
     /// another sort is selected; empty means no saved local arrangement.
     pub sidebar_order: Vec<String>,
+    /// Spindle: the player bar's right-hand buttons, left to right, as
+    /// arranged by dragging them: "friends", "lyrics", "queue", "devices",
+    /// "volume". Unknown names are ignored and missing ones keep their
+    /// place at the end, so an older or edited list still shows them all.
+    pub player_bar_order: Vec<String>,
     /// Explicit order per Library shelf. Missing shelves keep their previous
     /// behaviour; selecting another order never deletes the local arrangement.
     pub library_sort: std::collections::BTreeMap<LibraryShelf, LibrarySort>,
@@ -510,6 +516,10 @@ impl Default for Settings {
             liked_songs_pinned: true,
             sidebar_order: Vec::new(),
             library_sort: std::collections::BTreeMap::new(),
+            player_bar_order: crate::ui::player_bar::DEFAULT_ORDER
+                .iter()
+                .map(|name| name.to_string())
+                .collect(),
             library_by_you: false,
             zoom: 1.0,
             winamp_window: false,

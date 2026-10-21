@@ -90,6 +90,9 @@ pub enum Operation {
     PlaylistLibrary,
     PlaylistCreation,
     PlaylistSearch,
+    /// Spindle: the Made for you fallback's playlist searches, which look
+    /// for Spotify's own mixes and so never leave the shared app.
+    MadeForYouSearch,
     CatalogSearch,
     Catalog,
     ArtistTopTracks,
@@ -125,6 +128,7 @@ fn plan(operation: Operation, personal_ready: bool) -> ApiSource {
         CanonicalAccount
         | PlaylistLibrary
         | PlaylistSearch
+        | MadeForYouSearch
         | ArtistTopTracks
         | UnsupportedDevelopmentMode => ApiSource::Shared,
         PlaylistMetadata(PlaylistAccess::External | PlaylistAccess::Unknown)
@@ -365,6 +369,20 @@ impl ApiGateway {
             };
             let _ = tokio::time::timeout(PERSONAL_VERDICT_WAIT, settled).await;
             source = plan(operation, self.personal_ready());
+        }
+        // Spindle: the shared app is Spotifast's, split among all its users,
+        // and on Nick's Mac it sat out rate limits for minutes while search
+        // showed nothing. While it waits, the playlist half of a search goes
+        // to the personal app: the account's and other people's playlists,
+        // without Spotify's own, which search could not find anyway when it
+        // never answered.
+        if operation == Operation::PlaylistSearch
+            && source == ApiSource::Shared
+            && self.personal_ready()
+            && !self.shared_available().await
+        {
+            log::info!("playlist search on the personal app while the shared app waits");
+            source = ApiSource::Personal;
         }
         let session = self.session(source);
         let mut state = session.state.subscribe();
@@ -652,6 +670,7 @@ mod tests {
             Operation::CanonicalAccount,
             Operation::PlaylistLibrary,
             Operation::PlaylistSearch,
+            Operation::MadeForYouSearch,
             Operation::UnsupportedDevelopmentMode,
             Operation::PlaylistMetadata(PlaylistAccess::External),
             Operation::PlaylistMetadata(PlaylistAccess::Unknown),

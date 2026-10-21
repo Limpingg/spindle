@@ -72,22 +72,8 @@ pub fn handle(app: &mut App, ctx: &egui::Context) {
             key(Modifiers::COMMAND, Key::H, Action::Open(Page::Home));
         }
         key(Modifiers::COMMAND, Key::L, Action::Open(Page::LikedSongs));
-        // Cmd+M minimises on macOS.
-        if cfg!(target_os = "macos") {
-            key(
-                Modifiers::COMMAND | Modifiers::SHIFT,
-                Key::M,
-                Action::ToggleWinampWindow,
-            );
-        } else {
-            key(Modifiers::COMMAND, Key::M, Action::ToggleWinampWindow);
-        }
-        // Winamp's key for starting and stopping the visualisation plug-in.
-        key(
-            Modifiers::COMMAND | Modifiers::SHIFT,
-            Key::K,
-            Action::ToggleWinampMilkdrop,
-        );
+        // Spindle: no keys for the Winamp mini player or the MilkDrop
+        // visualiser; Nick plays only in the main window.
         key(
             Modifiers::COMMAND,
             Key::Slash,
