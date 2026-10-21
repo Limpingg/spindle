@@ -38,7 +38,7 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git fetch origin spotifast-renamed:spotifast-renamed
           git remote add upstream https://github.com/crmne/spotifast.git
-          git fetch --tags upstream
+          git fetch --no-tags upstream '+refs/tags/v*:refs/tags/spotifast/v*' 
       - name: Merge the release
         id: merge
         env:
@@ -51,10 +51,11 @@ jobs:
           set -e
           echo "$output"
           echo "status=$status" >> "$GITHUB_OUTPUT"
+          delimiter="spindle-$(date +%s%N)"
           {
-            echo "output<<EOF"
+            echo "output<<$delimiter"
             echo "$output"
-            echo "EOF"
+            echo "$delimiter"
           } >> "$GITHUB_OUTPUT"
           if [ "$status" = "0" ] && [ "$(git rev-parse HEAD)" != "$before" ]; then
             echo "merged=true" >> "$GITHUB_OUTPUT"
@@ -75,7 +76,7 @@ jobs:
         run: |
           pip install ziglang
           cargo install cargo-zigbuild --locked
-          cargo zigbuild --release --no-default-features --target x86_64-pc-windows-gnu
+          cargo zigbuild --locked --release --no-default-features --target x86_64-pc-windows-gnu
       - name: Push and release
         if: steps.merge.outputs.merged == 'true'
         env:

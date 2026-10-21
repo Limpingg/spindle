@@ -225,7 +225,30 @@ pub fn app_icon_rgba(size: usize) -> Vec<u8> {
     if master.width() == side {
         return master.as_raw().clone();
     }
-    image::imageops::resize(master, side, side, image::imageops::FilterType::Lanczos3).into_raw()
+    // Resize premultiplied, or the clear pixels (black with no alpha)
+    // around the ball darken its rim at tray sizes; then divide back.
+    let mut premultiplied = master.clone();
+    for pixel in premultiplied.pixels_mut() {
+        let alpha = u32::from(pixel[3]);
+        for channel in &mut pixel.0[..3] {
+            *channel = ((u32::from(*channel) * alpha + 127) / 255) as u8;
+        }
+    }
+    let mut resized = image::imageops::resize(
+        &premultiplied,
+        side,
+        side,
+        image::imageops::FilterType::Lanczos3,
+    );
+    for pixel in resized.pixels_mut() {
+        let alpha = u32::from(pixel[3]);
+        if alpha > 0 {
+            for channel in &mut pixel.0[..3] {
+                *channel = ((u32::from(*channel) * 255 + alpha / 2) / alpha).min(255) as u8;
+            }
+        }
+    }
+    resized.into_raw()
 }
 
 pub fn greeting(locale: Locale) -> Cow<'static, str> {

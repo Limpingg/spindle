@@ -23,18 +23,41 @@ use std::thread;
 use eframe::egui::{self, Color32, CornerRadius, Margin, RichText, Vec2};
 
 const APP_NAME: &str = "Spindle";
-const VERSION: &str = env!("CARGO_PKG_VERSION");
+/// The app's version, read by build.rs from the repository's Cargo.toml, so
+/// the setup program, Apps & features and spindle.exe always agree.
+const VERSION: &str = env!("SPINDLE_VERSION");
 /// spindle.exe, deflated by build.rs.
 const PAYLOAD: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/spindle.exe.deflate"));
+/// Windows hides console windows of child processes started with this flag.
+#[cfg(windows)]
+const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 
 /// The exe, inflated.
 fn payload() -> Result<Vec<u8>, String> {
     use std::io::Read;
+    if PAYLOAD.is_empty() {
+        return Err("This setup program was built without spindle.exe inside it.".into());
+    }
     let mut bytes = Vec::with_capacity(PAYLOAD.len() * 3);
     flate2::read::DeflateDecoder::new(PAYLOAD)
         .read_to_end(&mut bytes)
         .map_err(|error| format!("The embedded spindle.exe is damaged: {error}"))?;
+    if !bytes.starts_with(b"MZ") {
+        return Err("The embedded spindle.exe is not a Windows program.".into());
+    }
     Ok(bytes)
+}
+
+/// A child process that opens no console window.
+fn quiet(program: &str) -> std::process::Command {
+    #[allow(unused_mut)]
+    let mut command = std::process::Command::new(program);
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        command.creation_flags(CREATE_NO_WINDOW);
+    }
+    command
 }
 const README: &str = include_str!("../../README.md");
 const LICENSE: &str = include_str!("../../LICENSE");
@@ -56,7 +79,7 @@ fn silent_flags() -> Option<Silent> {
     let arguments: Vec<String> = std::env::args().skip(1).collect();
     let silent = arguments
         .iter()
-        .any(|argument| matches!(argument.to_ascii_uppercase().as_str(), "/VERYSILENT" | "/SILENT" | "--silent"));
+        .any(|argument| matches!(argument.to_ascii_uppercase().as_str(), "/VERYSILENT" | "/SILENT" | "--SILENT"));
     if !silent {
         return None;
     }
@@ -78,10 +101,19 @@ fn silent_flags() -> Option<Silent> {
     })
 }
 
+/// Whether this process is the uninstall.exe copy: run from Apps &
+/// features it gets `--uninstall`, but a double click gives no arguments.
+fn running_as_uninstaller() -> bool {
+    std::env::current_exe().is_ok_and(|own| {
+        own.file_name()
+            .is_some_and(|name| name.eq_ignore_ascii_case("uninstall.exe"))
+    })
+}
+
 fn main() -> eframe::Result<()> {
     if let Some(silent) = silent_flags() {
         let lines = std::cell::RefCell::new(Vec::new());
-        let result = install_into(silent.directory.clone(), false, &|message: &str| {
+        let result = install_into(silent.directory.clone(), false, true, &|message: &str| {
             lines.borrow_mut().push(message.to_owned());
         });
         if let Some(log) = &silent.log {
@@ -95,7 +127,8 @@ fn main() -> eframe::Result<()> {
         }
         std::process::exit(if result.is_ok() { 0 } else { 1 });
     }
-    let uninstall = std::env::args().any(|argument| argument == "--uninstall");
+    let uninstall =
+        std::env::args().any(|argument| argument == "--uninstall") || running_as_uninstaller();
     let icon = image::load_from_memory(WINDOW_ICON)
         .map(|image| {
             let rgba = image.to_rgba8();
@@ -140,7 +173,14 @@ struct Places {
 }
 
 impl Places {
+    /// The folder this uninstaller lives in, else the per user default.
     fn discover() -> Result<Self, String> {
+        if running_as_uninstaller()
+            && let Ok(own) = std::env::current_exe()
+            && let Some(directory) = own.parent()
+        {
+            return Ok(Self::in_directory(directory.to_path_buf()));
+        }
         let local = std::env::var_os("LOCALAPPDATA")
             .map(PathBuf::from)
             .filter(|path| path.is_dir())
@@ -401,12 +441,14 @@ impl Setup {
                 }
                 ui.add_space(14.0);
                 if ui.button(RichText::new("Finish").size(15.0)).clicked() {
-                    if !self.uninstall && self.launch {
-                        if let Ok(places) = Places::discover() {
-                            let _ = std::process::Command::new(&places.exe)
-                                .current_dir(&places.install_dir)
-                                .spawn();
-                        }
+                    if self.uninstall {
+                        delete_self_after_exit();
+                    } else if self.launch
+                        && let Ok(places) = Places::discover()
+                    {
+                        let _ = std::process::Command::new(&places.exe)
+                            .current_dir(&places.install_dir)
+                            .spawn();
                     }
                     ctx.send_viewport_cmd(egui::ViewportCommand::Close);
                 }
@@ -436,14 +478,18 @@ impl Setup {
 
 /// Installs everything, reporting each step.
 fn install(desktop_shortcut: bool, report: &dyn Fn(&str)) -> Result<(), String> {
-    install_into(None, desktop_shortcut, report)
+    install_into(None, desktop_shortcut, false, report)
 }
 
 /// Installs into `directory`, or the per user Programs folder. An update
-/// keeps the shortcuts it finds: `keep_shortcuts` adds none on the desktop.
+/// keeps the shortcuts it finds and adds none on the desktop. A silent
+/// update (`lenient`) succeeds once spindle.exe is in place: a shortcut or
+/// registry step that fails is logged, not a reason for the updater to put
+/// the old version back.
 fn install_into(
     directory: Option<PathBuf>,
     desktop_shortcut: bool,
+    lenient: bool,
     report: &dyn Fn(&str),
 ) -> Result<(), String> {
     let places = match directory {
@@ -461,7 +507,9 @@ fn install_into(
     report("Copying the uninstaller");
     let own = std::env::current_exe().map_err(|error| format!("Couldn't find this program: {error}"))?;
     let own_bytes = std::fs::read(&own).map_err(|error| format!("Couldn't read {}: {error}", own.display()))?;
-    write_replacing(&places.uninstaller, &own_bytes)?;
+    if own.canonicalize().ok() != places.uninstaller.canonicalize().ok() {
+        write_replacing(&places.uninstaller, &own_bytes)?;
+    }
     write_replacing(&places.install_dir.join("README.md"), README.as_bytes())?;
     write_replacing(&places.install_dir.join("LICENSE"), LICENSE.as_bytes())?;
     // Tells Spindle's updater this copy was installed by the setup program,
@@ -471,9 +519,19 @@ fn install_into(
         b"spindle-installer-v1\n",
     )?;
     report("Creating shortcuts");
-    shortcuts(&places, desktop_shortcut)?;
+    let tolerate = |step: &str, result: Result<(), String>| -> Result<(), String> {
+        match result {
+            Ok(()) => Ok(()),
+            Err(error) if lenient => {
+                report(&format!("{step} failed, continuing: {error}"));
+                Ok(())
+            }
+            Err(error) => Err(error),
+        }
+    };
+    tolerate("Shortcuts", shortcuts(&places, desktop_shortcut))?;
     report("Registering with Windows");
-    register(&places, exe_bytes.len() + own_bytes.len())?;
+    tolerate("Registration", register(&places, exe_bytes.len() + own_bytes.len()))?;
     report("Done");
     Ok(())
 }
@@ -496,18 +554,54 @@ fn remove(report: &dyn Fn(&str)) -> Result<(), String> {
                 .map_err(|error| format!("Couldn't delete {}: {error}", path.display()))?;
         }
     }
-    // The running uninstaller cannot delete itself: cmd waits for it to
-    // exit, then deletes the file and the folder (if empty by then).
-    let script = format!(
-        "ping -n 3 127.0.0.1 >nul & del /q \"{}\" & rmdir \"{}\"",
-        places.uninstaller.display(),
-        places.install_dir.display()
-    );
-    let _ = std::process::Command::new("cmd")
-        .args(["/c", &script])
-        .spawn();
+    // The updater's staging folders (.spindle-update-<hex>, holding the
+    // previous exe and the downloaded setup program) and any .tmp left by
+    // an interrupted write go too, or the folder could never be removed.
+    if let Ok(entries) = std::fs::read_dir(&places.install_dir) {
+        for entry in entries.flatten() {
+            let name = entry.file_name().to_string_lossy().into_owned();
+            let path = entry.path();
+            if path.is_dir() && name.starts_with(".spindle-update-") {
+                let _ = std::fs::remove_dir_all(&path);
+            } else if path.is_file() && name.ends_with(".tmp") {
+                let _ = std::fs::remove_file(&path);
+            }
+        }
+    }
+    // The running uninstaller cannot delete itself: `delete_self_after_exit`
+    // does that once the window closes.
     report("Done");
     Ok(())
+}
+
+/// Starts a batch file that waits for this process to exit, deletes
+/// uninstall.exe, removes the folder and deletes itself. It runs from the
+/// temp folder, so it does not hold the install folder open, and a batch
+/// file (not `cmd /c`) is what allows the retry loop. `ping` is the sleep:
+/// `timeout` refuses to run without a console.
+fn delete_self_after_exit() {
+    let Ok(places) = Places::discover() else {
+        return;
+    };
+    let uninstaller = places.uninstaller.display().to_string();
+    let directory = places.install_dir.display().to_string();
+    let script = format!(
+        "@echo off\r\n\
+         :wait\r\n\
+         del /q \"{uninstaller}\" >nul 2>&1\r\n\
+         if exist \"{uninstaller}\" (ping -n 2 127.0.0.1 >nul & goto wait)\r\n\
+         rmdir \"{directory}\" >nul 2>&1\r\n\
+         del \"%~f0\"\r\n"
+    );
+    let batch = std::env::temp_dir().join("spindle-remove.cmd");
+    if std::fs::write(&batch, script).is_err() {
+        return;
+    }
+    let _ = quiet("cmd")
+        .arg("/c")
+        .arg(&batch)
+        .current_dir(std::env::temp_dir())
+        .spawn();
 }
 
 /// Writes a file, replacing one that is there, through a temporary file
@@ -527,7 +621,7 @@ fn write_replacing(path: &Path, bytes: &[u8]) -> Result<(), String> {
 /// Asks a running Spindle to close, then makes sure it is gone before the
 /// exe is replaced. taskkill is part of every Windows install.
 fn close_running_app() {
-    let _ = std::process::Command::new("taskkill")
+    let _ = quiet("taskkill")
         .args(["/IM", "spindle.exe", "/F"])
         .output();
     std::thread::sleep(std::time::Duration::from_millis(600));
@@ -535,7 +629,7 @@ fn close_running_app() {
 
 /// Runs a PowerShell script without a console window.
 fn powershell(script: &str) -> Result<(), String> {
-    let output = std::process::Command::new("powershell")
+    let output = quiet("powershell")
         .args([
             "-NoProfile",
             "-NonInteractive",

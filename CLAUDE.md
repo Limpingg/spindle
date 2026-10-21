@@ -16,7 +16,11 @@ then merged into main. Both sides carry identical renames, so merges
 conflict only where Spindle's own changes meet Spotifast's.
 
 - `scripts/sync-spotifast.sh [vX.Y.Z]` does one release. Exit 2 means
-  conflicts are left in the tree to resolve and commit.
+  conflicts are left in the tree to resolve and commit (or Cargo.lock on
+  main differs from Spotifast's beyond the version line, which the script
+  refuses to resolve blindly). Spotifast's tags are fetched under
+  refs/tags/spotifast/ so they never mix or collide with Spindle's own v*
+  tags (Spindle's v0.15.1 versus Spotifast's v0.15.1).
 - `.github/workflows/spindle-sync-spotifast.yml` runs it daily, pushes a
   clean merge, and dispatches the Release workflow; conflicts become an
   issue titled "Spotifast merge needs a hand" for a person to run the
@@ -150,7 +154,17 @@ Needs the PipeWire and ALSA headers only to run the test suite on Linux:
   shared app answers at once and the remembered account
   (verified_user_<source>.json in the data folder) signs in instantly; the
   PC log showed the old path waiting 32 s inside the client's own retries
-  before the remembered account was even consulted.
+  before the remembered account was even consulted. The remembered file is
+  keyed on the client id only (PKCE rotates the refresh token on every
+  refresh, so a key with it matched only after short runs) and deleted on
+  sign out and when a grant is forgotten.
+- Reads the personal app serves wait up to 5 s for its sign-in verdict
+  (`ApiGateway::client_for`) instead of going to the throttled shared app
+  when the shared app signed in first from the remembered account.
+- The setup program takes its version from the root Cargo.toml (build.rs
+  sets SPINDLE_VERSION); installer/Cargo.toml's own version is 0.0.0 and
+  never bumped. Uninstall deletes the updater's .spindle-update-* staging
+  folders and removes itself through a batch file in the temp folder.
 - Friends: polled every 15 s with the panel open and every 45 s with it
   closed while the session is up, refreshed the moment the session comes
   up or back. A read the session's end cut short now answers with a

@@ -2771,7 +2771,9 @@ impl App {
                     self.load_hidden_songs();
                     // Spindle: the friends feed needs the session; read it
                     // as soon as there is one, and again after a reconnect.
-                    // A read the old session cut short is over.
+                    // A read the old session cut short is over, and its
+                    // answer, should it still come, belongs to the past.
+                    self.friends_generation += 1;
                     self.friends_in_flight = false;
                     self.friends_fetched_at = None;
                     self.refresh_friends();
@@ -2783,6 +2785,7 @@ impl App {
                 self.local_device_id = None;
             }
             LocalPlayback::Failed(message) => {
+                crate::timeline::play_cancelled();
                 self.local_ready = false;
                 if self.queued_play.take().is_some() {
                     self.clear_play_pending();

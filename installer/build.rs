@@ -5,8 +5,26 @@
 use std::path::PathBuf;
 use std::process::Command;
 
+/// The app's version from the repository's Cargo.toml: the setup program
+/// shows and registers it, so the two can never drift apart (the Spotifast
+/// sync bumps only that file).
+fn app_version() -> String {
+    println!("cargo:rerun-if-changed=../Cargo.toml");
+    let manifest = std::fs::read_to_string("../Cargo.toml").expect("../Cargo.toml");
+    manifest
+        .lines()
+        .find_map(|line| {
+            line.strip_prefix("version = \"")
+                .and_then(|rest| rest.strip_suffix('"'))
+        })
+        .expect("version in ../Cargo.toml")
+        .to_owned()
+}
+
 fn main() {
     println!("cargo:rerun-if-env-changed=SPINDLE_EXE");
+    let version = app_version();
+    println!("cargo:rustc-env=SPINDLE_VERSION={version}");
     let out = PathBuf::from(std::env::var_os("OUT_DIR").expect("OUT_DIR"));
     let exe = std::env::var("SPINDLE_EXE").unwrap_or_default();
     // The exe is embedded deflated (about a third of its size); the setup
@@ -35,7 +53,6 @@ fn main() {
         .to_string()
         .replace('\\', "/");
     println!("cargo:rerun-if-changed={icon}");
-    let version = env!("CARGO_PKG_VERSION");
     let mut numbers: Vec<&str> = version.split(['.', '-']).take(3).collect();
     while numbers.len() < 3 {
         numbers.push("0");

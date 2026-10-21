@@ -21,16 +21,20 @@ upstream_url=https://github.com/crmne/spotifast.git
 renamed_branch=spotifast-renamed
 
 git remote get-url upstream >/dev/null 2>&1 || git remote add upstream "$upstream_url"
-git fetch --quiet --tags upstream
+# Spotifast's tags live under refs/tags/spotifast/, apart from Spindle's
+# own v* tags: the two would otherwise mix (the newest "v" tag would be
+# Spindle's) and collide (Spindle's v0.15.1 against Spotifast's).
+git fetch --quiet --no-tags upstream '+refs/tags/v*:refs/tags/spotifast/v*'
 
 if [ $# -ge 1 ]; then
     tag=$1
 else
     # The newest release tag: a plain v<major>.<minor>.<patch>, no pre-release.
-    tag=$(git tag --list 'v[0-9]*' | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -1)
+    tag=$( (git for-each-ref --format='%(refname:lstrip=3)' 'refs/tags/spotifast/v*' \
+        | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' || true) | sort -V | tail -1)
 fi
 [ -n "$tag" ] || { echo "no Spotifast release tag found" >&2; exit 1; }
-upstream_commit=$(git rev-parse "$tag^{commit}")
+upstream_commit=$(git rev-parse "refs/tags/spotifast/$tag^{commit}")
 upstream_version=${tag#v}
 
 if git merge-base --is-ancestor "$upstream_commit" HEAD; then
@@ -45,10 +49,10 @@ git rev-parse --verify --quiet "$renamed_branch" >/dev/null \
 previous_renamed=$(git rev-parse "$renamed_branch")
 
 # Already renamed (a previous run that stopped at conflicts): reuse it.
-renamed_commit=$(git log --format=%H --min-parents=2 "$renamed_branch" \
+renamed_commit=$( (git log --format=%H --min-parents=2 "$renamed_branch" || true) \
     | while read -r commit; do
         if [ "$(git rev-parse "$commit^2")" = "$upstream_commit" ]; then echo "$commit"; break; fi
-      done)
+      done || true)
 if [ -z "$renamed_commit" ]; then
 # Rename the release in a scratch worktree and commit it on the renamed
 # branch, with the release as a second parent so history shows it.
@@ -64,6 +68,15 @@ renamed_commit=$(git commit-tree "$renamed_tree" -p "$previous_renamed" -p "$ups
 git branch -f "$renamed_branch" "$renamed_commit"
 git worktree remove --force "$scratch"
 trap - EXIT
+fi
+
+# Spindle's own lock changes (a dependency only main has) would be lost to
+# the "theirs" resolution below; stop for a person instead.
+lock_changes=$( (git diff "$previous_renamed" HEAD -- Cargo.lock | grep -E '^[-+][^-+]' || true) \
+    | grep -vcE '^[-+]version = "' || true)
+if [ "${lock_changes:-0}" != "0" ]; then
+    echo "Cargo.lock differs from Spotifast's beyond Spindle's version: merge $tag by hand" >&2
+    exit 2
 fi
 
 # Merge it. The version lines always conflict: Spindle's follows the rule.

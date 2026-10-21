@@ -2973,7 +2973,7 @@ impl Worker {
                     Err(error) if error.status().is_some_and(|status| status < 500) => break error,
                     Err(error) => {
                         if let Some(user) = remembered_verified_user(&remembered_path, &remembered_key).await {
-                            log::info!("Spotify sign-in verification throttled ({error}); using the remembered account");
+                            log::info!("Spotify sign-in check did not answer ({error}); using the remembered account");
                             let _ = commands.send(Command::WebVerified {
                                 source,
                                 token: Box::new(token),
@@ -3006,7 +3006,19 @@ impl Worker {
         });
     }
 
+    /// The accounts remembered for instant sign-in belong to the grants
+    /// that verified them; they go with the grants.
+    fn forget_remembered_users(&self) {
+        for slot in ["shared", "personal"] {
+            let _ = std::fs::remove_file(self.dirs.verified_user_file(slot));
+        }
+    }
+
     fn forget_web_grant(&mut self, source: ApiSource) {
+        let _ = std::fs::remove_file(self.dirs.verified_user_file(match source {
+            ApiSource::Shared => "shared",
+            ApiSource::Personal => "personal",
+        }));
         let slot = web_slot(source);
         if let Err(error) = self.credentials.revoke(slot) {
             self.emit(Event::Error(error.to_string()));
@@ -3262,6 +3274,7 @@ impl Worker {
         self.spotify_restore_started = true;
         self.cancel_search();
         self.signed_in = false;
+        self.forget_remembered_users();
         self.rootlist_pending = false;
         self.made_for_you = Arc::new(crate::made_for_you::MadeForYou::new(self.http.clone()));
         self.new_releases = Arc::new(crate::new_releases::NewReleases::new(self.http.clone()));
@@ -5848,6 +5861,9 @@ fn same_account(username: &str, account: Option<&AccountId>) -> bool {
 /// under a second on Nick's connection; past ten the line has dropped (the
 /// PC log shows Spotify closing it), and the Web API answers in two.
 const SESSION_READ_TIMEOUT: Duration = Duration::from_secs(10);
+/// The whole library is rootlist pages plus owner names, more than one
+/// answer: it keeps upstream's thirty seconds.
+const SESSION_LIBRARY_READ_TIMEOUT: Duration = Duration::from_secs(30);
 
 /// Whether the playlist library is read from the playback session's
 /// rootlist: when the shared app, which lists it with every field, cannot
@@ -5881,7 +5897,11 @@ async fn over_session(engine: &Engine, request: &ApiRequest) -> Option<ApiRespon
             }
         })
     };
-    let Ok(answer) = tokio::time::timeout(SESSION_READ_TIMEOUT, read).await else {
+    let budget = match session_read(request) {
+        Some(SessionRead::Library) => SESSION_LIBRARY_READ_TIMEOUT,
+        _ => SESSION_READ_TIMEOUT,
+    };
+    let Ok(answer) = tokio::time::timeout(budget, read).await else {
         log::debug!("session read timed out; asking the Web API");
         return None;
     };
@@ -9674,12 +9694,14 @@ mod tests {
 
 /// What ties a remembered verification to one grant: the app it came from
 /// and its refresh token, hashed so the file holds no secret.
+/// The remembered account is keyed on the app it was verified through. Not
+/// on the refresh token: PKCE rotates it on every refresh, so a key with it
+/// matched only after a short previous run. A different account cannot
+/// inherit the file: signing out and forgetting a grant delete it.
 fn remembered_key(token: &crate::auth::StoredToken) -> String {
     use sha2::{Digest, Sha256};
     let mut hasher = Sha256::new();
     hasher.update(token.client_id.as_bytes());
-    hasher.update(b"\n");
-    hasher.update(token.refresh_token.as_bytes());
     format!("{:x}", hasher.finalize())
 }
 
