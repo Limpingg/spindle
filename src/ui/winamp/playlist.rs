@@ -917,7 +917,9 @@ mod tests {
         assert!(
             matches!(
                 app.actions.as_slice(),
-                [Action::RemoveFromQueue { rows }] if *rows == [(1, queued[1].clone())]
+                // Spindle: the Next up row goes too.
+                [Action::RemoveFromQueue { rows }]
+                    if rows.len() == 2 && rows[0] == (1, queued[1].clone())
             ),
             "{:?}",
             app.actions

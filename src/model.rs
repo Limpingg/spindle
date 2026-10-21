@@ -1115,6 +1115,16 @@ pub enum Action {
         items: Vec<PlayableItem>,
         position: usize,
     },
+    /// Spindle: move a "Next up" row (the playing context's own) to slot
+    /// `to` of the queue as drawn. A slot inside Playing next moves that one
+    /// song there. A slot inside Next up moves every Next up row above it
+    /// into Playing next in the new order, since the context's own order
+    /// cannot be rewritten; what plays matches what was drawn.
+    ArrangeNextUp {
+        from: usize,
+        uri: String,
+        to: usize,
+    },
     /// Take rows out of the manually queued "Playing next" section, each
     /// named by its index in the queue and the song it holds there. Only
     /// applied while the local player is the active target; see

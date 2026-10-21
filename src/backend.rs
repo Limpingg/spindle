@@ -834,6 +834,8 @@ pub enum Command {
     },
     /// Resolve user ids to display names through the streaming session.
     UserNames(Vec<String>),
+    /// Spindle: an artist's monthly listeners, by artist id.
+    ArtistListeners(String),
     /// Read Spotify's play counts for an album's songs or an artist's
     /// popular songs, by the album's or the artist's URI.
     PlayCounts(String),
@@ -1031,6 +1033,12 @@ pub enum Event {
     FriendActivity {
         generation: u64,
         result: Result<Vec<session_reads::FriendActivity>, String>,
+    },
+    /// Spindle: an artist's monthly listeners as Spotify writes them
+    /// ("70.2M"), or `None` when the page did not say.
+    ArtistListeners {
+        id: String,
+        listeners: Option<String>,
     },
     /// A user id resolved to a display name and avatar (each `None` when
     /// nothing answers).
@@ -2592,6 +2600,7 @@ impl Worker {
                     }
                 }
                 Command::UserNames(ids) => self.fetch_user_names(ids),
+                Command::ArtistListeners(id) => self.fetch_artist_listeners(id),
                 Command::PlayCounts(uri) => self.fetch_play_counts(uri),
                 Command::FriendActivity(generation) => self.fetch_friend_activity(generation),
                 Command::LoadLikedSongsCache { generation } => {
@@ -4547,6 +4556,45 @@ impl Worker {
     /// popular songs was played. It needs the playback session and a
     /// verified Web API grant, as upcoming album pages do; without them the
     /// lists simply show no counts.
+    /// Spindle: monthly listeners come from the artist's public page on
+    /// open.spotify.com, whose description reads "Artist · 70.2M monthly
+    /// listeners." No Web API gives it, and the page needs no sign-in.
+    fn fetch_artist_listeners(&self, id: String) {
+        let events = self.events.clone();
+        let waker = self.waker.clone();
+        let http = self.http.client();
+        tokio::spawn(async move {
+            let listeners = match http {
+                Ok(http) if id.bytes().all(|byte| byte.is_ascii_alphanumeric()) => {
+                    let page = http
+                        .get(format!("https://open.spotify.com/artist/{id}"))
+                        .header(reqwest::header::USER_AGENT, "Mozilla/5.0 (Spindle)")
+                        .timeout(Duration::from_secs(10))
+                        .send()
+                        .await;
+                    match page {
+                        Ok(response) if response.status().is_success() => response
+                            .text()
+                            .await
+                            .ok()
+                            .and_then(|html| crate::util::monthly_listeners(&html)),
+                        Ok(response) => {
+                            log::debug!("artist page answered {}", response.status());
+                            None
+                        }
+                        Err(error) => {
+                            log::debug!("artist page unreachable: {error}");
+                            None
+                        }
+                    }
+                }
+                _ => None,
+            };
+            let _ = events.send(Event::ArtistListeners { id, listeners });
+            waker.wake();
+        });
+    }
+
     fn fetch_play_counts(&self, uri: String) {
         let events = self.events.clone();
         let waker = self.waker.clone();

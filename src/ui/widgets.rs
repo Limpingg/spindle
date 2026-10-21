@@ -985,8 +985,8 @@ fn item_menu_at(
             label: label.clone(),
         });
     }
-    // Only a song the user queued, and only on this computer's queue: the
-    // context's rows play themselves, and no other queue can be rewritten.
+    // Any upcoming row, on this computer's queue only: no other queue can
+    // be rewritten.
     if let (Some(RowContext::Queue), Some(index)) = (context, index)
         && app.can_remove_from_queue(index)
         && menu_item(
@@ -1530,9 +1530,8 @@ fn track_row_contents(
                     editable_playlist: Some((id, _)),
                     ..
                 } => Some((id.clone(), row.index as u32)),
-                RowContext::Queue
-                    if row.index < app.queued_rows_len() && app.queue_locally_reorderable() =>
-                {
+                // Spindle: Next up rows move too, see `Action::ArrangeNextUp`.
+                RowContext::Queue if app.queue_locally_reorderable() => {
                     Some(("queue".to_string(), row.index as u32))
                 }
                 _ => None,

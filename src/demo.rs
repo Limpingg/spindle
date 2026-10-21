@@ -8555,7 +8555,8 @@ mod tests {
         );
         let tree = accessible_frame(&ctx, &mut app, vec![]);
         accessible_node(&tree, "Add to queue", Role::Button);
-        assert!(!has_remove(&tree), "a Next up row cannot be removed");
+        // Spindle: Next up rows can be removed too.
+        assert!(has_remove(&tree), "a Next up row can be removed");
         accessible_frame(
             &ctx,
             &mut app,

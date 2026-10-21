@@ -324,6 +324,14 @@ pub fn show(app: &mut App, ui: &mut egui::Ui, id: &str) {
 fn artist_hero(app: &mut App, ui: &mut egui::Ui, artist: &Artist, preview: Option<&Artist>) {
     let locale = app.locale;
     let mut byline = Vec::new();
+    // Spindle: monthly listeners first, as Spotify shows them.
+    if let Some(listeners) = app.artist_listeners(&artist.id) {
+        byline.push((
+            // Translators: {count} is a short number such as 70.2M.
+            gettext(locale, "{count} monthly listeners").replace("{count}", &listeners),
+            None,
+        ));
+    }
     if let Some(followers) = &artist.followers {
         byline.push((
             ngettext(
