@@ -600,6 +600,118 @@ fn removal_changes(
     changes
 }
 
+/// Spindle: adds an empty folder named `name` at the top of the account's
+/// library, as Spotify's own apps do: two rootlist rows, a `start-group`
+/// marker carrying a fresh id and the name, and its `end-group`. The change
+/// is based on the rootlist's current revision and sent once, through a
+/// client that never retries, since a resent change would add a second
+/// folder.
+pub async fn create_folder(
+    session: &Session,
+    http: &reqwest::Client,
+    name: &str,
+) -> anyhow::Result<()> {
+    let bytes = session
+        .spclient()
+        .get_rootlist(0, Some(1))
+        .await
+        .map_err(|error| anyhow::anyhow!("rootlist: {error}"))?;
+    let revision = SelectedListContent::parse_from_bytes(&bytes)?
+        .revision()
+        .to_vec();
+    let username = session.username();
+    let changes = folder_changes(
+        &revision,
+        &username,
+        jiff::Timestamp::now().as_millisecond(),
+        &folder_id(),
+        name,
+    );
+    let endpoint = format!(
+        "{}/playlist/v2/user/{}/rootlist/changes",
+        session.spclient().base_url().await?,
+        username
+    );
+    let login = session.login5().auth_token().await?;
+    let client_token = session.spclient().client_token().await?;
+    let response = http
+        .post(endpoint)
+        .bearer_auth(&login.access_token)
+        .header("client-token", client_token)
+        .header(reqwest::header::CONTENT_TYPE, "application/x-protobuf")
+        .body(changes.write_to_bytes()?)
+        .send()
+        .await
+        .map_err(reqwest::Error::without_url)?;
+    anyhow::ensure!(
+        response.status() != reqwest::StatusCode::CONFLICT,
+        "Your library changed meanwhile. Try again."
+    );
+    anyhow::ensure!(
+        response.status().is_success(),
+        "Spotify did not add the folder (HTTP {}).",
+        response.status().as_u16()
+    );
+    Ok(())
+}
+
+/// A folder id as Spotify's apps make them: 16 hex digits.
+fn folder_id() -> String {
+    format!("{:016x}", rand::random::<u64>())
+}
+
+/// A folder name as the rootlist writes it: percent encoded, a space as `+`.
+fn encode_folder_name(name: &str) -> String {
+    let mut out = String::new();
+    for byte in name.bytes() {
+        match byte {
+            b' ' => out.push('+'),
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'*' => {
+                out.push(byte as char)
+            }
+            other => out.push_str(&format!("%{other:02X}")),
+        }
+    }
+    out
+}
+
+/// The change that puts a new empty folder first in the rootlist.
+fn folder_changes(
+    revision: &[u8],
+    user: &str,
+    timestamp_ms: i64,
+    id: &str,
+    name: &str,
+) -> librespot_protocol::playlist4_external::ListChanges {
+    use librespot_protocol::playlist4_external::{Add, ChangeInfo, Delta, ListChanges, Op, op};
+    let marker = |uri: String| {
+        let mut item = Item::new();
+        item.set_uri(uri);
+        item
+    };
+    let mut add = Add::new();
+    add.set_from_index(0);
+    add.set_add_first(true);
+    add.items.push(marker(format!(
+        "spotify:start-group:{id}:{}",
+        encode_folder_name(name)
+    )));
+    add.items.push(marker(format!("spotify:end-group:{id}")));
+    let mut op = Op::new();
+    op.set_kind(op::Kind::ADD);
+    op.add = protobuf::MessageField::some(add);
+    let mut info = ChangeInfo::new();
+    info.set_user(user.to_string());
+    info.set_timestamp(timestamp_ms);
+    let mut delta = Delta::new();
+    delta.ops.push(op);
+    delta.info = protobuf::MessageField::some(info);
+    let mut changes = ListChanges::new();
+    changes.set_base_revision(revision.to_vec());
+    changes.deltas.push(delta);
+    changes
+}
+
 /// A playlist's header: name, owner, cover, and snapshot.
 pub async fn playlist(session: &Session, id: &str) -> Result<Playlist, Failure> {
     let list = window(session, id, 0, 0).await?;
@@ -1025,6 +1137,25 @@ fn profile_from_json(json: &serde_json::Value) -> UserProfile {
         name: text("name"),
         image_url: text("image_url"),
     }
+}
+
+/// Spindle: a Jam this device hosts: the session's id, the link friends
+/// open to join it, and who is in it by display name.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct JamSession {
+    pub id: String,
+    pub join_url: String,
+    pub members: Vec<String>,
+}
+
+/// Spindle: starts a Jam hosted on this device (filled in below).
+pub async fn start_jam(_session: &Session, _http: &reqwest::Client) -> anyhow::Result<JamSession> {
+    anyhow::bail!("not yet")
+}
+
+/// Spindle: ends the Jam `id`.
+pub async fn end_jam(_session: &Session, _http: &reqwest::Client, _id: &str) -> anyhow::Result<()> {
+    anyhow::bail!("not yet")
 }
 
 /// What one friend is listening to, or last played, with names to show.
@@ -1994,6 +2125,30 @@ mod tests {
             removals,
             vec![(4, 1, vec!["a"], false), (0, 1, vec!["a"], false)]
         );
+    }
+
+    #[test]
+    fn a_new_folder_is_two_markers_at_the_top_that_read_back_as_the_folder() {
+        let changes = folder_changes(b"rev", "nick", 7, "0123456789abcdef", "Late Night & Co");
+        assert_eq!(changes.base_revision(), b"rev");
+        let add = changes.deltas[0].ops[0].add.as_ref().unwrap();
+        assert!(add.add_first());
+        let uris: Vec<String> = add.items.iter().map(|item| item.uri().to_string()).collect();
+        assert_eq!(
+            uris,
+            [
+                "spotify:start-group:0123456789abcdef:Late+Night+%26+Co",
+                "spotify:end-group:0123456789abcdef",
+            ]
+        );
+        assert_eq!(
+            crate::player::parse_rootlist(&uris)[0],
+            crate::player::RootlistEntry::FolderStart {
+                id: "0123456789abcdef".into(),
+                name: "Late Night & Co".into(),
+            }
+        );
+        assert_eq!(folder_id().len(), 16);
     }
 
     /// Another market's ranking must not replace the account's own or worldwide list.

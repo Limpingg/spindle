@@ -980,6 +980,13 @@ pub enum Dialog {
         public: bool,
         add_uris: Vec<String>,
     },
+    /// Spindle: names a new folder at the top of the library.
+    CreateFolder {
+        name: String,
+    },
+    /// Spindle: the Jam this device hosts, while it starts and runs. Its
+    /// state is `App::jam`.
+    Jam,
     EditPlaylist {
         cover: crate::playlist_cover::Draft,
         id: String,
@@ -1174,6 +1181,12 @@ pub enum Action {
         public: bool,
         add_uris: Vec<String>,
     },
+    /// Spindle: adds an empty folder at the top of the library.
+    CreateFolder(String),
+    /// Spindle: starts a Jam hosted on this device and shows its link.
+    StartJam,
+    /// Spindle: ends the Jam this device hosts.
+    EndJam,
     ChoosePlaylistCover(String),
     UploadPlaylistCover(String),
     UpdatePlaylist {
@@ -1495,4 +1508,15 @@ mod finite_scroll_tests {
         list.fail("offline".into());
         assert_eq!(list.window_at(150, 50), None);
     }
+}
+
+/// Spindle: the Jam this device hosts.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub enum JamState {
+    #[default]
+    Off,
+    Starting,
+    Live(crate::session_reads::JamSession),
+    Ending,
+    Failed(String),
 }

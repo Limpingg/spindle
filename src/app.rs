@@ -689,6 +689,8 @@ pub struct App {
     /// Spindle: monthly listeners by artist id; `None` while asked or when
     /// the artist page did not say.
     pub artist_listeners: HashMap<String, Option<String>>,
+    /// Spindle: the Jam this device hosts.
+    pub jam: crate::model::JamState,
     pub user_names_revision: u64,
     /// How often Spotify says each song was played, by track URI, for the
     /// albums and artists in `play_count_reads`.
@@ -1246,6 +1248,7 @@ impl App {
                 .collect(),
             user_names: HashMap::new(),
             artist_listeners: HashMap::new(),
+            jam: crate::model::JamState::Off,
             play_counts: HashMap::new(),
             play_count_reads: HashMap::new(),
             user_names_revision: 0,
@@ -2603,6 +2606,38 @@ impl App {
                 }
                 Event::ArtistListeners { id, listeners } => {
                     self.artist_listeners.insert(id, listeners);
+                }
+                Event::JamStarted(result) => {
+                    self.jam = match result {
+                        Ok(session) => crate::model::JamState::Live(session),
+                        Err(message) => crate::model::JamState::Failed(message),
+                    };
+                }
+                Event::JamEnded(result) => match result {
+                    Ok(()) => {
+                        self.jam = crate::model::JamState::Off;
+                        if matches!(self.dialog, Some(Dialog::Jam)) {
+                            self.dialog = None;
+                        }
+                        self.toast(gettext(self.locale, "Jam ended"));
+                    }
+                    Err(message) => {
+                        self.jam = crate::model::JamState::Failed(message);
+                    }
+                },
+                Event::FolderCreated { name, result } => {
+                    self.playlist_busy = false;
+                    match result {
+                        Ok(()) => {
+                            if matches!(self.dialog, Some(Dialog::CreateFolder { .. })) {
+                                self.dialog = None;
+                            }
+                            // Translators: {name} is a folder name.
+                            self.toast(gettext(self.locale, "Made the folder “{name}”").replace("{name}", &name));
+                            self.read_rootlist();
+                        }
+                        Err(message) => self.toast_error(message),
+                    }
                 }
                 Event::UserName { id, name, image } => {
                     self.set_user_name(id.clone(), name);
@@ -11171,6 +11206,25 @@ impl App {
                     public,
                     description: String::new(),
                 });
+            }
+            Action::StartJam => {
+                self.dialog = Some(Dialog::Jam);
+                // A Jam already running is shown as it is, not started again.
+                if !matches!(self.jam, crate::model::JamState::Live(_)) {
+                    self.jam = crate::model::JamState::Starting;
+                    self.backend.send(Command::StartJam);
+                }
+            }
+            Action::EndJam => {
+                if let crate::model::JamState::Live(session) = &self.jam {
+                    let id = session.id.clone();
+                    self.jam = crate::model::JamState::Ending;
+                    self.backend.send(Command::EndJam(id));
+                }
+            }
+            Action::CreateFolder(name) => {
+                self.playlist_busy = true;
+                self.backend.send(Command::CreateFolder(name));
             }
             Action::UpdatePlaylist {
                 id,

@@ -455,6 +455,7 @@ fastframe_icons::icons! {
         Eye => "eye",
         EyeOff => "eye-off",
         ExternalLink => lucide "external-link",
+        Folder => "folder",
         Gamepad => "gamepad-2",
         Globe => "globe",
         GripVertical => "grip-vertical",
