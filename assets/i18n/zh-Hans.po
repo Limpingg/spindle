@@ -1,14 +1,14 @@
-# Simplified Chinese translation of the Spotifast navigation pilot.
-# Distributed under the same MIT license as Spotifast.
+# Simplified Chinese translation of the Spindle navigation pilot.
+# Distributed under the same MIT license as Spindle.
 #
 msgid ""
 msgstr ""
-"Project-Id-Version: Spotifast\n"
+"Project-Id-Version: Spindle\n"
 "Report-Msgid-Bugs-To: https://github.com/crmne/spotifast/issues/new?"
 "template=translation.yml\n"
 "POT-Creation-Date: 2026-10-20 10:32+0200\n"
 "PO-Revision-Date: 2026-09-09 13:30+0000\n"
-"Last-Translator: Spotifast contributors\n"
+"Last-Translator: Spindle contributors\n"
 "Language-Team: Simplified Chinese\n"
 "Language: zh_CN\n"
 "MIME-Version: 1.0\n"
@@ -289,8 +289,8 @@ msgid "Mute"
 msgstr "静音"
 
 #: src/ui/player_bar.rs:981
-msgid "This device's volume can't be changed from Spotifast"
-msgstr "无法从 Spotifast 更改此设备的音量"
+msgid "This device's volume can't be changed from Spindle"
+msgstr "无法从 Spindle 更改此设备的音量"
 
 #: src/ui/player_bar.rs:1001 src/ui/devices.rs:401
 msgid "Connect to a device"
@@ -399,8 +399,8 @@ msgstr "当前处于离线状态"
 #: src/ui/collection.rs:2065 src/ui/collection.rs:2312 src/ui/home.rs:34
 #: src/ui/library.rs:262 src/ui/show.rs:69 src/ui/show.rs:115
 #: src/ui/show.rs:145
-msgid "Spotifast will reconnect automatically when your connection returns."
-msgstr "连接恢复后，Spotifast 将自动重新连接。"
+msgid "Spindle will reconnect automatically when your connection returns."
+msgstr "连接恢复后，Spindle 将自动重新连接。"
 
 #. Translators: Keep {error} unchanged. It is the original failure detail.
 #: src/ui/lyrics.rs:171 src/ui/lyrics.rs:455 src/ui/lyrics.rs:691
@@ -698,8 +698,8 @@ msgid "Restoring proxy settings"
 msgstr "正在恢复代理设置"
 
 #: src/app.rs:1478
-msgid "Couldn't change how Spotifast starts with your computer."
-msgstr "无法更改 Spotifast 随电脑启动的方式。"
+msgid "Couldn't change how Spindle starts with your computer."
+msgstr "无法更改 Spindle 随电脑启动的方式。"
 
 #. Translators: {name} is the name of a speaker or other playback device.
 #: src/app.rs:2479
@@ -718,12 +718,12 @@ msgstr "{error}原始设置文件保持不变，更改的偏好设置尚未保�
 #. Translators: {version} is a version number such as 1.4.0.
 #: src/app.rs:2662
 #, rust-format
-msgid "Spotifast {version} is available"
-msgstr "Spotifast {version} 已推出"
+msgid "Spindle {version} is available"
+msgstr "Spindle {version} 已推出"
 
 #: src/app.rs:2679
-msgid "Spotifast is up to date"
-msgstr "Spotifast 已是最新版本"
+msgid "Spindle is up to date"
+msgstr "Spindle 已是最新版本"
 
 #. Translators: {error} is an error message.
 #: src/app.rs:2687
@@ -950,8 +950,8 @@ msgid "This song's album is not on Spotify"
 msgstr "这首歌曲所属的专辑不在 Spotify 上"
 
 #: src/app.rs:8245
-msgid "Spotifast cannot open this kind of Spotify link"
-msgstr "Spotifast 无法打开这类 Spotify 链接"
+msgid "Spindle cannot open this kind of Spotify link"
+msgstr "Spindle 无法打开这类 Spotify 链接"
 
 #: src/app.rs:8493
 msgid "Nothing is playing. Pick something first"
@@ -1411,13 +1411,13 @@ msgstr "歌曲之间不插入静音。"
 
 #: src/ui/settings.rs:664
 msgid ""
-"Spotifast hides to the system tray. Quit from the tray menu or with Ctrl+Q."
-msgstr "Spotifast 会隐藏到系统托盘。可通过托盘菜单或 Ctrl+Q 退出。"
+"Spindle hides to the system tray. Quit from the tray menu or with Ctrl+Q."
+msgstr "Spindle 会隐藏到系统托盘。可通过托盘菜单或 Ctrl+Q 退出。"
 
 #: src/ui/settings.rs:668
 msgid ""
-"Spotifast hides to the system tray. Quit from the tray menu or with Cmd+Q."
-msgstr "Spotifast 会隐藏到系统托盘。可通过托盘菜单或 Cmd+Q 退出。"
+"Spindle hides to the system tray. Quit from the tray menu or with Cmd+Q."
+msgstr "Spindle 会隐藏到系统托盘。可通过托盘菜单或 Cmd+Q 退出。"
 
 #: src/ui/settings.rs:675
 msgid "Checks GitHub once a day. No personal data is sent."
@@ -1459,10 +1459,10 @@ msgstr "本地文件"
 
 #: src/ui/settings.rs:711
 msgid ""
-"When off, Spotifast lives in the menu bar and leaves Cmd+Tab. Open it from "
+"When off, Spindle lives in the menu bar and leaves Cmd+Tab. Open it from "
 "its menu-bar icon."
 msgstr ""
-"关闭后，Spotifast 只留在菜单栏，也不会出现在 Cmd+Tab 中。请从菜单栏图标打开"
+"关闭后，Spindle 只留在菜单栏，也不会出现在 Cmd+Tab 中。请从菜单栏图标打开"
 "它。"
 
 #: src/ui/settings.rs:717
@@ -1624,8 +1624,8 @@ msgstr ""
 
 #: src/ui/settings.rs:1192
 msgid ""
-"Draw Spotifast's own title bar and window buttons instead of the desktop's."
-msgstr "使用 Spotifast 自己的标题栏和窗口按钮，而不是桌面环境提供的。"
+"Draw Spindle's own title bar and window buttons instead of the desktop's."
+msgstr "使用 Spindle 自己的标题栏和窗口按钮，而不是桌面环境提供的。"
 
 #: src/ui/settings.rs:1200
 msgid ""
@@ -1813,34 +1813,34 @@ msgstr "预设"
 #: src/ui/settings.rs:1865
 #, rust-format
 msgid ""
-"None yet in {folder}. Add .milk files here. Spotifast downloads presets when "
+"None yet in {folder}. Add .milk files here. Spindle downloads presets when "
 "MilkDrop first opens with an empty folder."
 msgstr ""
 "{folder} 中还没有预设。请将 .milk 文件添加到此处。首次打开 MilkDrop 时如果文"
-"件夹为空，Spotifast 会下载预设。"
+"件夹为空，Spindle 会下载预设。"
 
 #. Translators: {folder} is the path of the MilkDrop presets folder.
 #: src/ui/settings.rs:1871
 #, rust-format
 msgid ""
-"One preset in {folder}. Add .milk files here. Spotifast downloads presets "
+"One preset in {folder}. Add .milk files here. Spindle downloads presets "
 "when MilkDrop first opens with an empty folder."
 msgstr ""
 "{folder} 中有 1 个预设。请将 .milk 文件添加到此处。首次打开 MilkDrop 时如果文"
-"件夹为空，Spotifast 会下载预设。"
+"件夹为空，Spindle 会下载预设。"
 
 #. Translators: {count} is the number of presets, {folder} the path of the MilkDrop presets folder.
 #: src/ui/settings.rs:1877
 #, rust-format
 msgid ""
-"{count} preset in {folder}. Add .milk files here. Spotifast downloads "
+"{count} preset in {folder}. Add .milk files here. Spindle downloads "
 "presets when MilkDrop first opens with an empty folder."
 msgid_plural ""
-"{count} presets in {folder}. Add .milk files here. Spotifast downloads "
+"{count} presets in {folder}. Add .milk files here. Spindle downloads "
 "presets when MilkDrop first opens with an empty folder."
 msgstr[0] ""
 "{folder} 中有 {count} 个预设。请将 .milk 文件添加到此处。首次打开 MilkDrop 时"
-"如果文件夹为空，Spotifast 会下载预设。"
+"如果文件夹为空，Spindle 会下载预设。"
 
 #: src/ui/settings.rs:1886
 msgid "Time per preset"
@@ -2021,8 +2021,8 @@ msgid "In the tray"
 msgstr "在托盘中"
 
 #: src/ui/settings.rs:2343
-msgid "Allow Spotifast in System Settings, General, Login Items."
-msgstr "请在“系统设置”>“通用”>“登录项”中允许 Spotifast。"
+msgid "Allow Spindle in System Settings, General, Login Items."
+msgstr "请在“系统设置”>“通用”>“登录项”中允许 Spindle。"
 
 #: src/ui/settings.rs:2348
 msgid ""
@@ -2031,8 +2031,8 @@ msgid ""
 msgstr "要在托盘中启动，需要开启“关闭窗口后继续播放音乐”。在此之前会打开窗口。"
 
 #: src/ui/settings.rs:2353
-msgid "Open Spotifast when you log in, with its window or in the tray."
-msgstr "登录时打开 Spotifast，显示窗口或留在托盘中。"
+msgid "Open Spindle when you log in, with its window or in the tray."
+msgstr "登录时打开 Spindle，显示窗口或留在托盘中。"
 
 #: src/ui/settings.rs:2459
 msgctxt "language"
@@ -2137,8 +2137,8 @@ msgstr "无法加载 Omarchy 调色板，将保留上次可用的外观。详情
 
 #: src/theme.rs:213
 msgid ""
-"Custom themes could not be loaded. Run spotifast reload-themes to try again."
-msgstr "无法加载自定义主题。请运行 spotifast reload-themes 重试。"
+"Custom themes could not be loaded. Run spindle reload-themes to try again."
+msgstr "无法加载自定义主题。请运行 spindle reload-themes 重试。"
 
 #: src/ui/artist.rs:32
 msgid "Popular"
@@ -2343,11 +2343,11 @@ msgstr "减少等待 Spotify 的时间"
 
 #: src/ui/dialogs.rs:47
 msgid ""
-"Spotifast's default connection shares Spotify's request limit with other "
+"Spindle's default connection shares Spotify's request limit with other "
 "listeners. When it gets busy, loading music and using playback controls can "
 "take longer."
 msgstr ""
-"Spotifast 的默认连接与其他听众共享 Spotify 的请求限额。繁忙时，加载音乐和使用"
+"Spindle 的默认连接与其他听众共享 Spotify 的请求限额。繁忙时，加载音乐和使用"
 "播放控制可能需要更长时间。"
 
 #: src/ui/dialogs.rs:48
@@ -2421,9 +2421,9 @@ msgstr "此账户无法在此播放音乐"
 #: src/ui/dialogs.rs:219
 msgid ""
 "Playback needs Spotify Premium. Free accounts can browse and search, but "
-"cannot play music through Spotifast."
+"cannot play music through Spindle."
 msgstr ""
-"播放需要 Spotify Premium。免费账户可以浏览和搜索，但无法通过 Spotifast 播放音"
+"播放需要 Spotify Premium。免费账户可以浏览和搜索，但无法通过 Spindle 播放音"
 "乐。"
 
 #: src/ui/dialogs.rs:228
@@ -2786,10 +2786,10 @@ msgstr "使用 Spotify 登录"
 
 #: src/ui/login.rs:136
 msgid ""
-"Sign in through your browser. Spotifast never sees your password. Local "
+"Sign in through your browser. Spindle never sees your password. Local "
 "playback needs Spotify Premium."
 msgstr ""
-"通过浏览器登录。Spotifast 永远不会看到你的密码。本地播放需要 Spotify "
+"通过浏览器登录。Spindle 永远不会看到你的密码。本地播放需要 Spotify "
 "Premium。"
 
 #: src/ui/login.rs:169
@@ -2799,8 +2799,8 @@ msgstr "代理设置"
 #. Translators: {version} is the app's version number, such as 1.2.0.
 #: src/ui/login.rs:195
 #, rust-format
-msgid "Spotifast {version} • not affiliated with Spotify"
-msgstr "Spotifast {version} • 与 Spotify 无关"
+msgid "Spindle {version} • not affiliated with Spotify"
+msgstr "Spindle {version} • 与 Spotify 无关"
 
 #: src/ui/mod.rs:476
 msgid "Minimize"
@@ -3024,8 +3024,8 @@ msgstr "想听什么？"
 
 #: src/ui/topbar.rs:521
 msgid ""
-"Spotifast is offline. Reconnecting automatically when connection returns."
-msgstr "Spotifast 处于离线状态。连接恢复后将自动重新连接。"
+"Spindle is offline. Reconnecting automatically when connection returns."
+msgstr "Spindle 处于离线状态。连接恢复后将自动重新连接。"
 
 #: src/ui/topbar.rs:548
 msgid "MilkDrop visualiser (Ctrl+Shift+K)"
@@ -3062,8 +3062,8 @@ msgid "Version {version} is available."
 msgstr "版本 {version} 已推出。"
 
 #: src/ui/update.rs:19
-msgid "Update Spotifast"
-msgstr "更新 Spotifast"
+msgid "Update Spindle"
+msgstr "更新 Spindle"
 
 #: src/ui/update.rs:51
 msgid "Close update"
@@ -3084,8 +3084,8 @@ msgid "Ready to install"
 msgstr "可以安装"
 
 #: src/ui/update.rs:115
-msgid "Music playing on this computer will stop when Spotifast restarts."
-msgstr "Spotifast 重启时，这台电脑上正在播放的音乐将停止。"
+msgid "Music playing on this computer will stop when Spindle restarts."
+msgstr "Spindle 重启时，这台电脑上正在播放的音乐将停止。"
 
 #: src/ui/update.rs:122
 msgid "Restart to update"
@@ -3404,29 +3404,29 @@ msgid "On Wayland, use your desktop's Keep Above shortcut or window rule."
 msgstr "在 Wayland 上，请使用桌面环境的“保持在最上层”快捷键或窗口规则。"
 
 #: src/window.rs:39
-msgid "Spotifast cannot open its window"
-msgstr "Spotifast 无法打开窗口"
+msgid "Spindle cannot open its window"
+msgstr "Spindle 无法打开窗口"
 
 #: src/window.rs:45
 msgid ""
-"On Windows on ARM, the OpenGL that Spotifast draws with comes from "
+"On Windows on ARM, the OpenGL that Spindle draws with comes from "
 "Microsoft's OpenCL, OpenGL & Vulkan Compatibility Pack. Open its Microsoft "
 "Store page to install or repair it?"
 msgstr ""
-"在 ARM 版 Windows 上，Spotifast 用于绘制界面的 OpenGL 由 Microsoft 的 "
+"在 ARM 版 Windows 上，Spindle 用于绘制界面的 OpenGL 由 Microsoft 的 "
 "OpenCL, OpenGL & Vulkan Compatibility Pack 提供。要打开其 Microsoft Store 页"
 "面以安装或修复吗？"
 
 #. Translators: Keep {url} exactly as written. It becomes the address
-#. of the Spotifast download page.
+#. of the Spindle download page.
 #: src/window.rs:55
 #, rust-format
 msgid ""
-"Spotifast needs a graphics driver with OpenGL 2.0 or newer, and this PC or "
+"Spindle needs a graphics driver with OpenGL 2.0 or newer, and this PC or "
 "virtual machine does not provide one. Install the graphics driver, or turn "
 "on GPU acceleration for the virtual machine. Open {url} to read more?"
 msgstr ""
-"Spotifast 需要支持 OpenGL 2.0 或更高版本的显卡驱动程序，而这台电脑或虚拟机没"
+"Spindle 需要支持 OpenGL 2.0 或更高版本的显卡驱动程序，而这台电脑或虚拟机没"
 "有提供。请安装显卡驱动程序，或为虚拟机开启 GPU 加速。要打开 {url} 了解更多"
 "吗？"
 

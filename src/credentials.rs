@@ -19,7 +19,7 @@ use sha2::{Digest, Sha256};
 
 use crate::{auth::StoredToken, paths::AppDirs};
 
-const SERVICE: &str = "rocks.spotifast.Spotifast";
+const SERVICE: &str = "com.nickaustin.spindle";
 const TIMEOUT: Duration = Duration::from_secs(20);
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -412,7 +412,7 @@ struct SealedFiles<S> {
 
 #[cfg(any(windows, test))]
 impl<S> SealedFiles<S> {
-    const MAGIC: &'static [u8] = b"spotifast-sealed-grant-1\n";
+    const MAGIC: &'static [u8] = b"spindle-sealed-grant-1\n";
 
     fn path(&self, key: &str) -> PathBuf {
         // Keys are "<hex profile>:<slot name>"; ':' cannot name a Windows file.
@@ -1207,7 +1207,7 @@ mod tests {
         fn new() -> Self {
             static NEXT: AtomicU64 = AtomicU64::new(0);
             let root = std::env::temp_dir().join(format!(
-                "spotifast-credential-tests-{}-{}",
+                "spindle-credential-tests-{}-{}",
                 std::process::id(),
                 NEXT.fetch_add(1, Ordering::Relaxed)
             ));

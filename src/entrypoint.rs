@@ -1,4 +1,4 @@
-use spotifast::{app, backend, paths, settings, single_instance, util};
+use spindle::{app, backend, paths, settings, single_instance, util};
 
 use clap::{CommandFactory, FromArgMatches, Parser};
 use fastframe_shell::window::Geometry;
@@ -12,7 +12,7 @@ struct Cli {
     control: Option<Control>,
 
     /// A Spotify link to open: spotify:track:…, or an open.spotify.com
-    /// address. The running Spotifast opens it when there is one, which
+    /// address. The running Spindle opens it when there is one, which
     /// is how the desktop hands links over.
     #[arg(value_name = "LINK")]
     link: Option<String>,
@@ -64,7 +64,7 @@ struct Cli {
     /// Requires demo mode.
     #[cfg(feature = "demo")]
     #[arg(long, value_enum)]
-    demo_language: Option<spotifast::i18n::Locale>,
+    demo_language: Option<spindle::i18n::Locale>,
 
     /// Write a PNG of the demo window to this path and exit. Implies
     /// `--demo`. Without `--demo-size`, the shot is the window's own frame
@@ -269,7 +269,7 @@ fn run_control(control: Control) -> i32 {
             }
         }
         Err(error) => {
-            eprintln!("Spotifast is not running or does not support remote control: {error}");
+            eprintln!("Spindle is not running or does not support remote control: {error}");
             return 1;
         }
     };
@@ -295,7 +295,7 @@ fn write_reply(out: &mut impl std::io::Write, text: &str) -> i32 {
 /// sandbox's app id, which Flatpak always sets in `FLATPAK_ID`.
 #[cfg(target_os = "linux")]
 fn desktop_entry() -> String {
-    fastframe_now_playing::desktop_entry("spotifast")
+    fastframe_now_playing::desktop_entry("spindle")
 }
 
 /// The `nowplaying` snapshot as one human-readable line.
@@ -322,7 +322,7 @@ fn format_now_playing(snapshot: &str) -> String {
 }
 
 /// The `devices` snapshot as one line per device, the active one marked.
-/// The id comes first because `spotifast transfer` is what it is for.
+/// The id comes first because `spindle transfer` is what it is for.
 fn format_devices(snapshot: &str) -> String {
     let Ok(devices) = serde_json::from_str::<Vec<serde_json::Value>>(snapshot) else {
         return String::new();
@@ -351,16 +351,16 @@ pub(crate) fn run() -> eframe::Result<()> {
     // First of all: `--apply-update <job>` makes this process the update
     // helper, which installs and exits; otherwise the receipt and error an
     // update relaunch carries are taken out of the arguments.
-    let launch = fastframe_update::intercept(&spotifast::updates::CONFIG);
+    let launch = fastframe_update::intercept(&spindle::updates::CONFIG);
     // Before any output is listed or opened.
-    spotifast::sink::name_in_mixers();
+    spindle::sink::name_in_mixers();
     // A MilkDrop child launch is a bare visualiser window, not the app: it has
     // its own event loop and OpenGL context, reads the sound from a shared
     // buffer, and never touches the app's state. Handle it before anything
     // else, including the argument parser, which does not know its flags.
     #[cfg(feature = "milkdrop")]
-    if let Some(args) = spotifast::milkdrop::child::Args::parse() {
-        std::process::exit(spotifast::milkdrop::child::run(args));
+    if let Some(args) = spindle::milkdrop::child::Args::parse() {
+        std::process::exit(spindle::milkdrop::child::run(args));
     }
 
     let cli = Cli::from_arg_matches(&Cli::command().get_matches_from(&launch.arguments))
@@ -372,7 +372,7 @@ pub(crate) fn run() -> eframe::Result<()> {
     let cli = if (cli.demo || cli.demo_shot.is_some()) && cli.demo_data.is_none() {
         Cli {
             demo_data: Some(
-                std::env::temp_dir().join(format!("spotifast-demo-{}", std::process::id())),
+                std::env::temp_dir().join(format!("spindle-demo-{}", std::process::id())),
             ),
             ..cli
         }
@@ -389,7 +389,7 @@ pub(crate) fn run() -> eframe::Result<()> {
     let link = cli
         .link
         .as_deref()
-        .map(|text| match spotifast::link::parse(text) {
+        .map(|text| match spindle::link::parse(text) {
             Some(uri) => uri,
             None => {
                 eprintln!("not a Spotify link: {text}");
@@ -415,11 +415,11 @@ pub(crate) fn run() -> eframe::Result<()> {
         match single_instance::acquire(&waker, link.as_deref(), hidden) {
             single_instance::Outcome::Only(guard) => Some(guard),
             single_instance::Outcome::Surfaced if hidden => {
-                log::info!("Spotifast is already running");
+                log::info!("Spindle is already running");
                 return Ok(());
             }
             single_instance::Outcome::Surfaced => {
-                log::info!("Spotifast is already running; asked it to show its window");
+                log::info!("Spindle is already running; asked it to show its window");
                 return Ok(());
             }
         }
@@ -427,11 +427,11 @@ pub(crate) fn run() -> eframe::Result<()> {
         None
     };
     let default_filter = if cli.verbose {
-        "info,librespot=info,spotifast=debug"
+        "info,librespot=info,spindle=debug"
     } else {
         // Which system face draws each script the interface font lacks,
         // one line per script at startup, for reports of odd-looking text.
-        "warn,spotifast=info,fastframe_fonts=info"
+        "warn,spindle=info,fastframe_fonts=info"
     };
     #[cfg(feature = "demo")]
     let demo_dirs = cli.demo_data.as_ref().map(|base| paths::AppDirs {
@@ -452,7 +452,7 @@ pub(crate) fn run() -> eframe::Result<()> {
     // Launched from a desktop, stderr goes nowhere; keep the run's log where
     // a bug report can find it, and a line per panic in the panic log (with
     // any link in its message removed: a URL can carry a token).
-    if let Err(error) = fastframe_log::Logging::new("spotifast", env!("CARGO_PKG_VERSION"))
+    if let Err(error) = fastframe_log::Logging::new("spindle", env!("CARGO_PKG_VERSION"))
         .filter(default_filter)
         .file(dirs.log_file())
         .panic_log(dirs.panic_log())
@@ -483,13 +483,13 @@ pub(crate) fn run() -> eframe::Result<()> {
     // Colour emoji: the fonts are found off this thread. A demo capture
     // draws every picture in the frame that shows it.
     #[cfg(feature = "demo")]
-    spotifast::emoji::install(demo);
+    spindle::emoji::install(demo);
     #[cfg(not(feature = "demo"))]
-    spotifast::emoji::install(false);
+    spindle::emoji::install(false);
     // macOS delivers links as Apple Events; install before the event loop.
     #[cfg(target_os = "macos")]
     if let Some(guard) = &instance {
-        spotifast::mac_links::install(guard.commands(), waker.clone());
+        spindle::mac_links::install(guard.commands(), waker.clone());
     }
 
     // A capture run is a throwaway process next to the real one: no tray
@@ -546,8 +546,8 @@ pub(crate) fn run() -> eframe::Result<()> {
     }
     #[cfg(feature = "demo")]
     if demo {
-        spotifast::demo::populate(&mut app);
-        spotifast::demo::apply_flags(&mut app, cli.demo_page.as_deref(), cli.demo_show.as_deref());
+        spindle::demo::populate(&mut app);
+        spindle::demo::apply_flags(&mut app, cli.demo_page.as_deref(), cli.demo_show.as_deref());
         if let Some(feed) = &cli.demo_update_feed {
             match fastframe_update::Source::local(feed) {
                 Ok(source) => app.update_source = source,
@@ -562,10 +562,10 @@ pub(crate) fn run() -> eframe::Result<()> {
                 app.update_restart_arguments
                     .extend(["--demo-data".into(), base.to_string_lossy().into_owned()]);
             }
-            app.actions.push(spotifast::model::Action::CheckForUpdates);
+            app.actions.push(spindle::model::Action::CheckForUpdates);
         }
         if let Some(locale) = cli.demo_language {
-            app.settings.language = spotifast::settings::LanguageChoice::Locale(locale);
+            app.settings.language = spindle::settings::LanguageChoice::Locale(locale);
             app.locale = locale;
         }
     }
@@ -593,7 +593,7 @@ pub(crate) fn run() -> eframe::Result<()> {
     #[cfg(feature = "demo")]
     let demo_inner = cli.demo_size;
     #[cfg(feature = "demo")]
-    spotifast::window::set_fixed_size(demo_inner.is_some());
+    spindle::window::set_fixed_size(demo_inner.is_some());
     #[cfg(feature = "demo")]
     let demo_storage = app.dirs.cache.join("demo-window.ron");
     // A start at login in the tray. A link asked to be seen, so it opens
@@ -641,7 +641,7 @@ pub(crate) fn run() -> eframe::Result<()> {
         #[cfg(target_os = "linux")]
         let hide_from_taskbar = options.viewport.taskbar == Some(false);
         eframe::run_native(
-            "Spotifast",
+            "Spindle",
             options,
             Box::new(move |cc| {
                 if let Some(gl) = &cc.gl {
@@ -665,22 +665,22 @@ pub(crate) fn run() -> eframe::Result<()> {
                 // the next repaint.
                 #[cfg(target_os = "macos")]
                 {
-                    spotifast::mac_touchbar_crash_guard::install();
-                    spotifast::mac_menu::init();
+                    spindle::mac_touchbar_crash_guard::install();
+                    spindle::mac_menu::init();
                     let ctx = cc.egui_ctx.clone();
-                    spotifast::mac_menu::set_waker(move || ctx.request_repaint());
+                    spindle::mac_menu::set_waker(move || ctx.request_repaint());
 
-                    spotifast::notch::init();
+                    spindle::notch::init();
                     let ctx_notch = cc.egui_ctx.clone();
-                    spotifast::notch::set_waker(move || ctx_notch.request_repaint());
+                    spindle::notch::set_waker(move || ctx_notch.request_repaint());
                 }
                 {
                     use raw_window_handle::HasDisplayHandle;
                     if let Ok(display) = cc.display_handle() {
                         app.window_level_supported =
-                            spotifast::window::supports_window_level(display.as_raw());
+                            spindle::window::supports_window_level(display.as_raw());
                         app.taskbar_hiding_supported =
-                            spotifast::window::supports_hiding_from_taskbar(display.as_raw());
+                            spindle::window::supports_hiding_from_taskbar(display.as_raw());
                     }
                 }
                 // winit hides a taskbar button on Windows only; X11 is
@@ -689,14 +689,14 @@ pub(crate) fn run() -> eframe::Result<()> {
                 if hide_from_taskbar {
                     use raw_window_handle::HasWindowHandle;
                     if let Ok(handle) = cc.window_handle() {
-                        spotifast::window::skip_x11_taskbar(handle.as_raw());
+                        spindle::window::skip_x11_taskbar(handle.as_raw());
                     }
                 }
                 app.attach(&cc.egui_ctx);
                 #[cfg(windows)]
                 let thumbbar = {
                     use raw_window_handle::{HasWindowHandle, RawWindowHandle};
-                    let mut toolbar = spotifast::thumbbar::ThumbBar::new();
+                    let mut toolbar = spindle::thumbbar::ThumbBar::new();
                     if thumbbar_enabled
                         && let Ok(handle) = cc.window_handle()
                         && let RawWindowHandle::Win32(window) = handle.as_raw()
@@ -732,7 +732,7 @@ pub(crate) fn run() -> eframe::Result<()> {
                     | eframe::Error::NoGlutinConfigs(..)
                     | eframe::Error::OpenGL(_)
             ) {
-                spotifast::window::report_missing_opengl(locale);
+                spindle::window::report_missing_opengl(locale);
             }
         })
     })
@@ -753,7 +753,7 @@ struct MiniWindow {
 impl MiniWindow {
     fn wanted(app: &app::App) -> Option<Self> {
         app.settings.winamp_window.then(|| Self {
-            size: spotifast::ui::winamp::initial_size(&app.settings),
+            size: spindle::ui::winamp::initial_size(&app.settings),
             geometry: Geometry {
                 position: app.winamp.geometry.position,
                 ..Geometry::default()
@@ -847,12 +847,12 @@ fn native_options(
     #[cfg(target_os = "linux")]
     let persistence_path = persistence_path.or_else(|| {
         // Keep the native profile path even when Flatpak supplies its app ID.
-        eframe::storage_dir("spotifast").map(|dir| dir.join("app.ron"))
+        eframe::storage_dir("spindle").map(|dir| dir.join("app.ron"))
     });
     #[cfg(target_os = "linux")]
     let app_id = desktop_entry();
     #[cfg(not(target_os = "linux"))]
-    let app_id = "spotifast";
+    let app_id = "spindle";
     let icon = if cfg!(target_os = "macos") {
         // macOS takes the dock icon from the bundle's .icns, which is the
         // 1024px drawing with the platform's rounding. Setting a window
@@ -862,7 +862,7 @@ fn native_options(
         app_icon()
     };
     let viewport = egui::ViewportBuilder::default()
-        .with_title("Spotifast")
+        .with_title("Spindle")
         .with_app_id(app_id)
         .with_taskbar(true)
         .with_icon(icon);
@@ -907,7 +907,7 @@ fn native_options(
                 // Removing its decorations lets the app surface fill the window.
                 .with_decorations(main_window_decorated(fastframe_titlebar::enabled()))
                 .with_inner_size(size)
-                .with_min_inner_size(inner_size.unwrap_or(spotifast::window::MAIN_MIN_SIZE))
+                .with_min_inner_size(inner_size.unwrap_or(spindle::window::MAIN_MIN_SIZE))
                 .with_fullscreen(fullscreen);
             if inner_size.is_some() {
                 viewport.with_max_inner_size(size)
@@ -929,7 +929,7 @@ fn native_options(
 
 fn profile_options(mut options: eframe::NativeOptions) -> eframe::NativeOptions {
     if options.persist_window {
-        options.persistence_path = eframe::storage_dir("spotifast").map(|dir| dir.join("app.ron"));
+        options.persistence_path = eframe::storage_dir("spindle").map(|dir| dir.join("app.ron"));
     }
     options
 }
@@ -973,7 +973,7 @@ mod native_window_tests {
         let main = profile_options(native_options(false, None, None, Geometry::default()));
         assert_eq!(
             main.persistence_path,
-            eframe::storage_dir("spotifast").map(|dir| dir.join("app.ron"))
+            eframe::storage_dir("spindle").map(|dir| dir.join("app.ron"))
         );
         let demo_path = std::path::PathBuf::from("temporary/demo.ron");
         let demo = profile_options(demo_native_options(
@@ -1006,12 +1006,12 @@ mod native_window_tests {
             assert_eq!(mini.viewport.app_id, main.viewport.app_id);
             assert_eq!(
                 main.persistence_path,
-                eframe::storage_dir("spotifast").map(|dir| dir.join("app.ron"))
+                eframe::storage_dir("spindle").map(|dir| dir.join("app.ron"))
             );
         }
         #[cfg(not(target_os = "linux"))]
         {
-            assert_eq!(main.viewport.app_id.as_deref(), Some("spotifast"));
+            assert_eq!(main.viewport.app_id.as_deref(), Some("spindle"));
             assert_eq!(mini.viewport.app_id, main.viewport.app_id);
             assert_eq!(main.persistence_path, None);
         }
@@ -1075,7 +1075,7 @@ mod native_window_tests {
                 skin_scale: Some(2),
                 ..Default::default()
             };
-            let size = spotifast::ui::winamp::initial_size(&settings);
+            let size = spindle::ui::winamp::initial_size(&settings);
             let options = native_options(
                 false,
                 Some(MiniWindow {
@@ -1289,7 +1289,7 @@ struct Shell {
     /// Whether this window's first frame checked that a monitor shows it.
     recovery_checked: bool,
     #[cfg(windows)]
-    thumbbar: spotifast::thumbbar::ThumbBar,
+    thumbbar: spindle::thumbbar::ThumbBar,
     /// A pending `--demo-shot` capture, if this is a screenshot run.
     #[cfg(feature = "demo")]
     shot: Option<Shot>,
@@ -1323,7 +1323,7 @@ impl Shell {
             .winit_window()
             .and_then(|window| window.current_monitor())
             .and_then(|monitor| monitor.refresh_rate_millihertz())
-            .and_then(spotifast::milkdrop::screen_hz)
+            .and_then(spindle::milkdrop::screen_hz)
             .unwrap_or(0);
     }
 
@@ -1337,9 +1337,9 @@ impl Shell {
         self.read_screen_hz(ctx, frame);
         let app = &mut *self.app;
         #[cfg(target_os = "macos")]
-        for command in spotifast::mac_menu::drain_commands() {
-            use spotifast::mac_menu::MenuCommand;
-            use spotifast::model::{Action, Dialog, Page};
+        for command in spindle::mac_menu::drain_commands() {
+            use spindle::mac_menu::MenuCommand;
+            use spindle::model::{Action, Dialog, Page};
             let action = match command {
                 MenuCommand::PlayPause => Action::TogglePlay,
                 MenuCommand::Next => Action::Next,
@@ -1604,10 +1604,10 @@ mod tests {
     /// launch has something to show.
     #[test]
     fn a_start_at_login_in_the_tray_waits_unless_there_is_something_to_show() {
-        let launch = Cli::try_parse_from(["spotifast", "--start-hidden"]).expect("it parses");
+        let launch = Cli::try_parse_from(["spindle", "--start-hidden"]).expect("it parses");
         assert!(launch.start_hidden);
         assert!(
-            !Cli::try_parse_from(["spotifast"])
+            !Cli::try_parse_from(["spindle"])
                 .expect("it parses")
                 .start_hidden
         );
@@ -1634,7 +1634,7 @@ mod tests {
     #[test]
     fn a_link_and_a_verb_are_told_apart() {
         // #given / #when / #then
-        let launch = Cli::try_parse_from(["spotifast", "spotify:track:4uLU6hMCjMI75M1A2tKUQC"])
+        let launch = Cli::try_parse_from(["spindle", "spotify:track:4uLU6hMCjMI75M1A2tKUQC"])
             .expect("a link parses");
         assert_eq!(
             launch.link.as_deref(),
@@ -1643,7 +1643,7 @@ mod tests {
         assert!(launch.control.is_none());
 
         let launch = Cli::try_parse_from([
-            "spotifast",
+            "spindle",
             "https://open.spotify.com/album/1DFixLWuPkv3KT3TnV35m3?si=x",
             "--verbose",
         ])
@@ -1651,11 +1651,11 @@ mod tests {
         assert!(launch.link.is_some());
         assert!(launch.verbose);
 
-        let verb = Cli::try_parse_from(["spotifast", "next"]).expect("a verb parses");
+        let verb = Cli::try_parse_from(["spindle", "next"]).expect("a verb parses");
         assert!(matches!(verb.control, Some(Control::Next)));
         assert!(verb.link.is_none());
 
-        let bare = Cli::try_parse_from(["spotifast"]).expect("a plain launch parses");
+        let bare = Cli::try_parse_from(["spindle"]).expect("a plain launch parses");
         assert!(bare.link.is_none() && bare.control.is_none());
     }
 }

@@ -1045,7 +1045,7 @@ pub enum Action {
         offset_index: Option<u32>,
     },
     /// Search one kind of thing and play the best match, as
-    /// `spotifast play-search` asks. Queued like the other play actions so
+    /// `spindle play-search` asks. Queued like the other play actions so
     /// it takes precedence in the order it was asked for.
     PlaySearch {
         kind: String,
@@ -1179,7 +1179,7 @@ pub enum Action {
     RefreshDevices,
     /// List this computer's audio outputs for the device picker.
     ListOutputDevices,
-    /// Start Spotifast when the person logs in, this way, or not at all.
+    /// Start Spindle when the person logs in, this way, or not at all.
     SetStartWithComputer(Option<fastframe_autostart::Start>),
     /// Play through this output, by name; `None` is the system default.
     SetAudioDevice(Option<String>),
@@ -1263,7 +1263,7 @@ pub enum Action {
     SetLanguage(crate::settings::LanguageChoice),
     OpenThemesFolder,
     SetCustomTheme(String),
-    /// Follow system shows this palette file (or Spotifast's own with
+    /// Follow system shows this palette file (or Spindle's own with
     /// `None`) while the system is in this appearance.
     SetPairTheme(fastframe_theme::Base, Option<String>),
     ReloadThemes,
@@ -1300,7 +1300,7 @@ pub enum Action {
     SetSkinScale(u8),
     ToggleWinampOnTop,
     SetWinampTaskbar(bool),
-    /// Windows: draw Spotifast's own title bar instead of the standard one.
+    /// Windows: draw Spindle's own title bar instead of the standard one.
     SetCustomTitlebar(bool),
     OpenSkinsFolder,
     /// Pick the folder a playlist's local files play from.

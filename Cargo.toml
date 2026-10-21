@@ -1,6 +1,6 @@
 [package]
-name = "spotifast"
-default-run = "spotifast"
+name = "spindle"
+default-run = "spindle"
 version = "0.14.0"
 edition = "2024"
 rust-version = "1.98"
@@ -11,12 +11,12 @@ keywords = ["spotify", "music", "egui", "librespot", "player"]
 categories = ["multimedia::audio"]
 
 [lib]
-name = "spotifast"
+name = "spindle"
 path = "src/lib.rs"
 
 [[bin]]
-name = "spotifast"
-path = "src/spotifast.rs"
+name = "spindle"
+path = "src/spindle.rs"
 
 [dependencies]
 anyhow = "1"
@@ -34,7 +34,7 @@ keyring-core = "1"
 eframe = { version = "0.36.2", default-features = false, features = ["accesskit", "glow", "default_fonts", "links", "wayland", "x11", "persistence"] }
 egui = "0.36.2"
 egui_extras = { version = "0.36.2", features = ["image", "svg"] }
-# The shared foundation of Spotifast, ZapFast, RekordFlash and TonePush
+# The shared foundation of Spindle, ZapFast, RekordFlash and TonePush
 # (crmne/fastframe). Every crate comes from the same revision; move them
 # together. Dock icons and badges share the same foundation as the tray.
 fastframe-text = { git = "https://github.com/crmne/fastframe", tag = "v0.14.0" }
@@ -85,7 +85,7 @@ fastframe-autostart = { git = "https://github.com/crmne/fastframe", tag = "v0.14
 # launch and the command line hand their requests to.
 fastframe-instance = { git = "https://github.com/crmne/fastframe", tag = "v0.14.0" }
 # The config, state and cache folders: the per-user ones, or for a copy from
-# the portable Windows zip, spotifast-data next to the executable (#703).
+# the portable Windows zip, spindle-data next to the executable (#703).
 fastframe-dirs = { git = "https://github.com/crmne/fastframe", tag = "v0.14.0" }
 # The desktop's media controls: MPRIS on Linux, the media overlay on
 # Windows, Now Playing on macOS. The media keys and those panels send
@@ -292,7 +292,7 @@ epaint_default_fonts = { git = "https://github.com/crmne/egui", rev = "6ce633ba5
 # crmne/winit apps-0.30, shared with the same apps: winit 0.30.13 plus Wayland
 # `Occluded` for the xdg-shell suspended state with commits on the app's behalf
 # while it isn't presenting (rust-windowing/winit#4709, #4710), macOS Quit
-# through close requests behind a feature Spotifast leaves off (winit#4692),
+# through close requests behind a feature Spindle leaves off (winit#4692),
 # a macOS window ordered out and flushed before it closes, so a Touch Bar
 # cannot leave a ghost window behind (winit#4728), preserving the menu-bar
 # window when the event loop exits (winit#4754), starting the event loop after
@@ -305,7 +305,7 @@ epaint_default_fonts = { git = "https://github.com/crmne/egui", rev = "6ce633ba5
 winit = { git = "https://github.com/crmne/winit", rev = "0bed9dc0a7db02590a279fb8bac795fa39ee6948" }
 # crmne/cpal: cpal 0.18.2 with stream names and roles for PipeWire and
 # PulseAudio (RustAudio/cpal#1409), which fastframe-audio 0.14 uses to name
-# Spotifast in volume mixers. rodio 0.21 gets cpal from crates.io; patching
+# Spindle in volume mixers. rodio 0.21 gets cpal from crates.io; patching
 # it to the same fork builds one cpal. Drop this when a cpal release has it.
 cpal = { git = "https://github.com/crmne/cpal", rev = "fcd8b6ebee9d822426fa8d6839cdd89af6e0d491" }
 # projectm-sys 1.2.2 hardcodes the Visual Studio 17 2022 CMake generator,

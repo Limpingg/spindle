@@ -72,7 +72,7 @@ pub fn scaled_uri(url: &str, pixels: u32) -> String {
     format!("{url}{SCALED}{pixels}")
 }
 
-const SCALED: &str = "#spotifast-px=";
+const SCALED: &str = "#spindle-px=";
 
 /// The artwork URL and pixel size in a [`scaled_uri`].
 fn parse_scaled(uri: &str) -> Option<(&str, u32)> {
@@ -531,7 +531,7 @@ impl Inner {
 
 impl BytesLoader for ArtLoader {
     fn id(&self) -> &'static str {
-        "spotifast::ArtLoader"
+        "spindle::ArtLoader"
     }
 
     fn load(&self, ctx: &egui::Context, uri: &str) -> BytesLoadResult {
@@ -1113,7 +1113,7 @@ fn scale_waiting(state: &Mutex<Scaling>, ctx: &egui::Context) {
 
 impl ImageLoader for CoverScaler {
     fn id(&self) -> &str {
-        "spotifast::CoverScaler"
+        "spindle::CoverScaler"
     }
 
     fn load(&self, ctx: &egui::Context, uri: &str, _: SizeHint) -> ImageLoadResult {
@@ -1300,7 +1300,7 @@ mod tests {
     #[test]
     fn downloaded_artwork_survives_caller_drop_and_reloads_without_network() {
         let dir =
-            std::env::temp_dir().join(format!("spotifast-art-roundtrip-{}", std::process::id()));
+            std::env::temp_dir().join(format!("spindle-art-roundtrip-{}", std::process::id()));
         let runtime = artwork_test_runtime();
         let loader = artwork_test_loader(&runtime, dir.clone());
         let expected: Vec<u8> = (0..256 * 1024).map(|index| (index % 251) as u8).collect();
@@ -1333,7 +1333,7 @@ mod tests {
     #[test]
     fn artwork_cache_write_failure_keeps_download_usable() {
         let dir = std::env::temp_dir().join(format!(
-            "spotifast-art-write-failure-{}",
+            "spindle-art-write-failure-{}",
             std::process::id()
         ));
         let runtime = artwork_test_runtime();
@@ -1364,7 +1364,7 @@ mod tests {
     #[test]
     fn rejected_artwork_responses_do_not_create_cache_files() {
         let dir =
-            std::env::temp_dir().join(format!("spotifast-art-rejected-{}", std::process::id()));
+            std::env::temp_dir().join(format!("spindle-art-rejected-{}", std::process::id()));
         let runtime = artwork_test_runtime();
         let loader = artwork_test_loader(&runtime, dir.clone());
         runtime.block_on(async {
@@ -1438,7 +1438,7 @@ mod tests {
     #[test]
     fn lyrics_backdrop_appears_while_a_cover_releases_the_same_artwork() {
         let runtime = artwork_test_runtime();
-        let dir = std::env::temp_dir().join(format!("spotifast-backdrop-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("spindle-backdrop-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         let loader = artwork_test_loader(&runtime, dir.clone());
         let ctx = egui::Context::default();
@@ -1473,7 +1473,7 @@ mod tests {
     fn lyrics_backdrop_holds_the_previous_song_and_retries_failures() {
         let runtime = artwork_test_runtime();
         let dir =
-            std::env::temp_dir().join(format!("spotifast-backdrop-retry-{}", std::process::id()));
+            std::env::temp_dir().join(format!("spindle-backdrop-retry-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         let loader = artwork_test_loader(&runtime, dir.clone());
         let ctx = egui::Context::default();
@@ -1552,7 +1552,7 @@ mod tests {
     fn painted_covers_keep_only_their_texture() {
         let runtime = artwork_test_runtime();
         let dir =
-            std::env::temp_dir().join(format!("spotifast-painted-texture-{}", std::process::id()));
+            std::env::temp_dir().join(format!("spindle-painted-texture-{}", std::process::id()));
         let loader = artwork_test_loader(&runtime, dir.clone());
         let ctx = egui::Context::default();
         egui_extras::install_image_loaders(&ctx);
@@ -1640,7 +1640,7 @@ mod tests {
     fn softened_cover_pending_requests_are_deduplicated() {
         let runtime = artwork_test_runtime();
         let dir =
-            std::env::temp_dir().join(format!("spotifast-softened-pending-{}", std::process::id()));
+            std::env::temp_dir().join(format!("spindle-softened-pending-{}", std::process::id()));
         let loader = artwork_test_loader(&runtime, dir.clone());
         let ctx = egui::Context::default();
         let mut covers = SoftenedCovers::default();
@@ -1736,7 +1736,7 @@ mod tests {
     /// takes the whole process with it.
     #[test]
     fn a_cached_file_is_named_only_once_it_is_really_there() {
-        let dir = std::env::temp_dir().join(format!("spotifast-art-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("spindle-art-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         let runtime = tokio::runtime::Builder::new_current_thread()
             .build()
@@ -1764,7 +1764,7 @@ mod tests {
 
     #[test]
     fn prefetching_starts_one_download_and_not_another() {
-        let dir = std::env::temp_dir().join(format!("spotifast-prefetch-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("spindle-prefetch-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         let runtime = tokio::runtime::Builder::new_current_thread()
             .build()
@@ -1913,7 +1913,7 @@ mod tests {
         );
 
         let runtime = artwork_test_runtime();
-        let dir = std::env::temp_dir().join(format!("spotifast-art-webp-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("spindle-art-webp-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         let loader = artwork_test_loader(&runtime, dir.clone());
         let ctx = egui::Context::default();
@@ -2027,7 +2027,7 @@ mod tests {
         assert_eq!(one, 640 * 640 * 4 * 4 / 3);
         let jpeg = 50_000usize;
         let dir = std::env::temp_dir().join(format!(
-            "spotifast-art-budget-{}-{}",
+            "spindle-art-budget-{}-{}",
             std::process::id(),
             Instant::now().elapsed().as_nanos()
         ));
@@ -2110,7 +2110,7 @@ mod tests {
         let uri = scaled_uri(url, 96);
         assert_eq!(parse_scaled(&uri), Some((url, 96)));
         assert_eq!(parse_scaled(url), None, "the source itself is not scaled");
-        assert_eq!(parse_scaled("bytes://cover#spotifast-px=96"), None);
+        assert_eq!(parse_scaled("bytes://cover#spindle-px=96"), None);
         assert_eq!(cover_pixels(44.0), 64);
         assert_eq!(cover_pixels(64.0), 64);
         assert_eq!(cover_pixels(65.5), 96);
@@ -2182,7 +2182,7 @@ mod tests {
     #[test]
     fn a_second_size_of_painted_artwork_is_still_made() {
         let runtime = artwork_test_runtime();
-        let dir = std::env::temp_dir().join(format!("spotifast-two-sizes-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("spindle-two-sizes-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         let loader = artwork_test_loader(&runtime, dir.clone());
         let ctx = egui::Context::default();
@@ -2286,7 +2286,7 @@ mod tests {
     #[test]
     fn a_new_window_starts_without_copies() {
         let runtime = artwork_test_runtime();
-        let dir = std::env::temp_dir().join(format!("spotifast-new-window-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("spindle-new-window-{}", std::process::id()));
         let loader = artwork_test_loader(&runtime, dir.clone());
         let url = "https://i.scdn.co/image/window";
         let uri = scaled_uri(url, 64);
@@ -2358,7 +2358,7 @@ mod tests {
     #[test]
     fn a_cover_changing_size_keeps_its_picture_while_the_new_copy_is_made() {
         let runtime = artwork_test_runtime();
-        let dir = std::env::temp_dir().join(format!("spotifast-resized-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("spindle-resized-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         let loader = artwork_test_loader(&runtime, dir.clone());
         let ctx = egui::Context::default();
@@ -2399,7 +2399,7 @@ mod tests {
     #[test]
     fn a_new_songs_cover_keeps_the_last_ones_place_until_it_is_made() {
         let runtime = artwork_test_runtime();
-        let dir = std::env::temp_dir().join(format!("spotifast-next-song-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("spindle-next-song-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         let loader = artwork_test_loader(&runtime, dir.clone());
         let ctx = egui::Context::default();
@@ -2447,7 +2447,7 @@ mod tests {
     fn only_a_few_covers_are_scaled_at_once() {
         use egui::load::ImageLoader;
         let runtime = artwork_test_runtime();
-        let dir = std::env::temp_dir().join(format!("spotifast-at-once-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("spindle-at-once-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         let loader = artwork_test_loader(&runtime, dir.clone());
         let ctx = egui::Context::default();
@@ -2529,7 +2529,7 @@ mod tests {
         drop(state);
 
         let dir =
-            std::env::temp_dir().join(format!("spotifast-asked-again-{}", std::process::id()));
+            std::env::temp_dir().join(format!("spindle-asked-again-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         let loader = artwork_test_loader(&runtime, dir.clone());
         ctx.add_bytes_loader(Arc::new(loader.clone()));
@@ -2582,7 +2582,7 @@ mod tests {
     fn the_scaler_makes_a_copy_from_the_artwork_loader() {
         use egui::load::ImageLoader;
         let runtime = artwork_test_runtime();
-        let dir = std::env::temp_dir().join(format!("spotifast-scaler-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("spindle-scaler-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         let loader = artwork_test_loader(&runtime, dir.clone());
         let ctx = egui::Context::default();
@@ -2624,7 +2624,7 @@ mod tests {
         use std::time::Duration as StdDuration;
 
         let dir = std::env::temp_dir().join(format!(
-            "spotifast-art-reload-{}-{}",
+            "spindle-art-reload-{}-{}",
             std::process::id(),
             Instant::now().elapsed().as_nanos()
         ));

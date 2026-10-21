@@ -66,7 +66,7 @@ pub fn show(app: &mut App, ui: &mut egui::Ui, id: &str) {
                     &gettext(locale, "You're offline"),
                     &gettext(
                         locale,
-                        "Spotifast will reconnect automatically when your connection returns.",
+                        "Spindle will reconnect automatically when your connection returns.",
                     ),
                 );
             } else {
@@ -112,7 +112,7 @@ pub fn show(app: &mut App, ui: &mut egui::Ui, id: &str) {
                     &gettext(app.locale, "You're offline"),
                     &gettext(
                         app.locale,
-                        "Spotifast will reconnect automatically when your connection returns.",
+                        "Spindle will reconnect automatically when your connection returns.",
                     ),
                 );
             } else {
@@ -142,7 +142,7 @@ pub fn show(app: &mut App, ui: &mut egui::Ui, id: &str) {
                     &gettext(app.locale, "You're offline"),
                     &gettext(
                         app.locale,
-                        "Spotifast will reconnect automatically when your connection returns.",
+                        "Spindle will reconnect automatically when your connection returns.",
                     ),
                 );
             } else {
@@ -488,7 +488,7 @@ mod tests {
 
     fn test_app() -> App {
         let root = std::env::temp_dir().join(format!(
-            "spotifast-show-test-{}-{}",
+            "spindle-show-test-{}-{}",
             std::process::id(),
             std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)

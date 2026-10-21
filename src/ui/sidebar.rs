@@ -2199,7 +2199,7 @@ mod ordering_tests {
     /// and known recent plays so ordering tests can distinguish each sort mode.
     fn app(name: &str) -> App {
         let root =
-            std::env::temp_dir().join(format!("spotifast-order-{name}-{}", std::process::id()));
+            std::env::temp_dir().join(format!("spindle-order-{name}-{}", std::process::id()));
         let mut app = App::new(
             &crate::backend::Waker::default(),
             crate::paths::AppDirs {

@@ -3,7 +3,7 @@
 //! librespot's rodio sink panics if no output device is available. Release
 //! builds abort on that panic. This sink opens the device when playback starts
 //! and reports a device it cannot open through the UI, from the first write
-//! (see `start`). Spotifast can then remain available as a Connect remote
+//! (see `start`). Spindle can then remain available as a Connect remote
 //! until an output appears.
 //!
 //! fastframe-audio owns the device stream: it pauses with playback, so a
@@ -33,7 +33,7 @@ use crate::resample::Resampler;
 /// Told about output failures, with a message fit for the interface.
 pub type ErrorHook = Arc<dyn Fn(String) + Send + Sync>;
 
-/// Told, with the saved name, the id of the device an older Spotifast saved
+/// Told, with the saved name, the id of the device an older Spindle saved
 /// by its name, once the output has opened on it, so the setting can hold
 /// the id from then on.
 pub type DeviceHook = Arc<dyn Fn(String, DeviceId) + Send + Sync>;
@@ -902,7 +902,7 @@ impl Sink for RodioSink {
 
 /// What a saved `audio_device` opens, among the outputs listed now.
 ///
-/// Spotifast saves the id `fastframe_audio::output_devices` gives (on Linux
+/// Spindle saves the id `fastframe_audio::output_devices` gives (on Linux
 /// PipeWire's or PulseAudio's node name, the WASAPI endpoint id on Windows,
 /// the CoreAudio UID on macOS). Up to 0.13.3 it saved a name from
 /// `output_device_names` instead, which on Linux was usually one of ALSA's
@@ -992,13 +992,13 @@ impl From<fastframe_audio::OpenError> for OpenError {
 /// The stream's name in the system's volume mixer, under the app's.
 const MEDIA_NAME: &str = "Spotify playback";
 
-/// Names Spotifast, with the desktop entry's icon, in the system's volume
+/// Names Spindle, with the desktop entry's icon, in the system's volume
 /// mixer (PipeWire and PulseAudio) for every output opened afterwards. Call
 /// once at startup, before any output is listed or opened.
 pub fn name_in_mixers() {
     let _ = fastframe_audio::set_app_info(fastframe_audio::AppInfo {
-        name: "Spotifast".to_owned(),
-        icon: Some("spotifast".to_owned()),
+        name: "Spindle".to_owned(),
+        icon: Some("spindle".to_owned()),
     });
 }
 

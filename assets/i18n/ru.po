@@ -1,14 +1,14 @@
-# Russian translation of the Spotifast navigation pilot.
-# Distributed under the same MIT license as Spotifast.
+# Russian translation of the Spindle navigation pilot.
+# Distributed under the same MIT license as Spindle.
 #
 msgid ""
 msgstr ""
-"Project-Id-Version: Spotifast\n"
+"Project-Id-Version: Spindle\n"
 "Report-Msgid-Bugs-To: https://github.com/crmne/spotifast/issues/new?"
 "template=translation.yml\n"
 "POT-Creation-Date: 2026-10-20 10:32+0200\n"
 "PO-Revision-Date: 2026-09-23 20:00+0000\n"
-"Last-Translator: Spotifast contributors\n"
+"Last-Translator: Spindle contributors\n"
 "Language-Team: Russian\n"
 "Language: ru\n"
 "MIME-Version: 1.0\n"
@@ -298,8 +298,8 @@ msgid "Mute"
 msgstr "Выключить звук"
 
 #: src/ui/player_bar.rs:981
-msgid "This device's volume can't be changed from Spotifast"
-msgstr "Громкость этого устройства нельзя изменить из Spotifast"
+msgid "This device's volume can't be changed from Spindle"
+msgstr "Громкость этого устройства нельзя изменить из Spindle"
 
 #: src/ui/player_bar.rs:1001 src/ui/devices.rs:401
 msgid "Connect to a device"
@@ -408,8 +408,8 @@ msgstr "Нет подключения к сети"
 #: src/ui/collection.rs:2065 src/ui/collection.rs:2312 src/ui/home.rs:34
 #: src/ui/library.rs:262 src/ui/show.rs:69 src/ui/show.rs:115
 #: src/ui/show.rs:145
-msgid "Spotifast will reconnect automatically when your connection returns."
-msgstr "Spotifast автоматически подключится, когда соединение восстановится."
+msgid "Spindle will reconnect automatically when your connection returns."
+msgstr "Spindle автоматически подключится, когда соединение восстановится."
 
 #. Translators: Keep {error} unchanged. It is the original failure detail.
 #: src/ui/lyrics.rs:171 src/ui/lyrics.rs:455 src/ui/lyrics.rs:691
@@ -714,8 +714,8 @@ msgid "Restoring proxy settings"
 msgstr "Восстановление настроек прокси"
 
 #: src/app.rs:1478
-msgid "Couldn't change how Spotifast starts with your computer."
-msgstr "Не удалось изменить запуск Spotifast вместе с компьютером."
+msgid "Couldn't change how Spindle starts with your computer."
+msgstr "Не удалось изменить запуск Spindle вместе с компьютером."
 
 #. Translators: {name} is the name of a speaker or other playback device.
 #: src/app.rs:2479
@@ -736,12 +736,12 @@ msgstr ""
 #. Translators: {version} is a version number such as 1.4.0.
 #: src/app.rs:2662
 #, rust-format
-msgid "Spotifast {version} is available"
-msgstr "Доступен Spotifast {version}"
+msgid "Spindle {version} is available"
+msgstr "Доступен Spindle {version}"
 
 #: src/app.rs:2679
-msgid "Spotifast is up to date"
-msgstr "Установлена последняя версия Spotifast"
+msgid "Spindle is up to date"
+msgstr "Установлена последняя версия Spindle"
 
 #. Translators: {error} is an error message.
 #: src/app.rs:2687
@@ -973,8 +973,8 @@ msgid "This song's album is not on Spotify"
 msgstr "Альбома этого трека нет в Spotify"
 
 #: src/app.rs:8245
-msgid "Spotifast cannot open this kind of Spotify link"
-msgstr "Spotifast не умеет открывать такие ссылки Spotify"
+msgid "Spindle cannot open this kind of Spotify link"
+msgstr "Spindle не умеет открывать такие ссылки Spotify"
 
 #: src/app.rs:8493
 msgid "Nothing is playing. Pick something first"
@@ -1456,16 +1456,16 @@ msgstr "Треки воспроизводятся без тишины между
 
 #: src/ui/settings.rs:664
 msgid ""
-"Spotifast hides to the system tray. Quit from the tray menu or with Ctrl+Q."
+"Spindle hides to the system tray. Quit from the tray menu or with Ctrl+Q."
 msgstr ""
-"Spotifast сворачивается в системный трей. Выйти можно через меню трея или по "
+"Spindle сворачивается в системный трей. Выйти можно через меню трея или по "
 "Ctrl+Q."
 
 #: src/ui/settings.rs:668
 msgid ""
-"Spotifast hides to the system tray. Quit from the tray menu or with Cmd+Q."
+"Spindle hides to the system tray. Quit from the tray menu or with Cmd+Q."
 msgstr ""
-"Spotifast сворачивается в системный трей. Выйти можно через меню трея или по "
+"Spindle сворачивается в системный трей. Выйти можно через меню трея или по "
 "Cmd+Q."
 
 #: src/ui/settings.rs:675
@@ -1512,10 +1512,10 @@ msgstr "Локальные файлы"
 
 #: src/ui/settings.rs:711
 msgid ""
-"When off, Spotifast lives in the menu bar and leaves Cmd+Tab. Open it from "
+"When off, Spindle lives in the menu bar and leaves Cmd+Tab. Open it from "
 "its menu-bar icon."
 msgstr ""
-"Если выключено, Spotifast остаётся только в строке меню и не появляется в "
+"Если выключено, Spindle остаётся только в строке меню и не появляется в "
 "Cmd+Tab. Открывайте его через значок в строке меню."
 
 #: src/ui/settings.rs:717
@@ -1683,9 +1683,9 @@ msgstr ""
 
 #: src/ui/settings.rs:1192
 msgid ""
-"Draw Spotifast's own title bar and window buttons instead of the desktop's."
+"Draw Spindle's own title bar and window buttons instead of the desktop's."
 msgstr ""
-"Рисовать собственную строку заголовка и кнопки окна Spotifast вместо "
+"Рисовать собственную строку заголовка и кнопки окна Spindle вместо "
 "элементов окружения рабочего стола."
 
 #: src/ui/settings.rs:1200
@@ -1883,39 +1883,39 @@ msgstr "Пресеты"
 #: src/ui/settings.rs:1865
 #, rust-format
 msgid ""
-"None yet in {folder}. Add .milk files here. Spotifast downloads presets when "
+"None yet in {folder}. Add .milk files here. Spindle downloads presets when "
 "MilkDrop first opens with an empty folder."
 msgstr ""
-"В {folder} пока пусто. Добавь сюда файлы .milk. Spotifast загрузит пресеты, "
+"В {folder} пока пусто. Добавь сюда файлы .milk. Spindle загрузит пресеты, "
 "когда MilkDrop впервые откроется с пустой папкой."
 
 #. Translators: {folder} is the path of the MilkDrop presets folder.
 #: src/ui/settings.rs:1871
 #, rust-format
 msgid ""
-"One preset in {folder}. Add .milk files here. Spotifast downloads presets "
+"One preset in {folder}. Add .milk files here. Spindle downloads presets "
 "when MilkDrop first opens with an empty folder."
 msgstr ""
-"В {folder} один пресет. Добавь сюда файлы .milk. Spotifast загрузит пресеты, "
+"В {folder} один пресет. Добавь сюда файлы .milk. Spindle загрузит пресеты, "
 "когда MilkDrop впервые откроется с пустой папкой."
 
 #. Translators: {count} is the number of presets, {folder} the path of the MilkDrop presets folder.
 #: src/ui/settings.rs:1877
 #, rust-format
 msgid ""
-"{count} preset in {folder}. Add .milk files here. Spotifast downloads "
+"{count} preset in {folder}. Add .milk files here. Spindle downloads "
 "presets when MilkDrop first opens with an empty folder."
 msgid_plural ""
-"{count} presets in {folder}. Add .milk files here. Spotifast downloads "
+"{count} presets in {folder}. Add .milk files here. Spindle downloads "
 "presets when MilkDrop first opens with an empty folder."
 msgstr[0] ""
-"В {folder} {count} пресет. Добавь сюда файлы .milk. Spotifast загрузит "
+"В {folder} {count} пресет. Добавь сюда файлы .milk. Spindle загрузит "
 "пресеты, когда MilkDrop впервые откроется с пустой папкой."
 msgstr[1] ""
-"В {folder} {count} пресета. Добавь сюда файлы .milk. Spotifast загрузит "
+"В {folder} {count} пресета. Добавь сюда файлы .milk. Spindle загрузит "
 "пресеты, когда MilkDrop впервые откроется с пустой папкой."
 msgstr[2] ""
-"В {folder} {count} пресетов. Добавь сюда файлы .milk. Spotifast загрузит "
+"В {folder} {count} пресетов. Добавь сюда файлы .milk. Spindle загрузит "
 "пресеты, когда MilkDrop впервые откроется с пустой папкой."
 
 #: src/ui/settings.rs:1886
@@ -2107,8 +2107,8 @@ msgid "In the tray"
 msgstr "В трее"
 
 #: src/ui/settings.rs:2343
-msgid "Allow Spotifast in System Settings, General, Login Items."
-msgstr "Разрешите Spotifast в Системных настройках: Основные, Объекты входа."
+msgid "Allow Spindle in System Settings, General, Login Items."
+msgstr "Разрешите Spindle в Системных настройках: Основные, Объекты входа."
 
 #: src/ui/settings.rs:2348
 msgid ""
@@ -2119,8 +2119,8 @@ msgstr ""
 "закрытия окна». До тех пор открывается окно."
 
 #: src/ui/settings.rs:2353
-msgid "Open Spotifast when you log in, with its window or in the tray."
-msgstr "Открывать Spotifast при входе в систему: с окном или в трее."
+msgid "Open Spindle when you log in, with its window or in the tray."
+msgstr "Открывать Spindle при входе в систему: с окном или в трее."
 
 #: src/ui/settings.rs:2459
 msgctxt "language"
@@ -2232,9 +2232,9 @@ msgstr ""
 
 #: src/theme.rs:213
 msgid ""
-"Custom themes could not be loaded. Run spotifast reload-themes to try again."
+"Custom themes could not be loaded. Run spindle reload-themes to try again."
 msgstr ""
-"Не удалось загрузить свои темы. Выполни spotifast reload-themes, чтобы "
+"Не удалось загрузить свои темы. Выполни spindle reload-themes, чтобы "
 "попробовать снова."
 
 #: src/ui/artist.rs:32
@@ -2449,11 +2449,11 @@ msgstr "Меньше ждать Spotify"
 
 #: src/ui/dialogs.rs:47
 msgid ""
-"Spotifast's default connection shares Spotify's request limit with other "
+"Spindle's default connection shares Spotify's request limit with other "
 "listeners. When it gets busy, loading music and using playback controls can "
 "take longer."
 msgstr ""
-"Стандартное подключение Spotifast делит лимит запросов Spotify с другими "
+"Стандартное подключение Spindle делит лимит запросов Spotify с другими "
 "слушателями. При высокой нагрузке музыка загружается, а кнопки управления "
 "срабатывают медленнее."
 
@@ -2531,10 +2531,10 @@ msgstr "С этим аккаунтом здесь нельзя слушать м
 #: src/ui/dialogs.rs:219
 msgid ""
 "Playback needs Spotify Premium. Free accounts can browse and search, but "
-"cannot play music through Spotifast."
+"cannot play music through Spindle."
 msgstr ""
 "Для воспроизведения нужен Spotify Premium. С бесплатным аккаунтом можно "
-"просматривать и искать, но не слушать музыку в Spotifast."
+"просматривать и искать, но не слушать музыку в Spindle."
 
 #: src/ui/dialogs.rs:228
 msgid "OK"
@@ -2906,10 +2906,10 @@ msgstr "Войти через Spotify"
 
 #: src/ui/login.rs:136
 msgid ""
-"Sign in through your browser. Spotifast never sees your password. Local "
+"Sign in through your browser. Spindle never sees your password. Local "
 "playback needs Spotify Premium."
 msgstr ""
-"Вход выполняется в браузере. Spotifast никогда не видит твой пароль. Для "
+"Вход выполняется в браузере. Spindle никогда не видит твой пароль. Для "
 "локального воспроизведения нужен Spotify Premium."
 
 #: src/ui/login.rs:169
@@ -2919,8 +2919,8 @@ msgstr "Настройки прокси"
 #. Translators: {version} is the app's version number, such as 1.2.0.
 #: src/ui/login.rs:195
 #, rust-format
-msgid "Spotifast {version} • not affiliated with Spotify"
-msgstr "Spotifast {version} • не связан со Spotify"
+msgid "Spindle {version} • not affiliated with Spotify"
+msgstr "Spindle {version} • не связан со Spotify"
 
 #: src/ui/mod.rs:476
 msgid "Minimize"
@@ -3149,9 +3149,9 @@ msgstr "Что хочешь послушать?"
 
 #: src/ui/topbar.rs:521
 msgid ""
-"Spotifast is offline. Reconnecting automatically when connection returns."
+"Spindle is offline. Reconnecting automatically when connection returns."
 msgstr ""
-"Spotifast не в сети. Подключение восстановится автоматически, когда сеть "
+"Spindle не в сети. Подключение восстановится автоматически, когда сеть "
 "станет доступна."
 
 #: src/ui/topbar.rs:548
@@ -3189,8 +3189,8 @@ msgid "Version {version} is available."
 msgstr "Доступна версия {version}."
 
 #: src/ui/update.rs:19
-msgid "Update Spotifast"
-msgstr "Обновить Spotifast"
+msgid "Update Spindle"
+msgstr "Обновить Spindle"
 
 #: src/ui/update.rs:51
 msgid "Close update"
@@ -3211,8 +3211,8 @@ msgid "Ready to install"
 msgstr "Готово к установке"
 
 #: src/ui/update.rs:115
-msgid "Music playing on this computer will stop when Spotifast restarts."
-msgstr "Музыка на этом компьютере остановится при перезапуске Spotifast."
+msgid "Music playing on this computer will stop when Spindle restarts."
+msgstr "Музыка на этом компьютере остановится при перезапуске Spindle."
 
 #: src/ui/update.rs:122
 msgid "Restart to update"
@@ -3543,29 +3543,29 @@ msgstr ""
 "своего окружения."
 
 #: src/window.rs:39
-msgid "Spotifast cannot open its window"
-msgstr "Spotifast не может открыть окно"
+msgid "Spindle cannot open its window"
+msgstr "Spindle не может открыть окно"
 
 #: src/window.rs:45
 msgid ""
-"On Windows on ARM, the OpenGL that Spotifast draws with comes from "
+"On Windows on ARM, the OpenGL that Spindle draws with comes from "
 "Microsoft's OpenCL, OpenGL & Vulkan Compatibility Pack. Open its Microsoft "
 "Store page to install or repair it?"
 msgstr ""
-"В Windows на ARM OpenGL, с помощью которого рисует Spotifast, предоставляет "
+"В Windows на ARM OpenGL, с помощью которого рисует Spindle, предоставляет "
 "пакет Microsoft OpenCL, OpenGL & Vulkan Compatibility Pack. Открыть его "
 "страницу в Microsoft Store, чтобы установить или восстановить его?"
 
 #. Translators: Keep {url} exactly as written. It becomes the address
-#. of the Spotifast download page.
+#. of the Spindle download page.
 #: src/window.rs:55
 #, rust-format
 msgid ""
-"Spotifast needs a graphics driver with OpenGL 2.0 or newer, and this PC or "
+"Spindle needs a graphics driver with OpenGL 2.0 or newer, and this PC or "
 "virtual machine does not provide one. Install the graphics driver, or turn "
 "on GPU acceleration for the virtual machine. Open {url} to read more?"
 msgstr ""
-"Spotifast нужен графический драйвер с OpenGL 2.0 или новее, а этот компьютер "
+"Spindle нужен графический драйвер с OpenGL 2.0 или новее, а этот компьютер "
 "или эта виртуальная машина его не предоставляет. Установите графический "
 "драйвер или включите GPU-ускорение для виртуальной машины. Открыть {url}, "
 "чтобы узнать больше?"

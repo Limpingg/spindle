@@ -94,7 +94,7 @@ fn catalogs_cover_the_template_and_preserve_named_placeholders() {
     }
     assert_eq!(
         catalogs + 1,
-        <spotifast::i18n::Locale as clap::ValueEnum>::value_variants().len()
+        <spindle::i18n::Locale as clap::ValueEnum>::value_variants().len()
     );
 }
 

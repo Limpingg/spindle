@@ -661,11 +661,11 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
             super::keys::platform_shortcut(
                 &gettext(
                     locale,
-                    "Spotifast hides to the system tray. Quit from the tray menu or with Ctrl+Q.",
+                    "Spindle hides to the system tray. Quit from the tray menu or with Ctrl+Q.",
                 ),
                 &gettext(
                     locale,
-                    "Spotifast hides to the system tray. Quit from the tray menu or with Cmd+Q.",
+                    "Spindle hides to the system tray. Quit from the tray menu or with Cmd+Q.",
                 ),
             )
             .to_owned(),
@@ -708,7 +708,7 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
             show_in_dock.clone(),
             gettext(
                 locale,
-                "When off, Spotifast lives in the menu bar and leaves Cmd+Tab. Open it from its menu-bar icon.",
+                "When off, Spindle lives in the menu bar and leaves Cmd+Tab. Open it from its menu-bar icon.",
             ),
         )
         .when(cfg!(target_os = "macos")),
@@ -1189,7 +1189,7 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
             custom_titlebar.clone(),
             gettext(
                 locale,
-                "Draw Spotifast's own title bar and window buttons instead of the desktop's.",
+                "Draw Spindle's own title bar and window buttons instead of the desktop's.",
             ),
         )
         .when(show_custom_titlebar),
@@ -1745,7 +1745,7 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
                 // the mini player opens.
                 const RANDOM: usize = usize::MAX;
                 let random = gettext(locale, "Random");
-                let mut options: Vec<(usize, &str)> = vec![(RANDOM, &random), (0, "Spotifast")];
+                let mut options: Vec<(usize, &str)> = vec![(RANDOM, &random), (0, "Spindle")];
                 options.extend(
                     choices
                         .iter()
@@ -1779,7 +1779,7 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
                     let label = options
                         .iter()
                         .find(|(value, _)| *value == showing)
-                        .map_or("Spotifast", |(_, label)| label);
+                        .map_or("Spindle", |(_, label)| label);
                     theme::subtle(
                         ui,
                         &palette,
@@ -1862,20 +1862,20 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
                 0 => gettext(
                     locale,
                     // Translators: {folder} is the path of the MilkDrop presets folder.
-                    "None yet in {folder}. Add .milk files here. Spotifast downloads presets when MilkDrop first opens with an empty folder.",
+                    "None yet in {folder}. Add .milk files here. Spindle downloads presets when MilkDrop first opens with an empty folder.",
                 )
                 .replace("{folder}", &folder),
                 1 => gettext(
                     locale,
                     // Translators: {folder} is the path of the MilkDrop presets folder.
-                    "One preset in {folder}. Add .milk files here. Spotifast downloads presets when MilkDrop first opens with an empty folder.",
+                    "One preset in {folder}. Add .milk files here. Spindle downloads presets when MilkDrop first opens with an empty folder.",
                 )
                 .replace("{folder}", &folder),
                 n => ngettext(
                     locale,
                     // Translators: {count} is the number of presets, {folder} the path of the MilkDrop presets folder.
-                    "{count} preset in {folder}. Add .milk files here. Spotifast downloads presets when MilkDrop first opens with an empty folder.",
-                    "{count} presets in {folder}. Add .milk files here. Spotifast downloads presets when MilkDrop first opens with an empty folder.",
+                    "{count} preset in {folder}. Add .milk files here. Spindle downloads presets when MilkDrop first opens with an empty folder.",
+                    "{count} presets in {folder}. Add .milk files here. Spindle downloads presets when MilkDrop first opens with an empty folder.",
                     u32::try_from(n).unwrap_or(u32::MAX),
                 )
                 .replace("{count}", &n.to_string())
@@ -2218,7 +2218,7 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
     let source_code = gettext(locale, "Source code");
     let about_rows = [
         RowText::new(
-            format!("Spotifast {}", env!("CARGO_PKG_VERSION")),
+            format!("Spindle {}", env!("CARGO_PKG_VERSION")),
             built_with.clone(),
         ),
         RowText::new(
@@ -2235,7 +2235,7 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
                 ui.vertical(|ui| {
                     theme::text(
                         ui,
-                        format!("Spotifast {}", env!("CARGO_PKG_VERSION")),
+                        format!("Spindle {}", env!("CARGO_PKG_VERSION")),
                         theme::semibold(15.0),
                         palette.text,
                     );
@@ -2329,7 +2329,7 @@ fn start_with_computer_choices(
 
 /// What the row says under its title: how to finish a registration the
 /// system holds for approval, why a start in the tray opens the window
-/// while nothing keeps Spotifast there, or what the choices do.
+/// while nothing keeps Spindle there, or what the choices do.
 fn start_with_computer_detail(
     locale: crate::i18n::Locale,
     state: Option<fastframe_autostart::State>,
@@ -2340,7 +2340,7 @@ fn start_with_computer_detail(
     if matches!(state, Some(State::NeedsApproval(_))) && choice.is_some() {
         gettext(
             locale,
-            "Allow Spotifast in System Settings, General, Login Items.",
+            "Allow Spindle in System Settings, General, Login Items.",
         )
     } else if choice == Some(Start::Hidden) && !keeps_running {
         gettext(
@@ -2350,7 +2350,7 @@ fn start_with_computer_detail(
     } else {
         gettext(
             locale,
-            "Open Spotifast when you log in, with its window or in the tray.",
+            "Open Spindle when you log in, with its window or in the tray.",
         )
     }
 }
@@ -2402,7 +2402,7 @@ fn start_with_computer_row(
 /// A band's frequency the short way: 60, 170, 1K, 16K.
 /// The interface language: System first, then each language by its own name,
 /// so a reader can find theirs whatever language the app is showing.
-/// Follow system's palette for light or dark mode: Spotifast's own, or a
+/// Follow system's palette for light or dark mode: Spindle's own, or a
 /// palette file of that base.
 fn pair_picker(app: &mut App, ui: &mut egui::Ui, base: fastframe_theme::Base, name: &str) {
     let locale = app.locale;
@@ -2616,7 +2616,7 @@ mod tests {
         use crate::model::Action;
         use egui::accesskit::{Action as AccessibleAction, ActionRequest, TreeId};
         let root = std::env::temp_dir().join(format!(
-            "spotifast-eq-presets-{}-{}",
+            "spindle-eq-presets-{}-{}",
             std::process::id(),
             std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)

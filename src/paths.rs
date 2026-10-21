@@ -1,20 +1,20 @@
-//! Where Spotifast keeps its files.
+//! Where Spindle keeps its files.
 //!
 //! Configuration, durable non-secret state, and disposable caches live in the
 //! platform's conventional directories, or, for a copy started from the
-//! portable Windows zip, in `spotifast-data` next to the executable (#703).
+//! portable Windows zip, in `spindle-data` next to the executable (#703).
 //! Spotify grants use the platform store; the token paths below are retained
 //! only for migration and sign-out cleanup.
 
 use std::path::PathBuf;
 
-/// Where Spotifast's folders are: the per-user folders, or a portable copy's
+/// Where Spindle's folders are: the per-user folders, or a portable copy's
 /// own. A new portable folder copies the per-user settings and state, except
 /// the single-instance files a running installed copy holds locked and the
 /// logs of its runs.
 const FOLDERS: fastframe_dirs::App = fastframe_dirs::App {
-    not_copied: &["instance", "spotifast.log", "panic.log"],
-    ..fastframe_dirs::App::new("spotifast", "me", "paolino", "spotifast")
+    not_copied: &["instance", "spindle.log", "panic.log"],
+    ..fastframe_dirs::App::new("spindle", "me", "paolino", "spindle")
 };
 
 #[derive(Clone, Debug)]
@@ -98,9 +98,9 @@ impl AppDirs {
     fn fallback() -> Self {
         let fallback = std::env::current_dir().unwrap_or_default();
         Self {
-            config: fallback.join("spotifast-config"),
-            state: fallback.join("spotifast-state"),
-            cache: fallback.join("spotifast-cache"),
+            config: fallback.join("spindle-config"),
+            state: fallback.join("spindle-state"),
+            cache: fallback.join("spindle-cache"),
         }
     }
 
@@ -143,7 +143,7 @@ impl AppDirs {
 
     /// The log of the current run, replaced at every start.
     pub fn log_file(&self) -> PathBuf {
-        self.state.join("spotifast.log")
+        self.state.join("spindle.log")
     }
 
     /// Where a panic is recorded before the process dies of it.
@@ -282,7 +282,7 @@ mod tests {
     fn the_log_says_which_folders_a_portable_copy_uses_and_why() {
         let installed = AppDirs::from(fastframe_dirs::Dirs::inside(Path::new("/user")));
         assert!(describe(&installed, &fastframe_dirs::Mode::Installed).is_none());
-        let folder = PathBuf::from("/usb/Spotifast/spotifast-data");
+        let folder = PathBuf::from("/usb/Spindle/spindle-data");
         let portable = AppDirs::from(fastframe_dirs::Dirs::inside(&folder));
         let (level, line) = describe(
             &portable,
@@ -294,7 +294,7 @@ mod tests {
         .unwrap();
         assert_eq!(level, log::Level::Info);
         assert!(
-            line.contains("spotifast-data") && line.contains("/user"),
+            line.contains("spindle-data") && line.contains("/user"),
             "{line}"
         );
         let (level, line) = describe(
@@ -315,8 +315,8 @@ mod tests {
     /// Installed copies, and every copy on Linux and macOS, keep the folders
     /// they always had.
     #[test]
-    fn the_per_user_folders_are_the_ones_spotifast_always_used() {
-        let Some(project) = directories::ProjectDirs::from("me", "paolino", "spotifast") else {
+    fn the_per_user_folders_are_the_ones_spindle_always_used() {
+        let Some(project) = directories::ProjectDirs::from("me", "paolino", "spindle") else {
             return;
         };
         let dirs = AppDirs::installed();
