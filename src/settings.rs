@@ -333,6 +333,9 @@ pub struct Settings {
     /// Local playback has been authorized at least once on this machine, so
     /// the app can resume it silently instead of prompting.
     pub playback_authorized: bool,
+    /// Spindle: the full search approval was opened in the browser once on
+    /// its own, so it is not opened again; Settings keeps a button for it.
+    pub full_search_offered: bool,
     /// Closing the window hides to the tray and keeps the music playing.
     pub keep_playing_in_background: bool,
     /// Linux and Windows: the tray icon in colour, white or black (#128).
@@ -506,6 +509,7 @@ impl Default for Settings {
             personal_app_nudge_at: None,
             personal_app_intro_seen: false,
             playback_authorized: false,
+            full_search_offered: false,
             keep_playing_in_background: true,
             tray_icon: TrayIcon::Colour,
             mac_notch_widget: false,

@@ -2805,6 +2805,21 @@ impl App {
                 {
                     self.load_made_for_you(false);
                 }
+                // Spindle: full search is on by default. It needs one
+                // browser approval, opened here once on its own.
+                if became_ready
+                    && !cfg!(test)
+                    && !self.settings.full_search_offered
+                    && !crate::session_search::has_grant(&self.dirs.state)
+                {
+                    self.settings.full_search_offered = true;
+                    self.settings_dirty = true;
+                    self.toast(gettext(
+                        self.locale,
+                        "Approve Spotify in your browser to turn on full search.",
+                    ));
+                    self.backend.send(Command::AuthorizeSearch);
+                }
                 if became_ready {
                     self.reread_playlists_over_session();
                     // The session reads Spotify's own feed of new releases,
