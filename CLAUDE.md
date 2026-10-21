@@ -42,7 +42,7 @@ conflict only where Spindle's own changes meet Spotifast's.
 
 ## Self updates
 
-`updates.rs` points at Nicolasaustin/spindle with no publisher key (the
+`updates.rs` points at Limpingg/spindle with no publisher key (the
 releases are not signed yet; sign checksums.txt in the Release workflow and
 put the public key in assets/update-public-key.hex to require it).
 Settings default `check_for_updates: true`. Never point the updater back at

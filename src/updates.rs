@@ -28,7 +28,7 @@ pub const CONFIG: UpdateConfig = UpdateConfig {
     appimage: false,
     mac_target: MacTarget::Arm64Only,
     ..UpdateConfig::new(
-        "Nicolasaustin/spindle",
+        "Limpingg/spindle",
         "Spindle",
         "spindle",
         env!("CARGO_PKG_VERSION"),
@@ -55,7 +55,7 @@ mod tests {
     /// release installed over Spindle would replace it.
     #[test]
     fn updates_come_from_spindles_own_repository() {
-        assert_eq!(CONFIG.repository, "Nicolasaustin/spindle");
+        assert_eq!(CONFIG.repository, "Limpingg/spindle");
         assert_eq!(CONFIG.slug, "spindle");
         assert!(matches!(CONFIG.mac_target, MacTarget::Arm64Only));
     }

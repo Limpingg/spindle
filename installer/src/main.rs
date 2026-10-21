@@ -710,7 +710,7 @@ fn register(places: &Places, size_bytes: usize) -> Result<(), String> {
     set("InstallLocation", &places.install_dir.display().to_string())?;
     set("UninstallString", &format!("\"{uninstaller}\" --uninstall"))?;
     set("QuietUninstallString", &format!("\"{uninstaller}\" --uninstall"))?;
-    set("URLInfoAbout", "https://github.com/Nicolasaustin/spindle")?;
+    set("URLInfoAbout", "https://github.com/Limpingg/spindle")?;
     key.set_value("NoModify", &1u32)
         .map_err(|error| format!("Couldn't write NoModify: {error}"))?;
     key.set_value("NoRepair", &1u32)
