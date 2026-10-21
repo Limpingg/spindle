@@ -994,27 +994,34 @@ fn extras(app: &mut App, ui: &mut egui::Ui, now: Option<&NowPlaying>, transport_
             input.pointer.interact_pos(),
         )
     });
-    let mut dragging: Option<&'static str> = ui.ctx().data(|data| data.get_temp::<&'static str>(drag_id));
+    // (the button pressed, whether the press has moved far enough to be a
+    // drag). Kept across frames: on the frame the button comes up, egui no
+    // longer reports where the press began.
+    let mut dragging: Option<(&'static str, bool)> =
+        ui.ctx().data(|data| data.get_temp::<(&'static str, bool)>(drag_id));
     if pressed {
         dragging = origin.and_then(|origin| {
             slots
                 .iter()
                 .find(|(_, _, handle)| handle.contains(origin))
-                .map(|(name, _, _)| *name)
+                .map(|(name, _, _)| (*name, false))
         });
     }
-    let moving = dragging.is_some()
-        && matches!((origin, pointer), (Some(origin), Some(pointer)) if origin.distance(pointer) > 6.0);
+    if let (Some((_, moving)), Some(origin), Some(pointer)) = (dragging.as_mut(), origin, pointer)
+        && origin.distance(pointer) > 6.0
+    {
+        *moving = true;
+    }
     let target = pointer.and_then(|pointer| {
         slots
             .iter()
             .find(|(_, rect, _)| rect.contains(pointer))
             .map(|(name, rect, _)| (*name, *rect))
     });
-    if moving && (down || released) {
+    if let Some((dragged, true)) = dragging {
         ui.ctx().set_cursor_icon(egui::CursorIcon::Grabbing);
         if let Some((name, rect)) = target
-            && Some(name) != dragging
+            && name != dragged
         {
             ui.painter().rect_stroke(
                 rect.expand(2.0),
@@ -1026,19 +1033,16 @@ fn extras(app: &mut App, ui: &mut egui::Ui, now: Option<&NowPlaying>, transport_
     }
     let mut moved = None;
     if released || !down {
-        if moving
-            && released
-            && let (Some(dragged), Some((name, _))) = (dragging, target)
-        {
+        if let (Some((dragged, true)), Some((name, _))) = (dragging, target) {
             moved = Some((dragged, name));
         }
         dragging = None;
     }
     ui.ctx().data_mut(|data| match dragging {
-        Some(name) => {
-            data.insert_temp(drag_id, name);
+        Some(state) => {
+            data.insert_temp(drag_id, state);
         }
-        None => data.remove::<&'static str>(drag_id),
+        None => data.remove::<(&'static str, bool)>(drag_id),
     });
     if let Some((dragged, target)) = moved
         && dragged != target
