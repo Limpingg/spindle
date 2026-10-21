@@ -1991,7 +1991,7 @@ mod tests {
             let tree = accessible_frame(&ctx, &mut app, vec![]);
             let home = accessible_node(&tree, &gettext(locale, "Home"), Role::Button);
             let search = accessible_node(&tree, &gettext(locale, "Search"), Role::Button);
-            accessible_node(&tree, &gettext(locale, "Create a playlist"), Role::Button);
+            accessible_node(&tree, &gettext(locale, "Create"), Role::Button);
             accessible_node(&tree, &gettext(locale, "Albums"), Role::Button);
             accessible_node(&tree, &gettext(locale, "Artists"), Role::Button);
             let liked = accessible_node(&tree, &gettext(locale, "Liked Songs"), Role::Button);

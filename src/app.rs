@@ -11209,11 +11209,13 @@ impl App {
             }
             Action::StartJam => {
                 self.dialog = Some(Dialog::Jam);
-                // A Jam already running is shown as it is, not started again.
+                // Spotify answers the Jam already running rather than a new
+                // one, so asking again refreshes who is in it; a live Jam
+                // stays on screen meanwhile.
                 if !matches!(self.jam, crate::model::JamState::Live(_)) {
                     self.jam = crate::model::JamState::Starting;
-                    self.backend.send(Command::StartJam);
                 }
+                self.backend.send(Command::StartJam);
             }
             Action::EndJam => {
                 if let crate::model::JamState::Live(session) = &self.jam {
