@@ -1,7 +1,7 @@
 [package]
 name = "spindle"
 default-run = "spindle"
-version = "0.14.113"
+version = "0.14.114"
 edition = "2024"
 rust-version = "1.98"
 license = "MIT"

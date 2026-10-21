@@ -838,6 +838,8 @@ pub enum Command {
     ArtistListeners(String),
     /// Spindle: add an empty folder with this name to the library.
     CreateFolder(String),
+    /// Spindle: the Web API search, after the session's search failed.
+    WebSearch { query: String, serial: u64 },
     /// Spindle: start a Jam hosted on this device, or read the one running.
     StartJam,
     /// Spindle: end the Jam with this session id.
@@ -1825,6 +1827,9 @@ struct Worker {
     /// second attempt does not pile up.
     engine_busy: bool,
     search_tasks: Vec<tokio::task::AbortHandle>,
+    /// Spindle: the newest search's serial, so a fallback for an older one
+    /// never cancels it.
+    latest_search: u64,
     /// A user changed engine-affecting settings while the current connection
     /// attempt was in flight. Its result is stale and must not be installed.
     engine_restart_pending: bool,
@@ -1934,6 +1939,7 @@ impl Worker {
             prerelease_waiting: None,
             engine_busy: false,
             search_tasks: Vec::new(),
+            latest_search: 0,
             engine_restart_pending: false,
             signed_in: false,
             premium: None,
@@ -2321,6 +2327,12 @@ impl Worker {
                     }
                 }
                 Command::Api(ApiRequest::Search { query, serial }) => self.search(query, serial),
+                Command::WebSearch { query, serial } => {
+                    if serial == self.latest_search {
+                        self.cancel_search();
+                        self.web_search(query, serial)
+                    }
+                }
                 Command::Api(request) => {
                     self.dispatch(request);
                 }
@@ -4786,9 +4798,54 @@ impl Worker {
 
     fn search(&mut self, query: String, serial: u64) {
         self.cancel_search();
+        self.latest_search = serial;
         if query.is_empty() {
             return;
         }
+        // Spindle: the whole catalogue first, as Spotify's own apps search
+        // it over the playback session; the Web API's answer to an outside
+        // app is a handful of results. Without the session, or when its
+        // search fails, the Web API search below runs as before.
+        if let (Some(engine), Some(web)) = (self.engine.clone(), self.api.prerelease_http_client()) {
+            self.emit(Event::Api(Box::new(ApiResponse::SearchStarted {
+                query: query.clone(),
+                serial,
+                split: false,
+            })));
+            let events = self.events.clone();
+            let waker = self.waker.clone();
+            let commands = self.commands.clone();
+            let task = tokio::spawn(async move {
+                let read = tokio::time::timeout(
+                    Duration::from_secs(10),
+                    crate::session_search::search(engine.session(), &web, &query),
+                )
+                .await;
+                match read {
+                    Ok(Ok(results)) => {
+                        let _ = events.send(Event::Api(Box::new(ApiResponse::Search {
+                            query,
+                            serial,
+                            result: Ok(results),
+                        })));
+                        waker.wake();
+                    }
+                    failed => {
+                        match failed {
+                            Ok(Err(error)) => log::warn!("session search failed, using the Web API: {error:#}"),
+                            _ => log::warn!("session search timed out, using the Web API"),
+                        }
+                        let _ = commands.send(Command::WebSearch { query, serial });
+                    }
+                }
+            });
+            self.search_tasks.push(task.abort_handle());
+            return;
+        }
+        self.web_search(query, serial);
+    }
+
+    fn web_search(&mut self, query: String, serial: u64) {
         let split = self.api.personal_ready();
         self.emit(Event::Api(Box::new(ApiResponse::SearchStarted {
             query: query.clone(),
