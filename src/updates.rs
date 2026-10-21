@@ -10,7 +10,7 @@ pub use fastframe_update::{
     CHECK_INTERVAL, DownloadState, Installation, Kind, Prepared, Release, Source, Unsupported,
     Updater,
 };
-use fastframe_update::{MacConfig, ReqwestTransport, UpdateConfig};
+use fastframe_update::{MacConfig, MacTarget, ReqwestTransport, UpdateConfig};
 
 pub const CONFIG: UpdateConfig = UpdateConfig {
     macos: MacConfig {
@@ -23,8 +23,10 @@ pub const CONFIG: UpdateConfig = UpdateConfig {
     // put its public key in assets/update-public-key.hex and require it here.
     // Spotifast's releases must never be offered: they would replace Spindle.
     publisher_key: None,
-    // Spindle does not ship AppImages.
+    // Spindle does not ship AppImages, and its Mac build is Apple silicon
+    // only: the release carries spindle-v<version>-macos-arm64.dmg.
     appimage: false,
+    mac_target: MacTarget::Arm64Only,
     ..UpdateConfig::new(
         "Nicolasaustin/spindle",
         "Spindle",
@@ -55,5 +57,6 @@ mod tests {
     fn updates_come_from_spindles_own_repository() {
         assert_eq!(CONFIG.repository, "Nicolasaustin/spindle");
         assert_eq!(CONFIG.slug, "spindle");
+        assert!(matches!(CONFIG.mac_target, MacTarget::Arm64Only));
     }
 }

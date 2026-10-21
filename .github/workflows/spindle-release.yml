@@ -1,0 +1,209 @@
+# Builds Spindle for Windows and macOS and publishes a GitHub release that
+# Spindle's own updater (src/updates.rs, fastframe-update) reads:
+#
+#   spindle-v<version>-x86_64-pc-windows-msvc-setup.exe   the setup program
+#   spindle-v<version>-x86_64-pc-windows-msvc.zip         portable exe
+#   spindle-v<version>-macos-arm64.dmg                    Apple silicon Macs
+#   checksums.txt                                         sha256 of each
+#
+# The Windows build is cross compiled from Linux with Zig, exactly as the
+# repository's CLAUDE.md describes, so the exe here is the one tested on
+# Nick's PC. The names say "msvc" because that is the target name the
+# updater looks for on Windows, whatever toolchain linked the exe.
+#
+# Runs on a v* tag, or by hand (the Spotifast sync workflow dispatches it
+# after a merge, since a tag pushed with the workflow token starts nothing).
+
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to release (v1.2.3). Created on main if missing."
+        required: true
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  tag:
+    name: Resolve the tag
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.pick.outputs.tag }}
+      version: ${{ steps.pick.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: pick
+        env:
+          INPUT_TAG: ${{ github.event.inputs.tag }}
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "push" ]; then
+            tag="${GITHUB_REF#refs/tags/}"
+          else
+            tag="$INPUT_TAG"
+            if ! git rev-parse -q --verify "refs/tags/$tag" >/dev/null; then
+              git config user.name "github-actions[bot]"
+              git config user.email "github-actions[bot]@users.noreply.github.com"
+              git tag -a "$tag" -m "Spindle ${tag#v}"
+              git push origin "$tag"
+            fi
+          fi
+          version="${tag#v}"
+          cargo_version=$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -1)
+          if [ "$cargo_version" != "$version" ]; then
+            echo "Cargo.toml says $cargo_version but the tag is $tag" >&2
+            exit 1
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+  windows:
+    name: Windows (cross compiled with Zig)
+    needs: tag
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.tag.outputs.tag }}
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: "1.98.0"
+          targets: x86_64-pc-windows-gnu
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: windows-gnu
+      - name: Install Zig and cargo-zigbuild
+        run: |
+          pip install ziglang
+          cargo install cargo-zigbuild --locked
+      - name: Build spindle.exe
+        run: cargo zigbuild --release --no-default-features --target x86_64-pc-windows-gnu
+      - name: Build the setup program
+        working-directory: installer
+        env:
+          SPINDLE_EXE: ${{ github.workspace }}/target/x86_64-pc-windows-gnu/release/spindle.exe
+        run: cargo zigbuild --release --target x86_64-pc-windows-gnu
+      - name: Name the files for the updater
+        env:
+          VERSION: ${{ needs.tag.outputs.version }}
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          stem="spindle-v$VERSION-x86_64-pc-windows-msvc"
+          cp installer/target/x86_64-pc-windows-gnu/release/spindle-setup.exe "dist/$stem-setup.exe"
+          # The portable zip: the exe and the marker that keeps its data beside it.
+          mkdir -p "portable/$stem"
+          cp target/x86_64-pc-windows-gnu/release/spindle.exe "portable/$stem/"
+          cp packaging/spindle-portable.txt "portable/$stem/" 2>/dev/null || echo "spindle-portable-v1" > "portable/$stem/spindle-portable.txt"
+          cp README.md LICENSE "portable/$stem/"
+          (cd portable && zip -qr "../dist/$stem.zip" "$stem")
+          ls -la dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          path: dist/*
+
+  macos:
+    name: macOS (Apple silicon)
+    needs: tag
+    runs-on: macos-latest
+    # The Mac build is a bonus: a failure here does not stop the Windows
+    # release. The job prints why, and the release notes say which files
+    # made it.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.tag.outputs.tag }}
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: "1.98.0"
+          targets: aarch64-apple-darwin
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: macos-arm64
+      - name: Build Spindle
+        run: cargo build --release --no-default-features --target aarch64-apple-darwin
+      - name: Bundle and make the disk image
+        env:
+          VERSION: ${{ needs.tag.outputs.version }}
+        run: |
+          set -euo pipefail
+          mkdir -p dist payload
+          packaging/macos/bundle.sh target/aarch64-apple-darwin/release/spindle "payload/Spindle.app" "$VERSION"
+          ruby packaging/macos/dmg.rb payload "dist/spindle-v$VERSION-macos-arm64.dmg"
+          ls -la dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos
+          path: dist/*
+
+  publish:
+    name: Publish the release
+    needs: [tag, windows, macos]
+    if: ${{ always() && needs.windows.result == 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.tag.outputs.tag }}
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      - name: Collect the files and write checksums.txt
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          find artifacts -type f -exec cp {} dist/ \;
+          cd dist
+          sha256sum * > checksums.txt
+          cat checksums.txt
+      - name: Write the release notes
+        env:
+          VERSION: ${{ needs.tag.outputs.version }}
+        run: |
+          set -euo pipefail
+          {
+            echo "Spindle $VERSION"
+            echo
+            # The Spotifast release this build carries: the newest one merged.
+            spotifast=$(git log --format=%s | grep -m1 -oE '^Merge Spotifast [0-9.]+' | awk '{print $3}' || true)
+            if [ -n "$spotifast" ]; then
+              echo "Carries Spotifast $spotifast. Spotifast's own notes: https://github.com/crmne/spotifast/releases/tag/v$spotifast"
+              echo
+            fi
+            echo "Files:"
+            for f in dist/*; do
+              case "$(basename "$f")" in
+                *-setup.exe) echo "- $(basename "$f"): Windows setup program (installs for your user, no admin prompt)";;
+                *.zip) echo "- $(basename "$f"): Windows portable exe";;
+                *.dmg) echo "- $(basename "$f"): macOS, Apple silicon";;
+                checksums.txt) echo "- checksums.txt: sha256 of every file, read by Spindle's updater";;
+              esac
+            done
+            echo
+            echo "Spindle is a fork of Spotifast by Carmine Paolino, MIT."
+          } > notes.md
+          cat notes.md
+      - name: Create the GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.tag.outputs.tag }}
+        run: |
+          set -euo pipefail
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" dist/* --clobber
+            gh release edit "$TAG" --notes-file notes.md --draft=false --prerelease=false
+          else
+            gh release create "$TAG" dist/* --title "Spindle ${TAG#v}" --notes-file notes.md --latest
+          fi

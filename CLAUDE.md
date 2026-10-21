@@ -1,40 +1,90 @@
 # Spindle (fork of Spotifast)
 
-This tree is crmne/spotifast 0.14.0 (MIT), renamed to Spindle for Nick. The
-upstream remote is `upstream`. AGENTS.md is spotifast's own agent guide and
-still applies to the code; this file adds what is different here.
+This tree is crmne/spotifast (MIT), renamed to Spindle for Nick. AGENTS.md
+is spotifast's own agent guide and still applies to the code; this file
+adds what is different here.
 
 Writing rule from Nick: no em dashes or en dashes anywhere, ever.
 
+## How Spotifast releases flow in (rename, then merge)
+
+History: Spotifast's commits, then "Rename Spotifast to Spindle" (the
+mechanical rename by scripts/rename-upstream.py, branch spotifast-renamed),
+then Nick's changes on main. Each Spotifast release is renamed the same way
+and committed on spotifast-renamed with the release as a second parent,
+then merged into main. Both sides carry identical renames, so merges
+conflict only where Spindle's own changes meet Spotifast's.
+
+- `scripts/sync-spotifast.sh [vX.Y.Z]` does one release. Exit 2 means
+  conflicts are left in the tree to resolve and commit.
+- `.github/workflows/spindle-sync-spotifast.yml` runs it daily, pushes a
+  clean merge, and dispatches the Release workflow; conflicts become an
+  issue titled "Spotifast merge needs a hand" for a person to run the
+  script locally.
+- `.github/workflows/spindle-release.yml` builds the Windows setup program
+  and portable zip (cross compiled with Zig, like here) and the macOS dmg,
+  writes checksums.txt and publishes the GitHub release the app's updater
+  reads. It runs on a `v*` tag or by dispatch.
+- Versions: Spindle's is Spotifast's major.minor with patch * 100 plus
+  Spindle's own revision (Spotifast 0.14.1 is Spindle 0.14.101; a Spindle
+  only change on top is 0.14.102). Always above the Spotifast release it
+  carries and below the next, so the updater orders them. The tag must
+  equal Cargo.toml's version.
+- Never change the rename rules casually: a changed rule makes the next
+  renamed base differ from the one main was built on. If a rule must
+  change, apply it to main in the same commit.
+- Spotifast's own workflows are dropped by the rename script (they would
+  run and fail here); Spindle's are the `spindle-*.yml` files.
+
+## Self updates
+
+`updates.rs` points at Nicolasaustin/spindle with no publisher key (the
+releases are not signed yet; sign checksums.txt in the Release workflow and
+put the public key in assets/update-public-key.hex to require it).
+Settings default `check_for_updates: true`. Never point the updater back at
+crmne/spotifast: with the PC's "download automatically" on, the app offered
+"Update to 0.14.1", which would have installed Spotifast over Spindle.
+The setup program accepts Inno Setup's silent flags (/VERYSILENT /DIR=
+/LOG=), which is how fastframe-update runs it, and writes
+spindle-installer.txt beside the exe so the updater knows the copy was
+installed that way. The Mac build is Apple silicon only
+(`MacTarget::Arm64Only`, asset spindle-v<version>-macos-arm64.dmg).
+
+## The icon
+
+Nick's green mirror ball, hung upside down: packaging/icons/render-icon.py
+draws packaging/icons/spindle-1024.png (transparent) and
+spindle-mac-1024.png (dark rounded square). `util::app_icon_rgba` decodes
+the transparent PNG once and scales it for the window icon, the trays and
+`theme::logo`; packaging/windows/spindle.ico, packaging/macos/icon-1024.png
+and spindle.icns, installer/assets/window-icon.png and the Linux tray
+packaging/icons/spindle.svg are made from the same picture. Regenerate the
+binary ones with the Python snippet in the git history of this file's
+commit (PIL: ico with PNG entries, icns with icp4..ic14 chunks) when the
+master changes. Nick asked for a Spotify logo on the ball; it is Spotify's
+trademark, so the ball carries no mark.
+
 ## What changed from upstream
 
-- `/home/claude/rename-fork.sh` did the rename: Spotifast -> Spindle,
-  spotifast -> spindle, bundle id com.nickaustin.spindle, bin src/spindle.rs,
-  assets/skins/spindle.wsz, contrib/omarchy/spindle*. Upstream links
-  (spotifast.rocks, github.com/crmne/spotifast) were restored on purpose.
-- Settings default `check_for_updates: false`, and `updates.rs` points at
-  Nicolasaustin/spindle with no publisher key. Never point it back at
-  crmne/spotifast: Nick's PC settings had both update toggles on, and the
-  app offered "Update to 0.14.1", which would have installed Spotifast over
-  Spindle. There are no Spindle releases yet, so a check finds nothing. To
-  turn self updates on, sign checksums.txt in a release workflow and put
-  the public key in assets/update-public-key.hex.
+- The rename is scripts/rename-upstream.py (see above): Spotifast ->
+  Spindle, spotifast -> spindle, bundle id com.nickaustin.spindle, bin
+  src/spindle.rs, assets/skins/spindle.wsz, contrib/omarchy/spindle*.
+  Upstream links (spotifast.rocks, github.com/crmne/spotifast), the credit
+  and the translation template's name stay.
 - Home: a Made for you or New releases shelf whose only content is a rate
   limit or Development Mode quota failure is hidden (`ui/home.rs`
   `shelf_state`) instead of showing an error row with Retry; the next Home
   refresh reads it again. The PC log showed 150 shared-app rate limit hits
   in 8 minutes with the Retry buttons in play.
-- Cherry picked upstream c85c038 (0.14.1): the sink queues 200 ms of sound
-  measured in time, not twelve packets. The PC log had nine WASAPI underruns
-  and one "audio queue ran dry" on the GoXLR before it.
+- Spotifast 0.14.1 merged (the sink queues 200 ms of sound measured in
+  time, not twelve packets). The PC log had nine WASAPI underruns and one
+  "audio queue ran dry" on the GoXLR before it.
 - Windows resources when cross compiling: build.rs (app and installer)
   writes an .rc with the icon and version info, compiles it with `zig rc`
   (or `python3 -m ziglang rc`, or whatever SPINDLE_RC names) and links the
   .res with `cargo:rustc-link-arg-bins`. winresource only runs on a Windows
   host, which is why the first PC build had no taskbar icon.
 - About shows "Spindle is a fork of Spotifast by Carmine Paolino, MIT".
-- Icons: packaging/macos/icon-1024.png and spindle.icns, packaging/windows/
-  spindle.ico are Spindle's disc icon.
 - `App::next_pass`: progress repaint 1000 ms when the window is unfocused
   (upstream 250 ms always).
 - `theme::spinner`: 15 fps in focus, frozen out of focus (upstream 30 fps

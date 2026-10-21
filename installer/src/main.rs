@@ -33,7 +33,57 @@ const WINDOW_SIZE: Vec2 = Vec2::new(760.0, 420.0);
 /// Settings > Apps lists the program under this key, which never changes.
 const UNINSTALL_KEY: &str = r"Software\Microsoft\Windows\CurrentVersion\Uninstall\Spindle";
 
+/// Spindle's own updater runs the setup program the way it runs Inno
+/// Setup: silently, into the folder the running copy lives in, with a log.
+/// Only these flags matter; the others Inno accepts are ignored.
+struct Silent {
+    directory: Option<PathBuf>,
+    log: Option<PathBuf>,
+}
+
+fn silent_flags() -> Option<Silent> {
+    let arguments: Vec<String> = std::env::args().skip(1).collect();
+    let silent = arguments
+        .iter()
+        .any(|argument| matches!(argument.to_ascii_uppercase().as_str(), "/VERYSILENT" | "/SILENT" | "--silent"));
+    if !silent {
+        return None;
+    }
+    let value = |prefix: &str| {
+        arguments
+            .iter()
+            .find_map(|argument| {
+                let upper = argument.to_ascii_uppercase();
+                upper
+                    .starts_with(prefix)
+                    .then(|| argument[prefix.len()..].trim_matches('"').to_owned())
+            })
+            .filter(|value| !value.is_empty())
+            .map(PathBuf::from)
+    };
+    Some(Silent {
+        directory: value("/DIR="),
+        log: value("/LOG="),
+    })
+}
+
 fn main() -> eframe::Result<()> {
+    if let Some(silent) = silent_flags() {
+        let lines = std::cell::RefCell::new(Vec::new());
+        let result = install_into(silent.directory.clone(), false, &|message: &str| {
+            lines.borrow_mut().push(message.to_owned());
+        });
+        if let Some(log) = &silent.log {
+            let mut text = lines.borrow().join("\n");
+            if let Err(error) = &result {
+                text.push_str("\nerror: ");
+                text.push_str(error);
+            }
+            text.push('\n');
+            let _ = std::fs::write(log, text);
+        }
+        std::process::exit(if result.is_ok() { 0 } else { 1 });
+    }
     let uninstall = std::env::args().any(|argument| argument == "--uninstall");
     let icon = image::load_from_memory(WINDOW_ICON)
         .map(|image| {
@@ -84,12 +134,15 @@ impl Places {
             .map(PathBuf::from)
             .filter(|path| path.is_dir())
             .ok_or("LOCALAPPDATA is not set")?;
-        let install_dir = local.join("Programs").join("spindle");
-        Ok(Self {
+        Ok(Self::in_directory(local.join("Programs").join("spindle")))
+    }
+
+    fn in_directory(install_dir: PathBuf) -> Self {
+        Self {
             exe: install_dir.join("spindle.exe"),
             uninstaller: install_dir.join("uninstall.exe"),
             install_dir,
-        })
+        }
     }
 }
 
@@ -372,7 +425,20 @@ impl Setup {
 
 /// Installs everything, reporting each step.
 fn install(desktop_shortcut: bool, report: &dyn Fn(&str)) -> Result<(), String> {
-    let places = Places::discover()?;
+    install_into(None, desktop_shortcut, report)
+}
+
+/// Installs into `directory`, or the per user Programs folder. An update
+/// keeps the shortcuts it finds: `keep_shortcuts` adds none on the desktop.
+fn install_into(
+    directory: Option<PathBuf>,
+    desktop_shortcut: bool,
+    report: &dyn Fn(&str),
+) -> Result<(), String> {
+    let places = match directory {
+        Some(directory) => Places::in_directory(directory),
+        None => Places::discover()?,
+    };
     report("Closing Spindle if it is running");
     close_running_app();
     report("Creating the install folder");
@@ -386,6 +452,12 @@ fn install(desktop_shortcut: bool, report: &dyn Fn(&str)) -> Result<(), String> 
     write_replacing(&places.uninstaller, &own_bytes)?;
     write_replacing(&places.install_dir.join("README.md"), README.as_bytes())?;
     write_replacing(&places.install_dir.join("LICENSE"), LICENSE.as_bytes())?;
+    // Tells Spindle's updater this copy was installed by the setup program,
+    // so an update downloads the next setup program and runs it silently.
+    write_replacing(
+        &places.install_dir.join("spindle-installer.txt"),
+        b"spindle-installer-v1\n",
+    )?;
     report("Creating shortcuts");
     shortcuts(&places, desktop_shortcut)?;
     report("Registering with Windows");
@@ -405,7 +477,7 @@ fn remove(report: &dyn Fn(&str)) -> Result<(), String> {
     report("Unregistering from Windows");
     unregister();
     report("Deleting the program files");
-    for name in ["spindle.exe", "README.md", "LICENSE"] {
+    for name in ["spindle.exe", "README.md", "LICENSE", "spindle-installer.txt"] {
         let path = places.install_dir.join(name);
         if path.exists() {
             std::fs::remove_file(&path)
@@ -474,20 +546,19 @@ fn powershell(script: &str) -> Result<(), String> {
     }
 }
 
-/// Start menu shortcut, and a desktop one when wanted. The shell's own
+/// Start menu shortcut, and a desktop one when wanted or already there (an
+/// update rewrites the shortcuts it finds and adds none). The shell's own
 /// Desktop folder is used, which follows a OneDrive redirected desktop.
 fn shortcuts(places: &Places, desktop: bool) -> Result<(), String> {
     let exe = places.exe.display().to_string().replace('\'', "''");
     let dir = places.install_dir.display().to_string().replace('\'', "''");
+    let want_desktop = if desktop { "$true" } else { "$false" };
     let mut script = format!(
         "$shell = New-Object -ComObject WScript.Shell\n\
-         $targets = @([IO.Path]::Combine($shell.SpecialFolders.Item('Programs'), '{APP_NAME}.lnk'))\n"
+         $targets = @([IO.Path]::Combine($shell.SpecialFolders.Item('Programs'), '{APP_NAME}.lnk'))\n\
+         $desktop = [IO.Path]::Combine($shell.SpecialFolders.Item('Desktop'), '{APP_NAME}.lnk')\n\
+         if ({want_desktop} -or (Test-Path $desktop)) {{ $targets += $desktop }}\n"
     );
-    if desktop {
-        script.push_str(&format!(
-            "$targets += [IO.Path]::Combine($shell.SpecialFolders.Item('Desktop'), '{APP_NAME}.lnk')\n"
-        ));
-    }
     script.push_str(&format!(
         "foreach ($target in $targets) {{\n\
            $link = $shell.CreateShortcut($target)\n\

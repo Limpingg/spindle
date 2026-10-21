@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <!-- Spindle: a green mirror ball hung upside down. Kept simple (no filters) for Qt's tray renderer. -->
+  <defs>
+    <radialGradient id="face" cx="0.38" cy="0.34" r="0.75">
+      <stop offset="0" stop-color="#9cf0bd"/>
+      <stop offset="0.35" stop-color="#3ddc7a"/>
+      <stop offset="0.8" stop-color="#1a8f4a"/>
+      <stop offset="1" stop-color="#0b3d22"/>
+    </radialGradient>
+    <pattern id="tiles" width="8" height="6" patternUnits="userSpaceOnUse" patternTransform="translate(0 2)">
+      <rect x="0" y="0" width="8" height="6" fill="none"/>
+      <path d="M0 0.5 H8 M0.5 0 V6" stroke="#06301a" stroke-width="1" stroke-opacity="0.85"/>
+    </pattern>
+    <clipPath id="ball">
+      <circle cx="64" cy="60" r="50"/>
+    </clipPath>
+  </defs>
+  <circle cx="64" cy="60" r="50" fill="url(#face)"/>
+  <g clip-path="url(#ball)">
+    <rect x="10" y="6" width="108" height="108" fill="url(#tiles)"/>
+    <ellipse cx="64" cy="104" rx="52" ry="12" fill="#06301a" fill-opacity="0.45"/>
+  </g>
+  <circle cx="64" cy="60" r="50" fill="none" stroke="#06301a" stroke-width="1.5"/>
+  <!-- the hook, at the bottom -->
+  <rect x="61" y="109" width="6" height="7" rx="2" fill="#9aa39e"/>
+  <circle cx="64" cy="120" r="3.2" fill="none" stroke="#b9c3be" stroke-width="1.6"/>
+  <!-- sparkle -->
+  <path d="M95 26 L96.4 34.6 L105 36 L96.4 37.4 L95 46 L93.6 37.4 L85 36 L93.6 34.6 Z" fill="#ffffff"/>
+  <path d="M33 80 L33.8 84.2 L38 85 L33.8 85.8 L33 90 L32.2 85.8 L28 85 L32.2 84.2 Z" fill="#ffffff"/>
+</svg>
