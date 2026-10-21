@@ -18,15 +18,15 @@ pub const CONFIG: UpdateConfig = UpdateConfig {
         executable_names: &["Spindle"],
         legacy_bundle_names: &[],
     },
-    // Releases publish an Ed25519 signature for checksums.txt. Require it
-    // before downloading an update, using the release workflow's public key.
-    publisher_key: Some(include_str!("../assets/update-public-key.hex")),
-    // Releases build their AppImages before publishing, so the signed
-    // checksums.txt lists them (#737): an AppImage replaces itself with the
-    // next one.
-    appimage: true,
+    // Spindle's own releases live in Nick's repository. They are not signed
+    // yet, so no publisher key: once a release workflow signs checksums.txt,
+    // put its public key in assets/update-public-key.hex and require it here.
+    // Spotifast's releases must never be offered: they would replace Spindle.
+    publisher_key: None,
+    // Spindle does not ship AppImages.
+    appimage: false,
     ..UpdateConfig::new(
-        "crmne/spotifast",
+        "Nicolasaustin/spindle",
         "Spindle",
         "spindle",
         env!("CARGO_PKG_VERSION"),
@@ -49,20 +49,11 @@ mod tests {
         assert_eq!(CONFIG.current_version, env!("CARGO_PKG_VERSION"));
     }
 
+    /// The updater reads Spindle's releases, never Spotifast's: a Spotifast
+    /// release installed over Spindle would replace it.
     #[test]
-    fn updates_require_the_release_signing_key() {
-        assert!(
-            CONFIG.publisher_key.is_some(),
-            "updates must require a publisher signature"
-        );
-        CONFIG.validate().unwrap();
-    }
-
-    /// An AppImage may replace itself only because the release workflow
-    /// builds the AppImages into the signed checksums.txt;
-    /// packaging/test-release-names.py checks that side.
-    #[test]
-    fn appimages_update_themselves() {
-        const { assert!(CONFIG.appimage) };
+    fn updates_come_from_spindles_own_repository() {
+        assert_eq!(CONFIG.repository, "Nicolasaustin/spindle");
+        assert_eq!(CONFIG.slug, "spindle");
     }
 }

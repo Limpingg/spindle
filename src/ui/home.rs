@@ -324,17 +324,34 @@ fn quick_access(app: &mut App, ui: &mut egui::Ui) {
     }
 }
 
+/// Whether a shelf's failure is Spotify asking for patience: the shared
+/// app's rate limit or a personal app's Development Mode quota. Both pass
+/// on their own and the shelf is read again with the next Home refresh, so
+/// it stays out of the way instead of showing a warning with a Retry
+/// button, which only adds to the requests Spotify is already refusing.
+fn passes_on_its_own(failure: &str) -> bool {
+    failure.contains("rate limiting") || failure.contains("quota")
+}
+
+/// A shelf's cards, whether it is still loading, and the failure to show
+/// when there are no cards. A failure that passes on its own hides the
+/// shelf.
+fn shelf_state<T: Clone>(loadable: &Loadable<Vec<T>>) -> Option<(Vec<T>, bool, Option<String>)> {
+    match loadable {
+        Loadable::Loaded(items) if items.is_empty() => None,
+        Loadable::Loaded(items) => Some((items.clone(), false, None)),
+        Loadable::Loading | Loadable::NotLoaded => Some((Vec::new(), true, None)),
+        Loadable::Failed(error) if passes_on_its_own(error) => None,
+        Loadable::Failed(error) => Some((Vec::new(), false, Some(error.clone()))),
+    }
+}
+
 /// Renders session Home cards or approximate fallback cards in the same shelf.
 fn made_for_you(app: &mut App, ui: &mut egui::Ui) {
     let palette = app.palette;
-    let (playlists, loading, failure) = match &app.home.made_for_you {
-        Loadable::Loaded(playlists) => (playlists.clone(), false, None),
-        Loadable::Loading | Loadable::NotLoaded => (Vec::new(), true, None),
-        Loadable::Failed(error) => (Vec::new(), false, Some(error.clone())),
-    };
-    if playlists.is_empty() && !loading && failure.is_none() {
+    let Some((playlists, loading, failure)) = shelf_state(&app.home.made_for_you) else {
         return;
-    }
+    };
     widgets::shelf(
         ui,
         &palette,
@@ -377,14 +394,9 @@ fn top_mixes(app: &mut App, ui: &mut egui::Ui) {
 /// the title opens the page that plays all their songs, newest first.
 fn new_releases(app: &mut App, ui: &mut egui::Ui) {
     let palette = app.palette;
-    let (albums, loading, failure) = match &app.home.new_releases {
-        Loadable::Loaded(albums) => (albums.clone(), false, None),
-        Loadable::Loading | Loadable::NotLoaded => (Vec::new(), true, None),
-        Loadable::Failed(error) => (Vec::new(), false, Some(error.clone())),
-    };
-    if albums.is_empty() && !loading && failure.is_none() {
+    let Some((albums, loading, failure)) = shelf_state(&app.home.new_releases) else {
         return;
-    }
+    };
     let open = widgets::linked_shelf(
         ui,
         &palette,
@@ -925,6 +937,27 @@ fn recommendations(app: &mut App, ui: &mut egui::Ui) {
 mod tests {
     use super::*;
     use crate::api::models::ResumePoint;
+
+    /// Spotify's rate limit and quota answers hide a shelf; other failures
+    /// show it with the message.
+    #[test]
+    fn a_shelf_spotify_will_answer_later_is_hidden() {
+        let rate_limited = crate::api::client::ApiError::RateLimited.to_string();
+        let quota = crate::api::client::ApiError::QuotaExhausted.to_string();
+        for failure in [rate_limited, quota] {
+            assert!(shelf_state(&Loadable::<Vec<Album>>::Failed(failure)).is_none());
+        }
+        let other = Loadable::<Vec<Album>>::Failed("Spotify couldn't load new releases".into());
+        assert_eq!(
+            shelf_state(&other).map(|(albums, loading, failure)| (albums.len(), loading, failure)),
+            Some((0, false, Some("Spotify couldn't load new releases".into())))
+        );
+        assert!(shelf_state(&Loadable::<Vec<Album>>::Loaded(Vec::new())).is_none());
+        assert_eq!(
+            shelf_state(&Loadable::<Vec<Album>>::Loading).map(|(_, loading, _)| loading),
+            Some(true)
+        );
+    }
 
     fn show(id: &str) -> Show {
         Show {

@@ -12,8 +12,26 @@ Writing rule from Nick: no em dashes or en dashes anywhere, ever.
   spotifast -> spindle, bundle id com.nickaustin.spindle, bin src/spindle.rs,
   assets/skins/spindle.wsz, contrib/omarchy/spindle*. Upstream links
   (spotifast.rocks, github.com/crmne/spotifast) were restored on purpose.
-- Settings default `check_for_updates: false` (the updater would fetch
-  spotifast releases).
+- Settings default `check_for_updates: false`, and `updates.rs` points at
+  Nicolasaustin/spindle with no publisher key. Never point it back at
+  crmne/spotifast: Nick's PC settings had both update toggles on, and the
+  app offered "Update to 0.14.1", which would have installed Spotifast over
+  Spindle. There are no Spindle releases yet, so a check finds nothing. To
+  turn self updates on, sign checksums.txt in a release workflow and put
+  the public key in assets/update-public-key.hex.
+- Home: a Made for you or New releases shelf whose only content is a rate
+  limit or Development Mode quota failure is hidden (`ui/home.rs`
+  `shelf_state`) instead of showing an error row with Retry; the next Home
+  refresh reads it again. The PC log showed 150 shared-app rate limit hits
+  in 8 minutes with the Retry buttons in play.
+- Cherry picked upstream c85c038 (0.14.1): the sink queues 200 ms of sound
+  measured in time, not twelve packets. The PC log had nine WASAPI underruns
+  and one "audio queue ran dry" on the GoXLR before it.
+- Windows resources when cross compiling: build.rs (app and installer)
+  writes an .rc with the icon and version info, compiles it with `zig rc`
+  (or `python3 -m ziglang rc`, or whatever SPINDLE_RC names) and links the
+  .res with `cargo:rustc-link-arg-bins`. winresource only runs on a Windows
+  host, which is why the first PC build had no taskbar icon.
 - About shows "Spindle is a fork of Spotifast by Carmine Paolino, MIT".
 - Icons: packaging/macos/icon-1024.png and spindle.icns, packaging/windows/
   spindle.ico are Spindle's disc icon.
@@ -44,8 +62,22 @@ then `rcodesign sign`, tar, device_commit_files to ~/Downloads/SpindleApp,
 untar with device_bash (avoids quarantine). Launch via the bundle id.
 
 Windows: `cargo +1.98.0 zigbuild --release --no-default-features --target
-x86_64-pc-windows-gnu`, then the installer in /home/claude/spindle/installer
-with SPINDLE_EXE pointing at the exe (autostart flag is `--start-hidden`).
+x86_64-pc-windows-gnu`, then the installer:
+
+    cd installer && SPINDLE_EXE=$PWD/../target/x86_64-pc-windows-gnu/release/spindle.exe \
+      cargo +1.98.0 zigbuild --release --target x86_64-pc-windows-gnu
+
+installer/ is its own small crate (egui, in this repository since the old
+workspace that held it was lost): spindle.exe embedded through build.rs,
+Nick's picture as the background, per user install to
+%LOCALAPPDATA%\Programs\spindle, Start menu and optional desktop shortcut
+through WScript.Shell in PowerShell, Apps & features registration through
+winreg; the copied uninstall.exe is the same binary run with --uninstall.
+Starting with Windows is the app's own setting (fastframe_autostart), so
+the installer never touches the Run key. Deliver as
+Spindle-<version>-Setup.exe into Nick's Downloads with device_commit_files.
+Needs the PipeWire and ALSA headers only to run the test suite on Linux:
+`apt-get install libpipewire-0.3-dev libasound2-dev`.
 
 ## Facts from the live test (Mac, 2026-10-20)
 
@@ -57,8 +89,16 @@ with SPINDLE_EXE pointing at the exe (autostart flag is `--start-hidden`).
 - While the window is covered by other windows, screenshots are stale;
   take a display screenshot (which uncovers the app) before judging state.
 
+## Facts from the live test (Windows PC, 2026-10-20)
+
+- Spindle 0.2.0 playing, window visible, no game: spindle.exe 0.1 percent
+  CPU, 150 MB, RTX 4090, GoXLR Music channel through WASAPI.
+- Settings live in %APPDATA%\paolino\spindle\config\settings.json, the
+  log in %LOCALAPPDATA%\paolino\spindle\data\spindle.log.
+- Task Manager runs elevated, so computer use cannot click in it; read the
+  Processes list and ask Nick for the GPU column.
+
 ## The old from-scratch app
 
-/home/claude/spindle (0.1.9) is kept for reference: its backend/dsp.rs EQ,
-lyrics.rs and the installer crate. Nothing in it is used by this tree except
-the installer.
+The 0.1.x from-scratch Spindle lived in an earlier workspace that is gone.
+Nothing from it is used here.

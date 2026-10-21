@@ -1,3 +1,42 @@
+# Spindle
+
+Spindle is Nick Austin's fork of [Spotifast](https://github.com/crmne/spotifast)
+by Carmine Paolino (MIT), tuned to sit quietly next to a game: it redraws
+less when its window is out of focus, keeps more sound queued for the
+audio device, and hides Spotify's rate limit noise on the home page.
+Everything below this section is Spotifast's own README and still applies
+to the code.
+
+## Install on Windows
+
+Run `Spindle-<version>-Setup.exe`. It installs for your user only (no
+administrator prompt), adds a Start menu shortcut and, if you leave the box
+checked, a desktop shortcut, and registers in Settings > Apps so you can
+remove it the normal way. Windows SmartScreen warns the first time because
+the files are not code signed: choose "More info", then "Run anyway".
+
+Settings and your Spotify sign in are kept under
+`%APPDATA%\paolino\spindle` and `%LOCALAPPDATA%\paolino\spindle`, so
+reinstalling or updating keeps them.
+
+## Build
+
+    cargo build --release --no-default-features
+
+MilkDrop is left out on purpose (a C++ visualizer is the opposite of what a
+music player next to a game should run). From Linux or macOS, build the
+Windows exe and installer with Zig as the linker and resource compiler:
+
+    pip install ziglang && cargo install cargo-zigbuild
+    rustup target add x86_64-pc-windows-gnu
+    cargo zigbuild --release --no-default-features --target x86_64-pc-windows-gnu
+    cd installer && SPINDLE_EXE=$PWD/../target/x86_64-pc-windows-gnu/release/spindle.exe \
+      cargo zigbuild --release --target x86_64-pc-windows-gnu
+
+The setup program lands in `installer/target/x86_64-pc-windows-gnu/release/spindle-setup.exe`.
+
+---
+
 <p align="center">
   <img src="docs/assets/images/logo.svg" alt="Spotifast logo" width="88" height="88">
 </p>

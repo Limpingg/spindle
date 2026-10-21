@@ -239,6 +239,7 @@ async fn read_section(request: &Request<'_>, section: &str) -> Result<Vec<Playli
             ));
         }
         if !status.is_success() {
+            log::warn!("Spotify Home section={section} status={status} page={page}");
             return Err(ApiError::Status {
                 status: status.as_u16(),
                 message: "Spotify couldn't load Made for you through the playback session. Try again later.".into(),

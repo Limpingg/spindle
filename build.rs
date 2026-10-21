@@ -42,8 +42,95 @@ fn glew_library(lib: &std::path::Path) -> Option<&'static str> {
         .find(|name| present.iter().any(|found| found == name))
 }
 
+/// Embeds the icon and version information when a Windows exe is built on
+/// another system, where winresource has no resource compiler. Zig ships
+/// one (`zig rc`), and cargo-zigbuild already needs Zig, so the resource
+/// script is compiled with it and linked into every binary. Without it the
+/// exe builds, but Windows shows the generic window icon for it.
+#[cfg(not(windows))]
+fn embed_windows_resources_with_zig() {
+    use std::path::PathBuf;
+    use std::process::Command;
+
+    let icon = PathBuf::from("packaging/windows/spindle.ico");
+    println!("cargo:rerun-if-changed={}", icon.display());
+    println!("cargo:rerun-if-env-changed=SPINDLE_RC");
+    let out = PathBuf::from(std::env::var_os("OUT_DIR").expect("OUT_DIR"));
+    let version = env!("CARGO_PKG_VERSION");
+    let mut numbers: Vec<&str> = version.split(['.', '-']).take(3).collect();
+    while numbers.len() < 3 {
+        numbers.push("0");
+    }
+    let numeric = format!("{},{},{},0", numbers[0], numbers[1], numbers[2]);
+    let icon_path = std::fs::canonicalize(&icon)
+        .expect("icon")
+        .display()
+        .to_string()
+        .replace('\\', "/");
+    let script = format!(
+        r#"1 ICON "{icon_path}"
+1 VERSIONINFO
+FILEVERSION {numeric}
+PRODUCTVERSION {numeric}
+BEGIN
+  BLOCK "StringFileInfo"
+  BEGIN
+    BLOCK "040904b0"
+    BEGIN
+      VALUE "FileDescription", "Spindle"
+      VALUE "FileVersion", "{version}"
+      VALUE "InternalName", "spindle"
+      VALUE "LegalCopyright", "Spindle is a fork of Spotifast by Carmine Paolino, MIT"
+      VALUE "OriginalFilename", "spindle.exe"
+      VALUE "ProductName", "Spindle"
+      VALUE "ProductVersion", "{version}"
+    END
+  END
+  BLOCK "VarFileInfo"
+  BEGIN
+    VALUE "Translation", 0x409, 0x4b0
+  END
+END
+"#
+    );
+    let rc = out.join("spindle.rc");
+    let res = out.join("spindle.res");
+    std::fs::write(&rc, script).expect("write resource script");
+
+    // SPINDLE_RC names the compiler ("zig rc" or "python3 -m ziglang rc");
+    // otherwise try both in turn.
+    let candidates: Vec<Vec<String>> = match std::env::var("SPINDLE_RC") {
+        Ok(custom) => vec![custom.split_whitespace().map(String::from).collect()],
+        Err(_) => vec![
+            vec!["zig".into(), "rc".into()],
+            vec!["python3".into(), "-m".into(), "ziglang".into(), "rc".into()],
+        ],
+    };
+    for candidate in candidates {
+        let Some((program, arguments)) = candidate.split_first() else {
+            continue;
+        };
+        let status = Command::new(program)
+            .args(arguments)
+            .arg(&rc)
+            .arg(&res)
+            .status();
+        if matches!(status, Ok(status) if status.success()) && res.is_file() {
+            println!("cargo:rustc-link-arg-bins={}", res.display());
+            return;
+        }
+    }
+    println!(
+        "cargo:warning=Windows resources not embedded: no resource compiler (install Zig or set SPINDLE_RC)"
+    );
+}
+
 fn main() {
     fastframe_i18n::build::compile_catalogs("assets/i18n");
+    #[cfg(not(windows))]
+    if std::env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("windows") {
+        embed_windows_resources_with_zig();
+    }
     #[cfg(windows)]
     if std::env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("windows") {
         println!("cargo:rerun-if-changed=packaging/windows/spindle.ico");
