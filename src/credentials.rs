@@ -20,7 +20,12 @@ use sha2::{Digest, Sha256};
 use crate::{auth::StoredToken, paths::AppDirs};
 
 const SERVICE: &str = "com.nickaustin.spindle";
-const TIMEOUT: Duration = Duration::from_secs(20);
+/// Spindle: long enough for a person to answer macOS's Keychain prompt.
+/// Each build is signed anew, so after an update macOS asks again before
+/// it hands over the saved grants; the three are read one after another,
+/// and with 20 seconds the two behind the open prompt timed out and the
+/// app came up without playback or the personal app (seen on the Mac).
+const TIMEOUT: Duration = Duration::from_secs(300);
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
