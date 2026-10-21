@@ -3128,9 +3128,14 @@ impl App {
             if matches!(state.playback, Playback::Playing | Playback::Loading) {
                 self.clear_play_pending();
             }
-            if state.playback == Playback::Playing {
-                crate::timeline::playing();
-            }
+        }
+        // Sound starts when playback turns to Playing, or when a load ends
+        // under a playback that read Playing all through the swap.
+        if state.playback == Playback::Playing
+            && state.error.is_none()
+            && (state.playback != self.local.playback || (self.local.loading && !state.loading))
+        {
+            crate::timeline::playing();
         }
         if state.track != self.local.track {
             self.clear_play_pending();
@@ -3155,6 +3160,8 @@ impl App {
         if let Some(error) = &state.error
             && self.local.error.as_deref() != Some(error.as_str())
         {
+            // A load the engine gave up on is not going to sound.
+            crate::timeline::play_cancelled();
             self.toast_error(engine_error_text(self.locale, error));
             // One unavailable track is Spotify's catalogue; several in a
             // row is the session's audio-key service gone bad, which
@@ -4424,12 +4431,20 @@ impl App {
         let Some(commands) = self.media_controls.as_ref().map(MediaControls::commands) else {
             return;
         };
+        // Spindle: the play state is read once and then follows the toggles
+        // this batch queues. Read per command, two Pause commands landing
+        // between frames both saw "playing", both toggled, and the music
+        // came back on. Actions run after the batch, so nothing else moves
+        // the state in between.
+        let mut playing = self.now_playing().is_some_and(|now| now.playing);
         for command in commands {
-            let playing = self.now_playing().is_some_and(|now| now.playing);
             let action = match command {
-                MediaCommand::Play => (!playing).then_some(Action::TogglePlay),
-                MediaCommand::Pause | MediaCommand::Stop => playing.then_some(Action::TogglePlay),
-                MediaCommand::PlayPause => Some(Action::TogglePlay),
+                MediaCommand::Play | MediaCommand::Pause | MediaCommand::Stop
+                | MediaCommand::PlayPause => {
+                    let toggle = media_toggles(&command, playing);
+                    playing ^= toggle;
+                    toggle.then_some(Action::TogglePlay)
+                }
                 MediaCommand::Next => Some(Action::Next),
                 MediaCommand::Previous => Some(Action::Previous),
                 MediaCommand::SeekBy(offset) => Some(Action::SeekBy(offset)),
@@ -9263,6 +9278,18 @@ impl App {
     fn toggle_play(&mut self) {
         let playing = self.now_playing().map(|now| now.playing);
         match self.target() {
+            // Spindle: a pick waiting for the engine to reconnect shows in
+            // the bar as loading with a pause button. Pressing it takes the
+            // pick back. Falling through would resume the previous run's
+            // song in its place, or toggle the old song still paused on the
+            // kept player, either way playing under a bar that says paused.
+            Target::Local if self.queued_play.is_some() => {
+                self.queued_play = None;
+                self.clear_play_pending();
+                crate::timeline::play_cancelled();
+                self.optimistic_playing = Some((false, Instant::now()));
+                return;
+            }
             Target::Local => {
                 if self.local.is_active() {
                     self.backend.player(PlayerCommand::Toggle);
@@ -13143,6 +13170,17 @@ fn cover_error(locale: Locale, error: &crate::api::client::ApiError) -> String {
 }
 
 mod radio;
+
+/// Whether a play, pause or play-pause command toggles playback, given
+/// whether the bar shows it playing.
+fn media_toggles(command: &MediaCommand, playing: bool) -> bool {
+    match command {
+        MediaCommand::Play => !playing,
+        MediaCommand::Pause | MediaCommand::Stop => playing,
+        MediaCommand::PlayPause => true,
+        _ => false,
+    }
+}
 
 #[cfg(test)]
 mod tests {
@@ -30231,4 +30269,316 @@ mod tests {
             widgets::sanitize_error_message("500 Internal Server Error", Locale::English);
         assert_eq!(server_err.as_ref(), "500 Internal Server Error");
     }
+
+    // ---- Spindle: play, pause and toggle while the engine is away ---------
+
+    /// A song picked while the engine reconnects waits in `queued_play` and
+    /// the bar shows it loading with a pause button. Pressing that button
+    /// is the user taking the pick back. It must not fall through to
+    /// "nothing plays here, resume the last session", which swaps the held
+    /// request for the song the previous run ended on and plays that once
+    /// the engine is back, under a bar that says paused.
+    #[test]
+    fn pausing_a_play_held_for_the_engine_cancels_it_instead_of_resuming_the_old_song() {
+        let mut app = headless_app();
+        app.remote = None;
+        app.selected_device = None;
+        app.local.connected = false;
+        store_track(&mut app, "new");
+        store_track(&mut app, "old");
+        app.resume_track = Some("spotify:track:old".into());
+        app.play_request(PlayRequest::tracks(vec!["spotify:track:new".into()]), false);
+        let held = app.queued_play.as_ref().expect("held for the engine");
+        assert_eq!(held.uris, ["spotify:track:new"]);
+        let now = app.now_playing().expect("the pick shows in the bar");
+        assert_eq!(now.uri, "spotify:track:new");
+        assert!(now.playing, "the bar offers a pause button");
+        app.backend.take_player_commands();
+
+        app.toggle_play();
+
+        assert!(
+            app.backend.take_player_commands().is_empty(),
+            "no engine is there to toggle"
+        );
+        assert!(
+            app.queued_play
+                .as_ref()
+                .is_none_or(|request| request.uris == ["spotify:track:new"]),
+            "pause must not replace the pick with the previous run's song: {:?}",
+            app.queued_play
+        );
+        assert!(
+            app.queued_play.is_none(),
+            "pause takes the held pick back"
+        );
+        assert!(
+            !app.now_playing().is_some_and(|now| now.playing),
+            "the bar shows paused"
+        );
+        app.backend.shutdown();
+    }
+
+    /// The same press while the dropped session's song is still paused on
+    /// the kept player: the pick waits, the bar shows the pick loading with
+    /// a pause button, and pressing it must not wake the old paused song
+    /// through `PlayerCommand::Toggle` under a bar that says paused.
+    #[test]
+    fn pausing_a_held_pick_does_not_toggle_the_old_song_on_the_kept_player() {
+        let mut app = headless_app();
+        app.remote = None;
+        app.selected_device = None;
+        store_track(&mut app, "new");
+        app.local = LocalState {
+            connected: false,
+            playback: Playback::Paused,
+            position_ms: 40_000,
+            track: Some(crate::player::LocalTrack {
+                uri: "spotify:track:old".into(),
+                title: "Old".into(),
+                duration_ms: 200_000,
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+        app.play_request(PlayRequest::tracks(vec!["spotify:track:new".into()]), false);
+        assert!(app.queued_play.is_some(), "held for the engine");
+        let now = app.now_playing().expect("the pick shows in the bar");
+        assert_eq!(now.uri, "spotify:track:new");
+        assert!(now.playing);
+        app.backend.take_player_commands();
+
+        app.toggle_play();
+
+        assert!(
+            !app
+                .backend
+                .take_player_commands()
+                .contains(&PlayerCommand::Toggle),
+            "the old song must not start playing under a paused bar"
+        );
+        assert!(app.queued_play.is_none(), "pause takes the held pick back");
+        app.backend.shutdown();
+    }
+
+    /// `play: sound after N ms` is measured from the click to the engine's
+    /// first `Playing` report of the song. A song picked while another one
+    /// plays never changes `playback` (it reads `Playing` throughout the
+    /// swap), so the clock has to stop when the load ends, not when the
+    /// playback state changes. Left running, it is read by the next resume
+    /// after a pause, minutes later, and logs that as the wait for sound.
+    #[test]
+    fn a_song_picked_mid_song_stops_the_sound_clock_when_it_starts_not_at_the_next_resume() {
+        let mut app = headless_app();
+        app.remote = None;
+        app.selected_device = None;
+        app.local = LocalState {
+            connected: true,
+            playback: Playback::Playing,
+            position_ms: 30_000,
+            track: Some(crate::player::LocalTrack {
+                uri: "spotify:track:first".into(),
+                title: "First".into(),
+                duration_ms: 200_000,
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+        let picked = "spotify:track:picked-mid-song";
+        app.play_request(PlayRequest::tracks(vec![picked.into()]), false);
+        assert!(app.queued_play.is_none(), "the connected engine took it");
+        // The clock now runs for the pick. Other tests share the clock, so
+        // what is asserted below is only that it is no longer this pick's.
+
+        // The engine's reports, in librespot's order: the load begins while
+        // the first song still reads Playing, the track changes, then the
+        // new song sounds.
+        let mut loading = app.local.clone();
+        loading.loading = true;
+        loading.position_ms = 0;
+        app.handle_local(loading);
+        let mut changed = app.local.clone();
+        changed.track = Some(crate::player::LocalTrack {
+            uri: picked.into(),
+            title: "Picked".into(),
+            duration_ms: 180_000,
+            ..Default::default()
+        });
+        changed.track_sequence += 1;
+        app.handle_local(changed);
+        let mut sounding = app.local.clone();
+        sounding.loading = false;
+        sounding.position_ms = 0;
+        app.handle_local(sounding);
+        assert_ne!(
+            crate::timeline::pending_play().as_deref(),
+            Some(picked),
+            "the song sounds: the clock stops here"
+        );
+
+        // A pause and a resume minutes later must not be what stops it.
+        let mut paused = app.local.clone();
+        paused.playback = Playback::Paused;
+        app.handle_local(paused);
+        let mut resumed = app.local.clone();
+        resumed.playback = Playback::Playing;
+        app.handle_local(resumed);
+        assert_ne!(crate::timeline::pending_play().as_deref(), Some(picked));
+        app.backend.shutdown();
+    }
+
+    /// A load the engine gives up on (the song is unavailable, or Spotify
+    /// refused its audio key) never reports `Playing`. The clock it started
+    /// must not keep running into the next resume of whatever was paused,
+    /// which would log minutes as the wait for a sound that never came.
+    #[test]
+    fn a_load_that_fails_does_not_leave_the_sound_clock_running_into_the_next_resume() {
+        let mut app = headless_app();
+        app.remote = None;
+        app.selected_device = None;
+        app.local = LocalState {
+            connected: true,
+            playback: Playback::Paused,
+            position_ms: 30_000,
+            track: Some(crate::player::LocalTrack {
+                uri: "spotify:track:paused".into(),
+                title: "Paused".into(),
+                duration_ms: 200_000,
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+        let failing = "spotify:track:never-sounds";
+        app.play_request(PlayRequest::tracks(vec![failing.into()]), false);
+
+        let mut loading = app.local.clone();
+        loading.loading = true;
+        app.handle_local(loading);
+        let mut failed = app.local.clone();
+        failed.loading = false;
+        failed.error = Some(format!("This item isn't available: {failing}"));
+        app.handle_local(failed);
+        assert_ne!(
+            crate::timeline::pending_play().as_deref(),
+            Some(failing),
+            "a failed load is not waiting for sound"
+        );
+
+        // Resuming the paused song is not the sound the pick waited for.
+        let mut resumed = app.local.clone();
+        resumed.playback = Playback::Playing;
+        app.handle_local(resumed);
+        assert_ne!(crate::timeline::pending_play().as_deref(), Some(failing));
+        app.backend.shutdown();
+    }
+    // ---- Spindle: media keys, double presses, pause while loading -------
+
+    /// Two Pause commands reaching one batch (a headset that sends Pause
+    /// twice, or two presses between frames) pause once. Play then Pause
+    /// in one batch ends paused; PlayPause twice ends where it began.
+    #[test]
+    fn a_batch_of_media_keys_follows_its_own_toggles() {
+        let run = |commands: &[MediaCommand], mut playing: bool| {
+            let mut toggles = 0;
+            for command in commands {
+                let toggle = media_toggles(command, playing);
+                playing ^= toggle;
+                toggles += usize::from(toggle);
+            }
+            (toggles, playing)
+        };
+        assert_eq!(run(&[MediaCommand::Pause, MediaCommand::Pause], true), (1, false));
+        assert_eq!(run(&[MediaCommand::Play, MediaCommand::Play], false), (1, true));
+        assert_eq!(run(&[MediaCommand::Play, MediaCommand::Pause], false), (2, false));
+        assert_eq!(run(&[MediaCommand::PlayPause, MediaCommand::PlayPause], true), (2, true));
+        assert_eq!(run(&[MediaCommand::Stop], false), (0, false));
+        assert!(!media_toggles(&MediaCommand::Next, true));
+    }
+
+    fn playing_locally(app: &mut App, playback: Playback) {
+        app.remote = None;
+        app.selected_device = None;
+        app.local = LocalState {
+            connected: true,
+            playback,
+            position_ms: 30_000,
+            track: Some(crate::player::LocalTrack {
+                uri: "spotify:track:song".into(),
+                title: "Song".into(),
+                duration_ms: 200_000,
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+    }
+
+    /// Pause pressed while the song is still loading reaches the engine
+    /// once, and the bar shows paused right away.
+    #[test]
+    fn pausing_while_the_song_loads_sends_one_toggle_and_shows_paused() {
+        let mut app = headless_app();
+        playing_locally(&mut app, Playback::Loading);
+        app.local.loading = true;
+        let before = app.now_playing().map(|now| now.playing);
+        app.backend.take_player_commands();
+
+        app.toggle_play();
+
+        let sent = app.backend.take_player_commands();
+        assert_eq!(
+            sent.iter().filter(|command| **command == PlayerCommand::Toggle).count(),
+            1,
+            "{sent:?}"
+        );
+        assert_eq!(
+            app.now_playing().map(|now| now.playing),
+            before.map(|playing| !playing),
+            "the bar flips at once"
+        );
+        app.backend.shutdown();
+    }
+
+    /// Pause then play pressed quickly, before the engine reports either:
+    /// both reach the engine in order, and the bar ends up playing.
+    #[test]
+    fn pause_then_play_before_the_engine_answers_ends_playing() {
+        let mut app = headless_app();
+        playing_locally(&mut app, Playback::Playing);
+        app.backend.take_player_commands();
+
+        app.toggle_play();
+        assert!(!app.now_playing().is_some_and(|now| now.playing), "paused at once");
+        app.toggle_play();
+
+        let sent = app.backend.take_player_commands();
+        assert_eq!(sent, [PlayerCommand::Toggle, PlayerCommand::Toggle]);
+        assert!(app.now_playing().is_some_and(|now| now.playing), "playing again");
+
+        // The engine's late reports of the pause and the play leave the
+        // bar playing.
+        let mut paused = app.local.clone();
+        paused.playback = Playback::Paused;
+        app.handle_local(paused);
+        let mut resumed = app.local.clone();
+        resumed.playback = Playback::Playing;
+        app.handle_local(resumed);
+        assert!(app.now_playing().is_some_and(|now| now.playing));
+        app.backend.shutdown();
+    }
+
+    /// A pause from the phone over Spotify Connect, while the window is out
+    /// of focus behind a game, shows at once: the engine's report changes
+    /// the bar without waiting for a frame the unfocused pacing would delay.
+    #[test]
+    fn a_pause_from_elsewhere_shows_while_the_window_is_unfocused() {
+        let mut app = headless_app();
+        playing_locally(&mut app, Playback::Playing);
+        app.window_focused = false;
+        let mut paused = app.local.clone();
+        paused.playback = Playback::Paused;
+        app.handle_local(paused);
+        assert!(!app.now_playing().is_some_and(|now| now.playing));
+        app.backend.shutdown();
+    }
+
 }

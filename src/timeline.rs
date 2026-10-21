@@ -54,6 +54,12 @@ pub fn playing() {
     }
 }
 
+/// What the clock is running for, if a play is still waiting for sound.
+#[cfg(test)]
+pub fn pending_play() -> Option<String> {
+    PLAY.lock().ok().and_then(|play| play.as_ref().map(|(_, what)| what.clone()))
+}
+
 /// The request was dropped or superseded: nothing to time.
 pub fn play_cancelled() {
     if let Ok(mut play) = PLAY.lock() {
