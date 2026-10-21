@@ -46,7 +46,34 @@ pub fn dialog(app: &mut App, ui: &mut egui::Ui) {
                 palette.secondary,
             );
             ui.add_space(4.0);
-            theme::text(ui, &session.join_url, theme::regular(14.0), palette.text);
+            // Spindle: clicking the link copies it.
+            let link = ui
+                .add(
+                    egui::Label::new(
+                        egui::RichText::new(&session.join_url)
+                            .font(theme::regular(14.0))
+                            .color(palette.text),
+                    )
+                    .truncate()
+                    .sense(egui::Sense::click()),
+                )
+                .on_hover_cursor(egui::CursorIcon::PointingHand)
+                .on_hover_text(gettext(locale, "Click to copy"));
+            if link.clicked() {
+                ui.ctx().copy_text(session.join_url.clone());
+                app.toast(gettext(locale, "Link copied"));
+            }
+            ui.add_space(12.0);
+            ui.vertical_centered(|ui| qr_code(ui, &session.join_url, 180.0));
+            ui.add_space(4.0);
+            ui.vertical_centered(|ui| {
+                theme::text(
+                    ui,
+                    gettext(locale, "Scan with a phone camera to join"),
+                    theme::regular(12.0),
+                    palette.secondary,
+                );
+            });
             if !session.members.is_empty() {
                 ui.add_space(12.0);
                 theme::text(
@@ -100,6 +127,36 @@ pub fn dialog(app: &mut App, ui: &mut egui::Ui) {
                     app.actions.push(Action::CloseDialog);
                 }
             });
+        }
+    }
+}
+
+/// Spindle: the join link as a QR code, drawn as squares on a white tile
+/// with a quiet zone so phone cameras read it in light and dark themes.
+fn qr_code(ui: &mut egui::Ui, text: &str, size: f32) {
+    let Ok(code) = qrcode::QrCode::new(text.as_bytes()) else {
+        return;
+    };
+    let width = code.width();
+    let colors = code.to_colors();
+    let quiet = 4usize;
+    let cells = width + quiet * 2;
+    let cell = (size / cells as f32).floor().max(1.0);
+    let side = cell * cells as f32;
+    let (rect, _) = ui.allocate_exact_size(egui::vec2(side, side), egui::Sense::hover());
+    let painter = ui.painter_at(rect);
+    painter.rect_filled(rect, egui::CornerRadius::same(6), egui::Color32::WHITE);
+    for y in 0..width {
+        for x in 0..width {
+            if colors[y * width + x] == qrcode::Color::Dark {
+                let min = rect.min
+                    + egui::vec2((x + quiet) as f32 * cell, (y + quiet) as f32 * cell);
+                painter.rect_filled(
+                    egui::Rect::from_min_size(min, egui::vec2(cell, cell)),
+                    0.0,
+                    egui::Color32::BLACK,
+                );
+            }
         }
     }
 }

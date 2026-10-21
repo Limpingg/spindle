@@ -47,6 +47,31 @@ const LEAD_GUESS: f32 = super::widgets::PAGE_PADDING + 2.0 * 32.0 + 3.0 * ITEM_S
 /// A badge collapsed to its icon: a square as tall as its 12.5 pt label.
 const BADGE_CHIP: f32 = 15.0 + BADGE_PADDING_Y;
 
+/// Spindle: the round Home button before the search field.
+const HOME_SIZE: f32 = 44.0;
+
+fn home_button(ui: &mut egui::Ui, palette: &Palette, active: bool, hint: &str) -> egui::Response {
+    let (rect, response) = ui.allocate_exact_size(Vec2::splat(HOME_SIZE), Sense::click());
+    if ui.is_rect_visible(rect) {
+        let fill = if response.hovered() {
+            palette.surface_hover
+        } else {
+            palette.surface
+        };
+        ui.painter()
+            .circle_filled(rect.center(), HOME_SIZE / 2.0, fill);
+        let color = if active || response.hovered() {
+            palette.text
+        } else {
+            palette.secondary
+        };
+        theme::paint_icon(ui, Icon::House, rect, 20.0, color);
+    }
+    response
+        .on_hover_cursor(egui::CursorIcon::PointingHand)
+        .on_hover_text(hint)
+}
+
 fn lead_id() -> egui::Id {
     egui::Id::new("topbar-lead")
 }
@@ -63,7 +88,9 @@ pub fn least_width(ctx: &egui::Context) -> f32 {
 }
 
 fn least_width_after(lead: f32) -> f32 {
-    lead + SEARCH_MIN
+    lead + HOME_SIZE
+        + ITEM_SPACING
+        + SEARCH_MIN
         + RIGHT_CONTROLS_WIDTH
         + SPINNER_SIZE
         + ITEM_SPACING
@@ -251,11 +278,6 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
                 }
                 ui.add_space(2.0);
             }
-            if !app.settings.sidebar_visible
-                && nav_button(ui, &palette, Icon::House, true, &gettext(locale, "Home")).clicked()
-            {
-                app.actions.push(Action::Open(Page::Home));
-            }
             if nav_button(
                 ui,
                 &palette,
@@ -335,7 +357,11 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
                     0.0
                 };
 
-            let search_room = (ui.available_width() - window_controls.topbar_width).max(0.0);
+            // Spindle: a round Home button sits before the field, as in
+            // Spotify, and the pair is centered on the bar when it fits.
+            let home_width = HOME_SIZE + ITEM_SPACING;
+            let search_room =
+                (ui.available_width() - window_controls.topbar_width - home_width).max(0.0);
             // What sits before the field: the page padding, the navigation
             // buttons, and any window buttons. The panels beside the page
             // keep room for it (`least_width`).
@@ -343,6 +369,23 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
             ui.ctx().data_mut(|data| data.insert_temp(lead_id(), lead));
             let fit = topbar_fit(search_room, controls, badges(true), badges(false));
             let search_width = fit.search;
+            {
+                let group = home_width + search_width;
+                let left_edge = ui.cursor().min.x;
+                let bar_left = left_edge - (width - ui.available_width());
+                let centered = bar_left + (width - group) / 2.0;
+                let right_need = controls
+                    + if fit.labels { badges(true) } else { badges(false) }
+                    + window_controls.topbar_width;
+                let latest = bar_left + width - right_need - group;
+                let shift = (centered.min(latest) - left_edge).max(0.0);
+                ui.add_space(shift);
+            }
+            if home_button(ui, &palette, matches!(app.page(), Page::Home), &gettext(locale, "Home"))
+                .clicked()
+            {
+                app.actions.push(Action::Open(Page::Home));
+            }
             let id = egui::Id::new("global-search");
             let before = app.search.query.clone();
             let selected = egui::TextEdit::load_state(ui.ctx(), id)
@@ -522,17 +565,23 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
                     ));
                 }
                 ui.add_space(4.0);
+                // Spindle: Listening activity beside the profile picture, as
+                // in Spotify. Settings is in the profile menu.
                 if theme::icon_button(
                     ui,
-                    Icon::Settings,
+                    Icon::Users,
                     ICON_BUTTON_ICON,
-                    palette.secondary,
+                    if app.show_friends_panel {
+                        palette.accent
+                    } else {
+                        palette.secondary
+                    },
                     palette.text,
-                    &gettext(locale, "Settings"),
+                    &gettext(locale, "Listening activity"),
                 )
                 .clicked()
                 {
-                    app.actions.push(Action::Open(Page::Settings));
+                    app.actions.push(Action::ToggleFriendsPanel);
                 }
                 // Spindle: no MilkDrop or Winamp mini player buttons; Nick
                 // plays only in the main window.

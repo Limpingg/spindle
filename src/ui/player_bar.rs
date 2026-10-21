@@ -951,6 +951,11 @@ fn extras(app: &mut App, ui: &mut egui::Ui, now: Option<&NowPlaying>, transport_
     let mut slots: Vec<(&'static str, egui::Rect, egui::Rect)> = Vec::new();
     // The layout runs right to left, so the rightmost button goes first.
     for name in order.iter().rev().copied() {
+        // Spindle: Listening activity lives in the top bar, beside the
+        // profile picture, as in Spotify.
+        if name == "friends" {
+            continue;
+        }
         // Listening activity is the first to go in a narrow window, so it
         // never crowds the transport.
         if name == "friends" {
@@ -1188,7 +1193,8 @@ fn bar_button(app: &mut App, ui: &mut egui::Ui, now: Option<&NowPlaying>, name: 
         "lyrics" => {
             if theme::icon_button(
                 ui,
-                Icon::Mic,
+                // Spindle: the tilted vocal mic Spotify uses for lyrics.
+                Icon::MicVocal,
                 18.0,
                 if app.show_lyrics_panel {
                     palette.accent
