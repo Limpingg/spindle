@@ -912,10 +912,6 @@ fn transport(app: &mut App, ui: &mut egui::Ui, now: Option<&NowPlaying>, region:
 /// Nick arranges them.
 pub const DEFAULT_ORDER: [&str; 5] = ["friends", "lyrics", "queue", "devices", "volume"];
 
-/// Spindle: a right-hand button being dragged to a new place, by name.
-#[derive(Clone, Debug)]
-struct BarSlot(&'static str);
-
 /// The arranged order, left to right: the saved names that are known, then
 /// any known name the saved list lacks.
 pub fn bar_order(saved: &[String]) -> Vec<&'static str> {
@@ -952,7 +948,7 @@ pub fn move_slot(order: &mut Vec<&'static str>, dragged: &str, target: &str) {
 fn extras(app: &mut App, ui: &mut egui::Ui, now: Option<&NowPlaying>, transport_right: f32) {
     ui.spacing_mut().item_spacing.x = 6.0;
     let order = bar_order(&app.settings.player_bar_order);
-    let mut moved: Option<(&'static str, &'static str)> = None;
+    let mut slots: Vec<(&'static str, egui::Rect, egui::Rect)> = Vec::new();
     // The layout runs right to left, so the rightmost button goes first.
     for name in order.iter().rev().copied() {
         // Listening activity is the first to go in a narrow window, so it
@@ -965,26 +961,88 @@ fn extras(app: &mut App, ui: &mut egui::Ui, now: Option<&NowPlaying>, transport_
                 continue;
             }
         }
-        let id = egui::Id::new(("player-bar-slot", name));
-        let slot = ui.dnd_drag_source(id, BarSlot(name), |ui| {
+        let slot = ui.scope(|ui| {
             ui.spacing_mut().item_spacing.x = 6.0;
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 bar_button(app, ui, now, name);
             });
         });
-        if let Some(dragged) = slot.response.dnd_release_payload::<BarSlot>() {
-            moved = Some((dragged.0, name));
-        }
-        if slot.response.dnd_hover_payload::<BarSlot>().is_some() {
+        // The volume slot drags by its speaker icon only, so its slider still
+        // slides.
+        let rect = slot.response.rect;
+        let handle = if name == "volume" {
+            egui::Rect::from_min_size(
+                rect.min,
+                egui::vec2((18.0 + theme::ICON_BUTTON_PAD).min(rect.width()), rect.height()),
+            )
+        } else {
+            rect
+        };
+        slots.push((name, rect, handle));
+    }
+    // Spindle: the drag is read from the pointer rather than from a drag
+    // widget over the buttons, which would take their clicks. A press on a
+    // button that moves past a few points is a drag; a press that stays put
+    // is the button's own click.
+    let drag_id = egui::Id::new("player-bar-drag");
+    let (pressed, down, released, origin, pointer) = ui.input(|input| {
+        (
+            input.pointer.primary_pressed(),
+            input.pointer.primary_down(),
+            input.pointer.primary_released(),
+            input.pointer.press_origin(),
+            input.pointer.interact_pos(),
+        )
+    });
+    let mut dragging: Option<&'static str> = ui.ctx().data(|data| data.get_temp::<&'static str>(drag_id));
+    if pressed {
+        dragging = origin.and_then(|origin| {
+            slots
+                .iter()
+                .find(|(_, _, handle)| handle.contains(origin))
+                .map(|(name, _, _)| *name)
+        });
+    }
+    let moving = dragging.is_some()
+        && matches!((origin, pointer), (Some(origin), Some(pointer)) if origin.distance(pointer) > 6.0);
+    let target = pointer.and_then(|pointer| {
+        slots
+            .iter()
+            .find(|(_, rect, _)| rect.contains(pointer))
+            .map(|(name, rect, _)| (*name, *rect))
+    });
+    if moving && (down || released) {
+        ui.ctx().set_cursor_icon(egui::CursorIcon::Grabbing);
+        if let Some((name, rect)) = target
+            && Some(name) != dragging
+        {
             ui.painter().rect_stroke(
-                slot.response.rect.expand(2.0),
+                rect.expand(2.0),
                 6.0,
                 egui::Stroke::new(1.0, app.palette.accent),
                 egui::StrokeKind::Outside,
             );
         }
     }
-    if let Some((dragged, target)) = moved {
+    let mut moved = None;
+    if released || !down {
+        if moving
+            && released
+            && let (Some(dragged), Some((name, _))) = (dragging, target)
+        {
+            moved = Some((dragged, name));
+        }
+        dragging = None;
+    }
+    ui.ctx().data_mut(|data| match dragging {
+        Some(name) => {
+            data.insert_temp(drag_id, name);
+        }
+        None => data.remove::<&'static str>(drag_id),
+    });
+    if let Some((dragged, target)) = moved
+        && dragged != target
+    {
         let mut order = order;
         move_slot(&mut order, dragged, target);
         app.settings.player_bar_order = order.iter().map(|name| name.to_string()).collect();
