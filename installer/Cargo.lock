@@ -2061,6 +2061,7 @@ name = "spindle-setup"
 version = "0.14.102"
 dependencies = [
  "eframe",
+ "flate2",
  "image",
  "winreg",
 ]

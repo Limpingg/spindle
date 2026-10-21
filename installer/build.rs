@@ -9,7 +9,9 @@ fn main() {
     println!("cargo:rerun-if-env-changed=SPINDLE_EXE");
     let out = PathBuf::from(std::env::var_os("OUT_DIR").expect("OUT_DIR"));
     let exe = std::env::var("SPINDLE_EXE").unwrap_or_default();
-    let payload = out.join("spindle.exe");
+    // The exe is embedded deflated (about a third of its size); the setup
+    // program inflates it while installing.
+    let payload = out.join("spindle.exe.deflate");
     if exe.is_empty() {
         // `cargo check` without a payload still builds; the installer then
         // refuses to run, with a clear message.
@@ -17,7 +19,11 @@ fn main() {
         println!("cargo:warning=SPINDLE_EXE is not set: the setup program embeds nothing");
     } else {
         println!("cargo:rerun-if-changed={exe}");
-        std::fs::copy(&exe, &payload).expect("copy spindle.exe into OUT_DIR");
+        let bytes = std::fs::read(&exe).expect("read spindle.exe");
+        let file = std::fs::File::create(&payload).expect("create payload");
+        let mut encoder = flate2::write::DeflateEncoder::new(file, flate2::Compression::best());
+        std::io::Write::write_all(&mut encoder, &bytes).expect("deflate spindle.exe");
+        encoder.finish().expect("finish deflate");
     }
 
     if std::env::var("CARGO_CFG_TARGET_OS").as_deref() != Ok("windows") {

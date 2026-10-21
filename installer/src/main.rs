@@ -24,7 +24,18 @@ use eframe::egui::{self, Color32, CornerRadius, Margin, RichText, Vec2};
 
 const APP_NAME: &str = "Spindle";
 const VERSION: &str = env!("CARGO_PKG_VERSION");
-const PAYLOAD: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/spindle.exe"));
+/// spindle.exe, deflated by build.rs.
+const PAYLOAD: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/spindle.exe.deflate"));
+
+/// The exe, inflated.
+fn payload() -> Result<Vec<u8>, String> {
+    use std::io::Read;
+    let mut bytes = Vec::with_capacity(PAYLOAD.len() * 3);
+    flate2::read::DeflateDecoder::new(PAYLOAD)
+        .read_to_end(&mut bytes)
+        .map_err(|error| format!("The embedded spindle.exe is damaged: {error}"))?;
+    Ok(bytes)
+}
 const README: &str = include_str!("../../README.md");
 const LICENSE: &str = include_str!("../../LICENSE");
 const BACKGROUND: &[u8] = include_bytes!("../assets/background.png");
@@ -444,8 +455,9 @@ fn install_into(
     report("Creating the install folder");
     std::fs::create_dir_all(&places.install_dir)
         .map_err(|error| format!("Couldn't create {}: {error}", places.install_dir.display()))?;
-    report("Copying spindle.exe");
-    write_replacing(&places.exe, PAYLOAD)?;
+    report("Unpacking spindle.exe");
+    let exe_bytes = payload()?;
+    write_replacing(&places.exe, &exe_bytes)?;
     report("Copying the uninstaller");
     let own = std::env::current_exe().map_err(|error| format!("Couldn't find this program: {error}"))?;
     let own_bytes = std::fs::read(&own).map_err(|error| format!("Couldn't read {}: {error}", own.display()))?;
@@ -461,7 +473,7 @@ fn install_into(
     report("Creating shortcuts");
     shortcuts(&places, desktop_shortcut)?;
     report("Registering with Windows");
-    register(&places, PAYLOAD.len() + own_bytes.len())?;
+    register(&places, exe_bytes.len() + own_bytes.len())?;
     report("Done");
     Ok(())
 }
