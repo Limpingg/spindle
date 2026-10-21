@@ -1417,12 +1417,15 @@ fn columns(width: f32, row: &TrackRow<'_>) -> Columns {
         } else {
             0.0
         },
-        added_by: if row.show_added_by && extra_wide {
+        // Spindle: on a playlist made together, Added by takes the place
+        // Date added would have (as in Spotify), and the date shows too only
+        // when there is room for both.
+        added_by: if row.show_added_by && wide {
             130.0
         } else {
             0.0
         },
-        added: if row.added_at.is_some() && wide {
+        added: if row.added_at.is_some() && (if row.show_added_by { extra_wide } else { wide }) {
             120.0
         } else {
             0.0
@@ -2409,13 +2412,13 @@ pub fn table_header(
     } else {
         0.0
     };
-    let added_width = if show_added && wide { 120.0 } else { 0.0 };
     let extra_wide = width > 920.0;
-    let added_by_width = if show_added_by && extra_wide {
-        130.0
+    let added_width = if show_added && (if show_added_by { extra_wide } else { wide }) {
+        120.0
     } else {
         0.0
     };
+    let added_by_width = if show_added_by && wide { 130.0 } else { 0.0 };
     let plays_width = if show_plays && plays_fit(width) {
         PLAYS_WIDTH
     } else {
