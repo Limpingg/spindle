@@ -49,6 +49,11 @@ pub fn remember_grant(state: &std::path::Path, refresh_token: &str) {
     }
 }
 
+/// Whether a browser approval for the catalogue search is saved.
+pub fn has_grant(state: &std::path::Path) -> bool {
+    state.join(GRANT_FILE).is_file()
+}
+
 pub fn forget_grant(state: &std::path::Path) {
     let _ = std::fs::remove_file(state.join(GRANT_FILE));
     if let Ok(mut access) = ACCESS.lock() {

@@ -744,6 +744,21 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
                 {
                     app.actions.push(Action::RestartEngine);
                 }
+                // Spindle: Spotify answers the full catalogue search only
+                // after a browser approval; offer it until one is saved.
+                if app.local_ready
+                    && !crate::session_search::has_grant(&app.dirs.state)
+                    && theme::soft_button(
+                        ui,
+                        &palette,
+                        Some(Icon::Search),
+                        &gettext(locale, "Turn on full search"),
+                        false,
+                    )
+                    .clicked()
+                {
+                    app.actions.push(Action::AuthorizeSearch);
+                }
             });
             filtered_row(ui, &palette, &needle, &playback, &playback_rows[1], |ui| {
                 let response = Frame::new()

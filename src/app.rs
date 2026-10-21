@@ -11724,6 +11724,7 @@ impl App {
                     ctx.send_viewport_cmd(egui::ViewportCommand::Close);
                 }
             }
+            Action::AuthorizeSearch => self.backend.send(Command::AuthorizeSearch),
             Action::EnablePlayback => {
                 let free = self
                     .user

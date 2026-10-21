@@ -184,7 +184,10 @@ Needs the PipeWire and ALSA headers only to run the test suite on Linux:
   playback session started from the browser approval and refused it (403
   "Client/request not allowed") in every request form for the same
   session restored from its saved login. So the approval's refresh token
-  is kept in `search-grant.json` in the state folder, and search asks with
+  is kept in `search-grant.json` in the state folder (saved by a playback
+  browser approval or by Settings > Turn on full search, which runs the
+  same approval without touching the playback session; Reconnect only
+  restarts the session from its saved login), and search asks with
   an access token from it first, then with Login5. Without either, the Web
   API search answers (personal app for the playlist half while the shared
   app is throttled).

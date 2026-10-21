@@ -14,6 +14,7 @@ pub(super) const fn platform_shortcut<'a>(ctrl: &'a str, cmd: &'a str) -> &'a st
 
 pub(super) const SIDEBAR_SHORTCUT: &str = platform_shortcut("Ctrl+B", "Cmd+B");
 pub(super) const QUIT_SHORTCUT: &str = platform_shortcut("Ctrl+Q", "Cmd+Q");
+#[allow(dead_code)] // Spindle: the mini player key is hidden.
 pub(super) const WINAMP_SHORTCUT: &str = platform_shortcut("Ctrl+M", "Cmd+Shift+M");
 pub(super) const MILKDROP_SHORTCUT: &str = platform_shortcut("Ctrl+Shift+K", "Cmd+Shift+K");
 

@@ -1308,6 +1308,9 @@ pub enum Action {
     ApplyProxy,
     ProxyEdited,
     EnablePlayback,
+    /// Spindle: approve the playback app in the browser for the catalogue
+    /// search alone, leaving the running playback session as it is.
+    AuthorizeSearch,
     ShowWindow,
     HideWindow,
     ClearArtCache,

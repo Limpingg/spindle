@@ -713,6 +713,8 @@ pub enum Command {
     SignOut,
     /// Authorize local playback on this computer (a separate browser grant).
     AuthorizePlayback,
+    /// Spindle: browser approval kept for the catalogue search only.
+    AuthorizeSearch,
     /// Reload the engine config (audio settings changed).
     RestartEngine(EngineConfig),
     /// Rebuild the HTTP client. Restart local playback only when its HTTP
@@ -2287,6 +2289,7 @@ impl Worker {
                     }
                 }
                 Command::AuthorizePlayback => self.authorize_playback(),
+                Command::AuthorizeSearch => self.authorize_search(),
                 Command::RestartEngine(mut config) => {
                     // Audio settings must not revert a proxy change whose UI
                     // acknowledgement was still in flight when this was clicked.
@@ -3627,6 +3630,68 @@ impl Worker {
     /// Start (or re-enter) the playback authorization in the browser. This is
     /// a distinct grant from the Web API sign-in: it uses Spotify's streaming
     /// client identity, the one librespot can play with.
+    /// Spindle: Spotify answers the catalogue search only with a token
+    /// from a browser approval of the playback app. This runs that approval
+    /// without touching the playback session or its saved grant and keeps
+    /// the refresh token for search (session_search::remember_grant).
+    fn authorize_search(&mut self) {
+        if self.cancel_signin.is_some() {
+            return;
+        }
+        let http = match self.http.client() {
+            Ok(http) => http,
+            Err(error) => {
+                self.emit(Event::Error(error.to_string()));
+                return;
+            }
+        };
+        let grant = crate::auth::Grant::playback();
+        let listener = match crate::auth::listen_for_redirect(grant.redirect_port) {
+            Ok(listener) => listener,
+            Err(error) => {
+                self.emit(Event::Error(error.to_string()));
+                return;
+            }
+        };
+        let flow = crate::auth::begin(grant.clone());
+        let browser_url = flow.url.clone();
+        tokio::task::spawn_blocking(move || {
+            if let Err(error) = crate::opener::open(&browser_url) {
+                log::warn!("unable to open a browser: {error}");
+            }
+        });
+        let state = self.dirs.state.clone();
+        let events = self.events.clone();
+        let waker = self.waker.clone();
+        tokio::spawn(async move {
+            // Its own cancel channel: nothing else waits on this flow.
+            let (_cancel_tx, cancel_rx) = watch::channel(false);
+            let result = async {
+                let code =
+                    crate::auth::wait_for_code_on_listener(listener, &flow.state, cancel_rx).await?;
+                crate::auth::exchange_code(&http, &grant, &code, &flow.verifier).await
+            }
+            .await;
+            match result {
+                Ok(token) => match token.refresh_token.filter(|token| !token.is_empty()) {
+                    Some(refresh) => {
+                        crate::session_search::remember_grant(&state, &refresh);
+                        log::info!("full search approved in the browser");
+                    }
+                    None => {
+                        let _ = events.send(Event::Error(
+                            "Spotify approved without a lasting token; full search stays off.".into(),
+                        ));
+                    }
+                },
+                Err(error) => {
+                    let _ = events.send(Event::Error(format!("Full search was not approved: {error}")));
+                }
+            }
+            waker.wake();
+        });
+    }
+
     fn authorize_playback_in_browser(&mut self) {
         let http = match self.http.client() {
             Ok(http) => http,
