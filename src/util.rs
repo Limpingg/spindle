@@ -196,11 +196,18 @@ pub fn open_spotify_url(uri: &str) -> Option<String> {
     Some(format!("https://open.spotify.com/{kind}/{id}"))
 }
 
-/// The menu-bar shape for macOS: the mirror ball's silhouette. macOS
+/// The menu-bar shape for macOS: the headphones in outline. macOS
 /// template images use only the alpha channel and paint the shape
 /// themselves, black in a light menu bar and white in a dark one.
 pub fn tray_template_rgba(size: usize) -> Vec<u8> {
-    let mut rgba = app_icon_rgba(size);
+    // The menu bar draws a template as a silhouette, so it takes the neon
+    // lines alone (packaging/icons/spindle-tray-1024.png), not the square.
+    let master = image::load_from_memory(include_bytes!("../packaging/icons/spindle-tray-1024.png"))
+        .expect("packaging/icons/spindle-tray-1024.png decodes")
+        .to_rgba8();
+    let side = size.max(1) as u32;
+    let mut rgba = image::imageops::resize(&master, side, side, image::imageops::FilterType::Lanczos3)
+        .into_raw();
     for pixel in rgba.as_chunks_mut::<4>().0 {
         pixel[0] = 0;
         pixel[1] = 0;
@@ -209,8 +216,8 @@ pub fn tray_template_rgba(size: usize) -> Vec<u8> {
     rgba
 }
 
-/// Spindle's icon: the green mirror ball of `packaging/icons/spindle-1024.png`,
-/// drawn by `packaging/icons/render-icon.py`, decoded once and scaled to
+/// Spindle's icon: Nick's neon headphones of `packaging/icons/spindle-1024.png`,
+/// made by `packaging/icons/make-icons.py`, decoded once and scaled to
 /// `size` for the window icon, the trays and the logo drawn in the app
 /// (`theme::logo`), so every place shows the same picture.
 pub fn app_icon_rgba(size: usize) -> Vec<u8> {
@@ -331,10 +338,10 @@ mod tests {
         ]
     }
 
-    /// The icon is the mirror ball at every size: a green face, clear
-    /// corners, and the menu-bar template is its black silhouette.
+    /// The icon is the neon headphones square at every size: green, clear
+    /// corners, and the menu-bar template is its lines in black.
     #[test]
-    fn the_icon_is_the_mirror_ball_at_every_size() {
+    fn the_icon_is_the_headphones_square_at_every_size() {
         // #given the icon at a dock size and at a tray size
         let (large, small) = (app_icon_rgba(128), app_icon_rgba(32));
         assert_eq!(large.len(), 128 * 128 * 4);
@@ -354,9 +361,10 @@ mod tests {
         assert_eq!(pixel(&large, 128, 1, 1)[3], 0);
         assert_eq!(pixel(&small, 32, 0, 0)[3], 0);
 
-        // #and the menu-bar template is black where the ball is
+        // #and the menu-bar template is black on the wave's centre line
         let template = tray_template_rgba(44);
-        assert_eq!(pixel(&template, 44, 22, 22), [0, 0, 0, 255]);
+        let line = (18..26).map(|y| pixel(&template, 44, 22, y)[3]).max().unwrap();
+        assert!(line > 200, "the wave shows in the template: {line}");
         assert_eq!(pixel(&template, 44, 0, 0)[3], 0);
     }
 
