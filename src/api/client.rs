@@ -456,6 +456,60 @@ impl ApiClient {
         self.http.client().map_err(ApiError::Network)
     }
 
+    /// Spindle: one Pathfinder query sent as Spotify's web player sends it
+    /// (`web_headers`: its platform and version headers) or as a GET to
+    /// v1 with the query in the URL (`get`). Used to find which form Spotify
+    /// accepts for search; the answer or Spotify's refusal comes back whole.
+    pub(crate) async fn partner_request_as(
+        &self,
+        bearer: &str,
+        client_token: &str,
+        query: &serde_json::Value,
+        web_headers: bool,
+        get: bool,
+    ) -> Result<serde_json::Value> {
+        let client = self.http_client()?;
+        let mut request = if get {
+            let variables = query.get("variables").cloned().unwrap_or_default().to_string();
+            let extensions = query.get("extensions").cloned().unwrap_or_default().to_string();
+            let operation = query
+                .get("operationName")
+                .and_then(|name| name.as_str())
+                .unwrap_or_default()
+                .to_string();
+            client
+                .get("https://api-partner.spotify.com/pathfinder/v1/query")
+                .query(&[
+                    ("operationName", operation),
+                    ("variables", variables),
+                    ("extensions", extensions),
+                ])
+        } else {
+            client
+                .post("https://api-partner.spotify.com/pathfinder/v2/query")
+                .json(query)
+        };
+        request = request
+            .bearer_auth(bearer)
+            .header("client-token", client_token);
+        if web_headers {
+            request = request
+                .header("app-platform", "WebPlayer")
+                .header("spotify-app-version", "1.3.7.2117.ge81eb9b13200");
+        }
+        let response = request.send().await?;
+        let status = response.status();
+        if !status.is_success() {
+            let body = response.text().await.unwrap_or_default();
+            let snippet: String = body.split_whitespace().collect::<Vec<_>>().join(" ").chars().take(200).collect();
+            return Err(ApiError::Status {
+                status: status.as_u16(),
+                message: format!("HTTP {}: {snippet}", status.as_u16()),
+            });
+        }
+        response.json().await.map_err(ApiError::from)
+    }
+
     /// Pathfinder has a separate cooldown: a shared Web API throttle must not
     /// block it, and a prerelease refresh must not erase its own Retry-After.
     pub(crate) async fn partner_request(

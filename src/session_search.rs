@@ -24,6 +24,17 @@ pub async fn search(
     web: &crate::api::ApiClient,
     query: &str,
 ) -> anyhow::Result<SearchResults> {
+    // After every form was refused, Spotify gets ten minutes before it is
+    // asked again, so each search does not pay for six refusals first.
+    static REFUSED_AT: std::sync::Mutex<Option<std::time::Instant>> = std::sync::Mutex::new(None);
+    if REFUSED_AT
+        .lock()
+        .ok()
+        .and_then(|at| *at)
+        .is_some_and(|at| at.elapsed() < std::time::Duration::from_secs(600))
+    {
+        anyhow::bail!("Spotify refused the full search a moment ago");
+    }
     let login = session.login5().auth_token().await?;
     let client_token = session.spclient().client_token().await?;
     // The web player's variables first; then the smaller set other clients
@@ -52,40 +63,62 @@ pub async fn search(
         "includePreReleases": true,
         "includeLocalConcertsField": false
     });
+    // Spindle: Spotify accepted the plain request on one playback
+    // connection and refused it ("Client/request not allowed", 403) on the
+    // next. The forms below are tried in turn, the first that answers is
+    // kept for the rest of the run, and each refusal is logged.
+    static WORKING: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+    const FORMS: [(&str, bool, bool); 3] = [
+        ("plain POST", false, false),
+        ("web player headers", true, false),
+        ("GET v1", true, true),
+    ];
+    let start = WORKING.load(std::sync::atomic::Ordering::Relaxed);
     let mut body = None;
     let mut last_error = None;
-    for variables in [full, small] {
-        let request = serde_json::json!({
-            "operationName": "searchDesktop",
-            "variables": variables,
-            "extensions": {
-                "persistedQuery": {"version": 1, "sha256Hash": SEARCH_DESKTOP_HASH}
-            }
-        });
-        match web
-            .partner_request(&login.access_token, &client_token, &request)
-            .await
-        {
-            Ok(answer) if answer.pointer("/data/searchV2").is_some() => {
-                body = Some(answer);
-                break;
-            }
-            Ok(answer) => {
-                let message = answer
-                    .pointer("/errors/0/message")
-                    .and_then(Value::as_str)
-                    .unwrap_or("no results")
-                    .to_string();
-                log::warn!("session search answered: {message}");
-                last_error = Some(anyhow::anyhow!("Spotify's search answered: {message}"));
-            }
-            Err(error) => {
-                log::warn!("session search refused: {error}");
-                last_error = Some(anyhow::anyhow!("{error}"));
+    'forms: for step in 0..FORMS.len() {
+        let index = (start + step) % FORMS.len();
+        let (name, web_headers, get) = FORMS[index];
+        for variables in [&full, &small] {
+            let request = serde_json::json!({
+                "operationName": "searchDesktop",
+                "variables": variables,
+                "extensions": {
+                    "persistedQuery": {"version": 1, "sha256Hash": SEARCH_DESKTOP_HASH}
+                }
+            });
+            match web
+                .partner_request_as(&login.access_token, &client_token, &request, web_headers, get)
+                .await
+            {
+                Ok(answer) if answer.pointer("/data/searchV2").is_some() => {
+                    if index != start {
+                        log::info!("session search works as {name}");
+                    }
+                    WORKING.store(index, std::sync::atomic::Ordering::Relaxed);
+                    body = Some(answer);
+                    break 'forms;
+                }
+                Ok(answer) => {
+                    let message = answer
+                        .pointer("/errors/0/message")
+                        .and_then(Value::as_str)
+                        .unwrap_or("no results")
+                        .to_string();
+                    log::warn!("session search as {name} answered: {message}");
+                    last_error = Some(anyhow::anyhow!("Spotify's search answered: {message}"));
+                }
+                Err(error) => {
+                    log::warn!("session search as {name} refused: {error}");
+                    last_error = Some(anyhow::anyhow!("{error}"));
+                }
             }
         }
     }
     let Some(body) = body else {
+        if let Ok(mut at) = REFUSED_AT.lock() {
+            *at = Some(std::time::Instant::now());
+        }
         return Err(last_error.unwrap_or_else(|| anyhow::anyhow!("Spotify's search failed")));
     };
     if let Some(error) = body
