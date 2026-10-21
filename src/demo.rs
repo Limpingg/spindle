@@ -4369,7 +4369,8 @@ mod tests {
             .unwrap()
             .rect();
         assert!(
-            popup.height() < 160.0,
+            // Spindle: the Jam row adds about 45 points above the list.
+            popup.height() < 210.0,
             "a list with only this computer should shrink to fit: {popup:?}"
         );
         app.backend.shutdown();

@@ -420,6 +420,18 @@ pub fn popup(app: &mut App, ctx: &egui::Context) {
                     });
                 });
                 ui.add_space(4.0);
+                // Spindle: Jam lives with the speakers, as in Spotify's own
+                // Connect menu. It opens the running Jam when there is one.
+                let jam_label = if matches!(app.jam, crate::model::JamState::Live(_)) {
+                    gettext(locale, "Jam")
+                } else {
+                    gettext(locale, "Start a Jam")
+                };
+                if super::widgets::menu_item(ui, &palette, Some(Icon::Users), &jam_label) {
+                    app.show_devices = false;
+                    app.actions.push(Action::StartJam);
+                }
+                super::widgets::menu_separator(ui, &palette);
                 let local_id = app.local_device_id.clone();
                 let mut devices: Vec<Device> = app.devices.clone();
                 if app.local_ready
