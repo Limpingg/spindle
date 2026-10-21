@@ -15,7 +15,10 @@ pub fn dialog(app: &mut App, ui: &mut egui::Ui) {
     ui.add_space(4.0);
     theme::text(
         ui,
-        gettext(locale, "Listen together from anywhere. Friends join with the link and add songs from their own Spotify."),
+        gettext(
+            locale,
+            "Listen together from anywhere. Friends join with the link and add songs from their own Spotify.",
+        ),
         theme::regular(13.0),
         palette.secondary,
     );

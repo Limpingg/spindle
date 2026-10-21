@@ -19,9 +19,89 @@ const SEARCH_DESKTOP_HASH: &str =
 /// Results per kind, as the web player asks for a full search page.
 const LIMIT: u32 = 50;
 
+/// Spindle: the playback grant's refresh token, saved when playback is
+/// approved in the browser. Spotify answered the search for a session
+/// started from that approval and refused it ("Client/request not
+/// allowed") for the same session restored from its saved login, so the
+/// search asks with an access token from this grant first. Kept in a
+/// private file in the state folder and removed with the playback grant.
+const GRANT_FILE: &str = "search-grant.json";
+
+#[derive(serde::Serialize, serde::Deserialize)]
+struct SavedGrant {
+    refresh_token: String,
+}
+
+/// The access token minted from the saved grant, and when it expires.
+static ACCESS: std::sync::Mutex<Option<(String, std::time::Instant)>> = std::sync::Mutex::new(None);
+
+pub fn remember_grant(state: &std::path::Path, refresh_token: &str) {
+    let saved = SavedGrant {
+        refresh_token: refresh_token.to_string(),
+    };
+    if let Ok(bytes) = serde_json::to_vec(&saved)
+        && let Err(error) = fastframe_file::write_private(&state.join(GRANT_FILE), bytes)
+    {
+        log::warn!("could not keep the search grant: {error}");
+    }
+    if let Ok(mut access) = ACCESS.lock() {
+        *access = None;
+    }
+}
+
+pub fn forget_grant(state: &std::path::Path) {
+    let _ = std::fs::remove_file(state.join(GRANT_FILE));
+    if let Ok(mut access) = ACCESS.lock() {
+        *access = None;
+    }
+}
+
+/// An access token from the saved grant, refreshed when it is near expiry;
+/// `None` without a grant or when Spotify will not refresh it.
+async fn grant_token(state: &std::path::Path, http: &reqwest::Client) -> Option<String> {
+    if let Ok(access) = ACCESS.lock()
+        && let Some((token, until)) = access.as_ref()
+        && *until > std::time::Instant::now()
+    {
+        return Some(token.clone());
+    }
+    let bytes = std::fs::read(state.join(GRANT_FILE)).ok()?;
+    let saved: SavedGrant = serde_json::from_slice(&bytes).ok()?;
+    match crate::auth::refresh(http, crate::auth::PLAYBACK_CLIENT_ID, &saved.refresh_token).await {
+        Ok(response) => {
+            if let Some(rotated) = response
+                .refresh_token
+                .as_deref()
+                .filter(|token| !token.is_empty())
+                && rotated != saved.refresh_token
+            {
+                remember_grant(state, rotated);
+            }
+            let lifetime = response.expires_in.unwrap_or(3600).saturating_sub(120);
+            if let Ok(mut access) = ACCESS.lock() {
+                *access = Some((
+                    response.access_token.clone(),
+                    std::time::Instant::now() + std::time::Duration::from_secs(lifetime),
+                ));
+            }
+            Some(response.access_token)
+        }
+        Err(crate::auth::TokenEndpointError::Rejected { detail, .. }) => {
+            log::warn!("Spotify would not refresh the search grant: {detail}");
+            forget_grant(state);
+            None
+        }
+        Err(error) => {
+            log::warn!("search grant refresh failed: {error}");
+            None
+        }
+    }
+}
+
 pub async fn search(
     session: &Session,
     web: &crate::api::ApiClient,
+    state: &std::path::Path,
     query: &str,
 ) -> anyhow::Result<SearchResults> {
     // After every form was refused, Spotify gets ten minutes before it is
@@ -35,8 +115,17 @@ pub async fn search(
     {
         anyhow::bail!("Spotify refused the full search a moment ago");
     }
-    let login = session.login5().auth_token().await?;
     let client_token = session.spclient().client_token().await?;
+    let mut bearers: Vec<(&str, String)> = Vec::new();
+    if let Ok(http) = web.http_client()
+        && let Some(token) = grant_token(state, &http).await
+    {
+        bearers.push(("the playback grant", token));
+    }
+    bearers.push((
+        "the session",
+        session.login5().auth_token().await?.access_token,
+    ));
     // The web player's variables first; then the smaller set other clients
     // send, in case Spotify refuses a flag this account's build lacks.
     let full = serde_json::json!({
@@ -76,41 +165,43 @@ pub async fn search(
     let start = WORKING.load(std::sync::atomic::Ordering::Relaxed);
     let mut body = None;
     let mut last_error = None;
-    'forms: for step in 0..FORMS.len() {
-        let index = (start + step) % FORMS.len();
-        let (name, web_headers, get) = FORMS[index];
-        for variables in [&full, &small] {
-            let request = serde_json::json!({
-                "operationName": "searchDesktop",
-                "variables": variables,
-                "extensions": {
-                    "persistedQuery": {"version": 1, "sha256Hash": SEARCH_DESKTOP_HASH}
-                }
-            });
-            match web
-                .partner_request_as(&login.access_token, &client_token, &request, web_headers, get)
-                .await
-            {
-                Ok(answer) if answer.pointer("/data/searchV2").is_some() => {
-                    if index != start {
-                        log::info!("session search works as {name}");
+    'forms: for (bearer_name, bearer) in &bearers {
+        for step in 0..FORMS.len() {
+            let index = (start + step) % FORMS.len();
+            let (name, web_headers, get) = FORMS[index];
+            for variables in [&full, &small] {
+                let request = serde_json::json!({
+                    "operationName": "searchDesktop",
+                    "variables": variables,
+                    "extensions": {
+                        "persistedQuery": {"version": 1, "sha256Hash": SEARCH_DESKTOP_HASH}
                     }
-                    WORKING.store(index, std::sync::atomic::Ordering::Relaxed);
-                    body = Some(answer);
-                    break 'forms;
-                }
-                Ok(answer) => {
-                    let message = answer
-                        .pointer("/errors/0/message")
-                        .and_then(Value::as_str)
-                        .unwrap_or("no results")
-                        .to_string();
-                    log::warn!("session search as {name} answered: {message}");
-                    last_error = Some(anyhow::anyhow!("Spotify's search answered: {message}"));
-                }
-                Err(error) => {
-                    log::warn!("session search as {name} refused: {error}");
-                    last_error = Some(anyhow::anyhow!("{error}"));
+                });
+                match web
+                    .partner_request_as(bearer, &client_token, &request, web_headers, get)
+                    .await
+                {
+                    Ok(answer) if answer.pointer("/data/searchV2").is_some() => {
+                        log::info!("session search answered as {name} with {bearer_name}");
+                        WORKING.store(index, std::sync::atomic::Ordering::Relaxed);
+                        body = Some(answer);
+                        break 'forms;
+                    }
+                    Ok(answer) => {
+                        let message = answer
+                            .pointer("/errors/0/message")
+                            .and_then(Value::as_str)
+                            .unwrap_or("no results")
+                            .to_string();
+                        log::warn!(
+                            "session search as {name} with {bearer_name} answered: {message}"
+                        );
+                        last_error = Some(anyhow::anyhow!("Spotify's search answered: {message}"));
+                    }
+                    Err(error) => {
+                        log::warn!("session search as {name} with {bearer_name} refused: {error}");
+                        last_error = Some(anyhow::anyhow!("{error}"));
+                    }
                 }
             }
         }
@@ -121,10 +212,7 @@ pub async fn search(
         }
         return Err(last_error.unwrap_or_else(|| anyhow::anyhow!("Spotify's search failed")));
     };
-    if let Some(error) = body
-        .pointer("/errors/0/message")
-        .and_then(Value::as_str)
-    {
+    if let Some(error) = body.pointer("/errors/0/message").and_then(Value::as_str) {
         anyhow::bail!("Spotify's search answered: {error}");
     }
     let search = body
@@ -153,12 +241,8 @@ fn images(value: Option<&Value>) -> Vec<Image> {
                 .iter()
                 .filter_map(|source| {
                     let url = source.get("url")?.as_str()?.to_string();
-                    let size = |key: &str| {
-                        source
-                            .get(key)
-                            .and_then(Value::as_u64)
-                            .map(|n| n as u32)
-                    };
+                    let size =
+                        |key: &str| source.get(key).and_then(Value::as_u64).map(|n| n as u32);
                     Some(Image {
                         url,
                         width: size("width"),
@@ -245,7 +329,9 @@ fn track(data: &Value) -> Track {
             images: images(data.pointer("/albumOfTrack/coverArt/sources")),
             ..Default::default()
         }),
-        is_playable: data.pointer("/playability/playable").and_then(Value::as_bool),
+        is_playable: data
+            .pointer("/playability/playable")
+            .and_then(Value::as_bool),
         uri,
         ..Default::default()
     }
@@ -451,9 +537,15 @@ mod tests {
         assert!(track.explicit);
         assert_eq!(track.artists[0].name, "Daniel Caesar");
         assert_eq!(track.album.as_ref().unwrap().images[0].width, Some(300));
-        assert_eq!(results.artists.unwrap().items[0].images[0].url, "https://i/r.jpg");
+        assert_eq!(
+            results.artists.unwrap().items[0].images[0].url,
+            "https://i/r.jpg"
+        );
         let album = &results.albums.unwrap().items[0];
-        assert_eq!((album.year(), album.album_type.as_deref()), (Some("2017"), Some("album")));
+        assert_eq!(
+            (album.year(), album.album_type.as_deref()),
+            (Some("2017"), Some("album"))
+        );
         let playlist = &results.playlists.unwrap().items[0];
         assert_eq!(playlist.name, "This Is Daniel Caesar");
         assert_eq!(playlist.owner.id.as_deref(), Some("spotify"));

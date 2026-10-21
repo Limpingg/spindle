@@ -518,7 +518,10 @@ mod tests {
         gateway
             .install(ApiSource::Shared, AccountId::new("same"))
             .unwrap();
-        gateway.begin_verification(ApiSource::Personal, provider("personal", ApiSource::Personal));
+        gateway.begin_verification(
+            ApiSource::Personal,
+            provider("personal", ApiSource::Personal),
+        );
         let mut waiting = Box::pin(gateway.client_for(Operation::UserData));
         std::future::poll_fn(|cx| {
             assert!(waiting.as_mut().poll(cx).is_pending());
@@ -534,7 +537,10 @@ mod tests {
             &gateway.verification_client(ApiSource::Personal)
         ));
         // A read only the shared app serves does not wait.
-        let shared = gateway.client_for(Operation::PlaylistLibrary).await.unwrap();
+        let shared = gateway
+            .client_for(Operation::PlaylistLibrary)
+            .await
+            .unwrap();
         assert!(Arc::ptr_eq(
             &shared,
             &gateway.verification_client(ApiSource::Shared)

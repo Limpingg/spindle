@@ -36,7 +36,8 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
     // which Spotify throttles for up to half a minute at a time. Once songs,
     // artists and albums are on screen, a "Loading" line above them for that
     // long reads as a stuck search; the playlists slot in when they arrive.
-    let showing_results = matches!(&app.search.results, Loadable::Loaded(results) if !results.is_empty());
+    let showing_results =
+        matches!(&app.search.results, Loadable::Loaded(results) if !results.is_empty());
     if pending && !(showing_results && !app.search.catalogue_pending) {
         widgets::loading_row(ui, &palette, app.locale);
     }

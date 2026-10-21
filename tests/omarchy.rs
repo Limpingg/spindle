@@ -43,11 +43,7 @@ fn omarchy_hook_replaces_only_its_palette_and_tolerates_a_stopped_app() {
         ),
     )
     .unwrap();
-    std::fs::set_permissions(
-        bin.join("spindle"),
-        std::fs::Permissions::from_mode(0o755),
-    )
-    .unwrap();
+    std::fs::set_permissions(bin.join("spindle"), std::fs::Permissions::from_mode(0o755)).unwrap();
     let run = || {
         let output = Command::new(&shell)
             .arg(concat!(

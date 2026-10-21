@@ -2229,11 +2229,14 @@ mod tests {
     }
 
     #[test]
-fn a_jam_answer_gives_its_id_link_and_members() {
+    fn a_jam_answer_gives_its_id_link_and_members() {
         let body = r#"{"session_id":"abc","join_session_token":"tok123","join_session_url":"https://x/sessions/join/tok123","session_members":[{"username":"nick","display_name":"nick"},{"username":"tyler1","display_name":""}],"is_session_owner":true}"#;
         let jam = parse_jam(body).unwrap();
         assert_eq!(jam.id, "abc");
-        assert_eq!(jam.join_url, "https://open.spotify.com/socialsession/tok123");
+        assert_eq!(
+            jam.join_url,
+            "https://open.spotify.com/socialsession/tok123"
+        );
         assert_eq!(jam.members, ["nick", "tyler1"]);
         let camel = r#"{"sessionId":"s","joinSessionToken":"t"}"#;
         assert_eq!(parse_jam(camel).unwrap().members, Vec::<String>::new());
@@ -2242,16 +2245,23 @@ fn a_jam_answer_gives_its_id_link_and_members() {
             jam_failure(403, r#"{"error_type":"X","message":"Premium required"}"#),
             "Spotify did not start the Jam: Premium required"
         );
-        assert_eq!(jam_failure(403, ""), "Spotify did not start the Jam (HTTP 403).");
+        assert_eq!(
+            jam_failure(403, ""),
+            "Spotify did not start the Jam (HTTP 403)."
+        );
     }
 
     #[test]
-        fn a_new_folder_is_two_markers_at_the_top_that_read_back_as_the_folder() {
+    fn a_new_folder_is_two_markers_at_the_top_that_read_back_as_the_folder() {
         let changes = folder_changes(b"rev", "nick", 7, "0123456789abcdef", "Late Night & Co");
         assert_eq!(changes.base_revision(), b"rev");
         let add = changes.deltas[0].ops[0].add.as_ref().unwrap();
         assert!(add.add_first());
-        let uris: Vec<String> = add.items.iter().map(|item| item.uri().to_string()).collect();
+        let uris: Vec<String> = add
+            .items
+            .iter()
+            .map(|item| item.uri().to_string())
+            .collect();
         assert_eq!(
             uris,
             [

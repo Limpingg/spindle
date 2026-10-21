@@ -290,7 +290,10 @@ pub enum PlayerCommand {
     /// Spindle: take one upcoming row out, queued or from the context.
     /// `index` counts the visible upcoming rows; a row whose song is no
     /// longer `uri` is left alone.
-    RemoveNextTrack { index: usize, uri: String },
+    RemoveNextTrack {
+        index: usize,
+        uri: String,
+    },
     Seek(u32),
     /// The volume to keep: applied at once and told to Spotify Connect.
     Volume(u16),

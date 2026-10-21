@@ -1655,8 +1655,7 @@ mod tests {
     use std::sync::Arc;
 
     fn accessible_app(name: &str) -> (egui::Context, App) {
-        let root =
-            std::env::temp_dir().join(format!("spindle-a11y-{name}-{}", std::process::id()));
+        let root = std::env::temp_dir().join(format!("spindle-a11y-{name}-{}", std::process::id()));
         let ctx = egui::Context::default();
         ctx.enable_accesskit();
         let waker = crate::backend::Waker::default();
@@ -6661,8 +6660,7 @@ mod tests {
     /// A toast is wide enough to avoid wrapping every word.
     #[test]
     fn a_toast_is_wide_enough_to_read() {
-        let root =
-            std::env::temp_dir().join(format!("spindle-toast-test-{}", std::process::id()));
+        let root = std::env::temp_dir().join(format!("spindle-toast-test-{}", std::process::id()));
         let dirs = AppDirs {
             config: root.join("config"),
             state: root.join("state"),
@@ -7099,10 +7097,8 @@ mod tests {
     /// Rule: side-panel headers stay on one line at their narrowest width.
     #[test]
     fn the_narrowest_panels_keep_their_headers_on_one_row() {
-        let root = std::env::temp_dir().join(format!(
-            "spindle-queue-header-test-{}",
-            std::process::id()
-        ));
+        let root =
+            std::env::temp_dir().join(format!("spindle-queue-header-test-{}", std::process::id()));
         let dirs = AppDirs {
             config: root.join("config"),
             state: root.join("state"),
@@ -7196,10 +7192,8 @@ mod tests {
     /// With nothing reported, the row is not drawn.
     #[test]
     fn the_queue_names_where_the_song_plays_from() {
-        let root = std::env::temp_dir().join(format!(
-            "spindle-playing-from-test-{}",
-            std::process::id()
-        ));
+        let root =
+            std::env::temp_dir().join(format!("spindle-playing-from-test-{}", std::process::id()));
         let dirs = AppDirs {
             config: root.join("config"),
             state: root.join("state"),
@@ -7544,8 +7538,7 @@ mod tests {
     /// Every page, panel, and dialog lays out without panicking.
     #[test]
     fn every_surface_renders_headless() {
-        let root =
-            std::env::temp_dir().join(format!("spindle-render-test-{}", std::process::id()));
+        let root = std::env::temp_dir().join(format!("spindle-render-test-{}", std::process::id()));
         let dirs = AppDirs {
             config: root.join("config"),
             state: root.join("state"),
@@ -7730,10 +7723,8 @@ mod tests {
     }
 
     fn drop_songs_on_sidebar(count: usize) {
-        let root = std::env::temp_dir().join(format!(
-            "spindle-drag-test-{}-{count}",
-            std::process::id()
-        ));
+        let root =
+            std::env::temp_dir().join(format!("spindle-drag-test-{}-{count}", std::process::id()));
         let dirs = AppDirs {
             config: root.join("config"),
             state: root.join("state"),

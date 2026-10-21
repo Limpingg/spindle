@@ -202,12 +202,14 @@ pub fn open_spotify_url(uri: &str) -> Option<String> {
 pub fn tray_template_rgba(size: usize) -> Vec<u8> {
     // The menu bar draws a template as a silhouette, so it takes the neon
     // lines alone (packaging/icons/spindle-tray-1024.png), not the square.
-    let master = image::load_from_memory(include_bytes!("../packaging/icons/spindle-tray-1024.png"))
-        .expect("packaging/icons/spindle-tray-1024.png decodes")
-        .to_rgba8();
+    let master =
+        image::load_from_memory(include_bytes!("../packaging/icons/spindle-tray-1024.png"))
+            .expect("packaging/icons/spindle-tray-1024.png decodes")
+            .to_rgba8();
     let side = size.max(1) as u32;
-    let mut rgba = image::imageops::resize(&master, side, side, image::imageops::FilterType::Lanczos3)
-        .into_raw();
+    let mut rgba =
+        image::imageops::resize(&master, side, side, image::imageops::FilterType::Lanczos3)
+            .into_raw();
     for pixel in rgba.as_chunks_mut::<4>().0 {
         pixel[0] = 0;
         pixel[1] = 0;
@@ -363,14 +365,18 @@ mod tests {
 
         // #and the menu-bar template is black on the wave's centre line
         let template = tray_template_rgba(44);
-        let line = (18..26).map(|y| pixel(&template, 44, 22, y)[3]).max().unwrap();
+        let line = (18..26)
+            .map(|y| pixel(&template, 44, 22, y)[3])
+            .max()
+            .unwrap();
         assert!(line > 200, "the wave shows in the template: {line}");
         assert_eq!(pixel(&template, 44, 0, 0)[3], 0);
     }
 
     #[test]
     fn monthly_listeners_are_read_from_the_artist_page() {
-        let page = r#"<meta property="og:description" content="Artist · 70.2M monthly listeners."/>"#;
+        let page =
+            r#"<meta property="og:description" content="Artist · 70.2M monthly listeners."/>"#;
         assert_eq!(monthly_listeners(page).as_deref(), Some("70.2M"));
         let small = r#"content="Artist · 1,234 monthly listeners.""#;
         assert_eq!(monthly_listeners(small).as_deref(), Some("1,234"));

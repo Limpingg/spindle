@@ -452,7 +452,7 @@ impl ApiClient {
             .ok_or(ApiError::NotSignedIn)
     }
 
-    fn http_client(&self) -> Result<reqwest::Client> {
+    pub(crate) fn http_client(&self) -> Result<reqwest::Client> {
         self.http.client().map_err(ApiError::Network)
     }
 
@@ -470,8 +470,16 @@ impl ApiClient {
     ) -> Result<serde_json::Value> {
         let client = self.http_client()?;
         let mut request = if get {
-            let variables = query.get("variables").cloned().unwrap_or_default().to_string();
-            let extensions = query.get("extensions").cloned().unwrap_or_default().to_string();
+            let variables = query
+                .get("variables")
+                .cloned()
+                .unwrap_or_default()
+                .to_string();
+            let extensions = query
+                .get("extensions")
+                .cloned()
+                .unwrap_or_default()
+                .to_string();
             let operation = query
                 .get("operationName")
                 .and_then(|name| name.as_str())
@@ -501,7 +509,13 @@ impl ApiClient {
         let status = response.status();
         if !status.is_success() {
             let body = response.text().await.unwrap_or_default();
-            let snippet: String = body.split_whitespace().collect::<Vec<_>>().join(" ").chars().take(200).collect();
+            let snippet: String = body
+                .split_whitespace()
+                .collect::<Vec<_>>()
+                .join(" ")
+                .chars()
+                .take(200)
+                .collect();
             return Err(ApiError::Status {
                 status: status.as_u16(),
                 message: format!("HTTP {}: {snippet}", status.as_u16()),
@@ -560,7 +574,10 @@ impl ApiClient {
                 .unwrap_or("request");
             return Err(ApiError::Status {
                 status: status.as_u16(),
-                message: format!("Spotify {operation} failed (HTTP {}): {snippet}", status.as_u16()),
+                message: format!(
+                    "Spotify {operation} failed (HTTP {}): {snippet}",
+                    status.as_u16()
+                ),
             });
         }
         response.json().await.map_err(ApiError::from)

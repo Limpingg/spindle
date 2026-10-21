@@ -239,9 +239,7 @@ fn claim(
             Outcome::Surfaced
         }
         fastframe_instance::Claim::Unanswered => {
-            log::warn!(
-                "Spindle is already running but did not answer; not starting a second copy"
-            );
+            log::warn!("Spindle is already running but did not answer; not starting a second copy");
             Outcome::Surfaced
         }
     }

@@ -767,6 +767,8 @@ pub enum Command {
     /// Internal: the playback grant produced a streaming access token.
     PlaybackAuthorized {
         access_token: String,
+        /// Spindle: kept for the catalogue search (see session_search).
+        refresh_token: Option<String>,
         lease: CredentialLease,
         attempt: u64,
     },
@@ -839,7 +841,10 @@ pub enum Command {
     /// Spindle: add an empty folder with this name to the library.
     CreateFolder(String),
     /// Spindle: the Web API search, after the session's search failed.
-    WebSearch { query: String, serial: u64 },
+    WebSearch {
+        query: String,
+        serial: u64,
+    },
     /// Spindle: start a Jam hosted on this device, or read the one running.
     StartJam,
     /// Spindle: end the Jam with this session id.
@@ -2460,10 +2465,14 @@ impl Worker {
                 }
                 Command::PlaybackAuthorized {
                     access_token,
+                    refresh_token,
                     lease,
                     attempt,
                 } => {
                     if lease.current() {
+                        if let Some(refresh) = refresh_token.filter(|token| !token.is_empty()) {
+                            crate::session_search::remember_grant(&self.dirs.state, &refresh);
+                        }
                         self.on_playback_authorized(access_token);
                     } else {
                         self.finish_playback_authorization(attempt);
@@ -3011,8 +3020,12 @@ impl Worker {
                     Err(error @ ApiError::SignInExpired { .. }) => break error,
                     Err(error) if error.status().is_some_and(|status| status < 500) => break error,
                     Err(error) => {
-                        if let Some(user) = remembered_verified_user(&remembered_path, &remembered_key).await {
-                            log::info!("Spotify sign-in check did not answer ({error}); using the remembered account");
+                        if let Some(user) =
+                            remembered_verified_user(&remembered_path, &remembered_key).await
+                        {
+                            log::info!(
+                                "Spotify sign-in check did not answer ({error}); using the remembered account"
+                            );
                             let _ = commands.send(Command::WebVerified {
                                 source,
                                 token: Box::new(token),
@@ -3297,6 +3310,9 @@ impl Worker {
     }
 
     fn delete_stored_grant(&self, slot: CredentialSlot) {
+        if slot == CredentialSlot::Playback {
+            crate::session_search::forget_grant(&self.dirs.state);
+        }
         let lease = self.credentials.lease(slot);
         let notice = self.storage_notice(lease.clone());
         // Queue deletion before a new browser flow can enqueue a replacement.
@@ -3671,6 +3687,7 @@ impl Worker {
                 Ok(token) => {
                     let _ = commands.send(Command::PlaybackAuthorized {
                         access_token: token.access_token,
+                        refresh_token: token.refresh_token,
                         lease: lease.clone(),
                         attempt,
                     });
@@ -4688,7 +4705,9 @@ impl Worker {
         let Some(engine) = self.engine.clone().filter(|_| self.signed_in) else {
             self.emit(Event::FolderCreated {
                 name,
-                result: Err("Making a folder needs local playback. Try again when connected.".into()),
+                result: Err(
+                    "Making a folder needs local playback. Try again when connected.".into(),
+                ),
             });
             return;
         };
@@ -4806,7 +4825,8 @@ impl Worker {
         // it over the playback session; the Web API's answer to an outside
         // app is a handful of results. Without the session, or when its
         // search fails, the Web API search below runs as before.
-        if let (Some(engine), Some(web)) = (self.engine.clone(), self.api.prerelease_http_client()) {
+        if let (Some(engine), Some(web)) = (self.engine.clone(), self.api.prerelease_http_client())
+        {
             self.emit(Event::Api(Box::new(ApiResponse::SearchStarted {
                 query: query.clone(),
                 serial,
@@ -4815,10 +4835,11 @@ impl Worker {
             let events = self.events.clone();
             let waker = self.waker.clone();
             let commands = self.commands.clone();
+            let state = self.dirs.state.clone();
             let task = tokio::spawn(async move {
                 let read = tokio::time::timeout(
                     Duration::from_secs(10),
-                    crate::session_search::search(engine.session(), &web, &query),
+                    crate::session_search::search(engine.session(), &web, &state, &query),
                 )
                 .await;
                 match read {
@@ -4832,7 +4853,9 @@ impl Worker {
                     }
                     failed => {
                         match failed {
-                            Ok(Err(error)) => log::warn!("session search failed, using the Web API: {error:#}"),
+                            Ok(Err(error)) => {
+                                log::warn!("session search failed, using the Web API: {error:#}")
+                            }
                             _ => log::warn!("session search timed out, using the Web API"),
                         }
                         let _ = commands.send(Command::WebSearch { query, serial });
@@ -8249,8 +8272,7 @@ mod authorization_tests {
             .enable_all()
             .build()
             .unwrap();
-        let root =
-            std::env::temp_dir().join(format!("spindle-auth-{name}-{}", std::process::id()));
+        let root = std::env::temp_dir().join(format!("spindle-auth-{name}-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&root);
         let dirs = AppDirs {
             config: root.join("config"),
@@ -8711,6 +8733,7 @@ mod authorization_tests {
         commands
             .send(Command::PlaybackAuthorized {
                 access_token: "dummy-streaming-token".into(),
+                refresh_token: None,
                 lease: playback.clone(),
                 attempt,
             })
@@ -9904,7 +9927,6 @@ mod tests {
     }
 }
 
-
 /// What ties a remembered verification to one grant: the app it came from
 /// and its refresh token, hashed so the file holds no secret.
 /// The remembered account is keyed on the app it was verified through. Not
@@ -9925,8 +9947,13 @@ struct RememberedUser {
 }
 
 async fn remember_verified_user(path: &std::path::Path, key: &str, user: &User) {
-    let record = RememberedUser { key: key.to_owned(), user: user.clone() };
-    let Ok(bytes) = serde_json::to_vec(&record) else { return };
+    let record = RememberedUser {
+        key: key.to_owned(),
+        user: user.clone(),
+    };
+    let Ok(bytes) = serde_json::to_vec(&record) else {
+        return;
+    };
     let path = path.to_owned();
     let _ = tokio::task::spawn_blocking(move || fastframe_file::write(&path, bytes)).await;
 }
