@@ -6,6 +6,10 @@ adds what is different here.
 
 Writing rule from Nick: no em dashes or en dashes anywhere, ever.
 
+Never run `cargo fmt` over the whole tree: it reformats Spotifast's lines
+and every reformatted line conflicts at the next merge. Format only files
+Spindle owns (`rustfmt src/session_search.rs`), or none.
+
 ## How Spotifast releases flow in (rename, then merge)
 
 History: Spotifast's commits, then "Rename Spotifast to Spindle" (the
@@ -172,6 +176,31 @@ Needs the PipeWire and ALSA headers only to run the test suite on Linux:
   failure; before, `friends_in_flight` stayed set forever and the panel
   never refreshed again after a reconnect.
 - Session reads fall back to the Web API after 10 s, not 30.
+
+## Search, the Keychain and releases (Mac, 2026-10-21)
+
+- Search goes through Pathfinder's `searchDesktop` (src/session_search.rs,
+  hash from the web player build of 2026-10-21). Spotify answered it for a
+  playback session started from the browser approval and refused it (403
+  "Client/request not allowed") in every request form for the same
+  session restored from its saved login. So the approval's refresh token
+  is kept in `search-grant.json` in the state folder, and search asks with
+  an access token from it first, then with Login5. Without either, the Web
+  API search answers (personal app for the playlist half while the shared
+  app is throttled).
+- Each build is signed anew, so after an update macOS shows a Keychain
+  prompt before handing over the saved grants. Credential reads wait five
+  minutes for it (credentials.rs TIMEOUT); at 20 seconds two of the three
+  grants timed out and playback and the personal app had to be approved
+  again.
+- Two releases dispatched close together publish in either order, and
+  GitHub marks the last published as Latest: check that the newest version
+  is Latest (edit the release, Set as the latest) or the updater offers
+  the older one.
+- Releases from 0.14.107 and older know the repository as
+  Nicolasaustin/spindle and reject assets GitHub now serves from
+  Limpingg/spindle ("Update asset does not belong to this release"); such a
+  copy needs one manual install.
 
 ## Facts from the live test (Windows PC, 2026-10-20)
 
