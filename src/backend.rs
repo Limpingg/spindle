@@ -5521,10 +5521,17 @@ async fn handle(
     let expired = std::cell::Cell::new(None);
     macro_rules! routed {
         ($method:ident($($argument:expr),* $(,)?)) => {{
-            let result = match &selected {
+            let mut result = match &selected {
                 Ok(client) => client.$method($($argument),*).await,
                 Err(error) => Err(error.clone()),
             };
+            // Spindle: the personal app's quota ran out; ask the shared app.
+            if matches!(result, Err(ApiError::QuotaExhausted))
+                && let Some(shared) = api.quota_fallback(operation)
+            {
+                log::info!("personal app quota exhausted; asking the shared app ({operation:?})");
+                result = shared.$method($($argument),*).await;
+            }
             if let Err(ApiError::SignInExpired { api_source }) = &result {
                 expired.set(Some(*api_source));
             }

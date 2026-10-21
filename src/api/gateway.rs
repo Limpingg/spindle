@@ -406,6 +406,18 @@ impl ApiGateway {
         Ok(session.client())
     }
 
+    /// Spindle: the shared app, for a read the personal app was asked for
+    /// and refused because its Development Mode quota ran out (seen on the
+    /// Mac: an artist's discography said so instead of listing albums).
+    /// `None` when the personal app was not the one asked or the shared app
+    /// cannot answer.
+    pub fn quota_fallback(&self, operation: Operation) -> Option<Arc<ApiClient>> {
+        (plan(operation, self.personal_ready()) == ApiSource::Personal
+            && plan(operation, false) == ApiSource::Shared
+            && matches!(self.state(ApiSource::Shared), SessionState::Ready { .. }))
+        .then(|| self.shared.client())
+    }
+
     /// Whether the streaming session, when up, should answer an operation.
     pub fn session_serves(&self, operation: Operation) -> bool {
         session_serves(operation, self.personal_ready())

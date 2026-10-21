@@ -63,6 +63,10 @@ impl<'a> RowText<'a> {
 const THEMES_GUIDE_URL: &str = "https://spotifast.rocks/settings-and-files/#custom-themes";
 /// Saving the equalizer as a named preset, and deleting the saved preset
 /// that is in use (#702).
+
+/// Spindle: the Winamp mini player and MilkDrop settings stay out of sight.
+const SHOW_PLAYER_SECTIONS: bool = false;
+
 fn eq_preset_controls(app: &mut App, ui: &mut egui::Ui, current: Option<&str>) {
     let palette = app.palette;
     let locale = app.locale;
@@ -1701,7 +1705,9 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
                 .join(" "),
         ),
     ];
-    if section_matches(&needle, &skins, &skins_rows) {
+    // Spindle: no mini player or MilkDrop sections; Nick plays only in the
+    // main window.
+    if SHOW_PLAYER_SECTIONS && section_matches(&needle, &skins, &skins_rows) {
         any_visible = true;
         section(ui, &palette, &skins, |ui| {
             filtered_row(ui, &palette, &needle, &skins, &skins_rows[0], |ui| {
@@ -1926,7 +1932,7 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
                 .join(" "),
         ),
     ];
-    if section_matches(&needle, "MilkDrop", &milkdrop_rows) {
+    if SHOW_PLAYER_SECTIONS && section_matches(&needle, "MilkDrop", &milkdrop_rows) {
         any_visible = true;
         section(ui, &palette, "MilkDrop", |ui| {
             filtered_row(ui, &palette, &needle, "MilkDrop", &milkdrop_rows[0], |ui| {
