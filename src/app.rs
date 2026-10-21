@@ -3778,14 +3778,14 @@ impl App {
         }
         self.maybe_suggest_personal_app();
 
-        // Not on a metered connection or without internet: the check waits
-        // for a connection that will do, and checking by hand still works.
+        // Spindle: one check per launch, plus the Check for updates button;
+        // no repeats while the app stays open (Nick's call). Not on a
+        // metered connection or without internet: the launch check waits for
+        // a connection that will do, and checking by hand still works.
         if self.settings.check_for_updates
             && !self.offline
             && !self.downloads_wait()
-            && self
-                .last_update_check
-                .is_none_or(|at| at.elapsed() >= crate::updates::CHECK_INTERVAL)
+            && self.last_update_check.is_none()
         {
             self.check_for_updates(false);
         }
