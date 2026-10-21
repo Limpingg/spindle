@@ -1152,8 +1152,8 @@ pub struct JamSession {
 /// hosts: Spotify's `current_or_new` answers the running session when there
 /// is one, so asking twice never makes a second Jam. Uses the same private
 /// social-connect service Spotify's own apps do (it has no public API), with
-/// `activate=true` so the Jam shows on the account's other devices. Needs
-/// Premium. Friends join through https://open.spotify.com/socialsession/<token>.
+/// `activate=true` so the Jam shows on the account's other devices.
+/// Friends join through https://open.spotify.com/socialsession/<token>.
 pub async fn start_jam(session: &Session, http: &reqwest::Client) -> anyhow::Result<JamSession> {
     let path = format!(
         "/social-connect/v2/sessions/current_or_new?activate=true&local_device_id={}&type=REMOTE",
@@ -1210,7 +1210,8 @@ async fn jam_request(
 }
 
 /// What to tell the user when social-connect refuses: Spotify's own message
-/// when it gave one, the Premium rule when it refused outright.
+/// when it gave one, the status otherwise. Every Spindle user has Premium,
+/// so a refusal is never blamed on the plan.
 fn jam_failure(status: u16, body: &str) -> String {
     let message = serde_json::from_str::<serde_json::Value>(body)
         .ok()
@@ -1218,7 +1219,6 @@ fn jam_failure(status: u16, body: &str) -> String {
         .filter(|message| !message.trim().is_empty());
     match (status, message) {
         (_, Some(message)) => format!("Spotify did not start the Jam: {message}"),
-        (401 | 403, None) => "Spotify refused the Jam. Hosting one needs Premium.".into(),
         (status, None) => format!("Spotify did not start the Jam (HTTP {status})."),
     }
 }
@@ -2242,7 +2242,7 @@ fn a_jam_answer_gives_its_id_link_and_members() {
             jam_failure(403, r#"{"error_type":"X","message":"Premium required"}"#),
             "Spotify did not start the Jam: Premium required"
         );
-        assert!(jam_failure(403, "").contains("Premium"));
+        assert_eq!(jam_failure(403, ""), "Spotify did not start the Jam (HTTP 403).");
     }
 
     #[test]
