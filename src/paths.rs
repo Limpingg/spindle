@@ -141,6 +141,12 @@ impl AppDirs {
         self.state.join("web_api_token.json")
     }
 
+    /// The account each Web API grant last verified as, so a start while
+    /// Spotify throttles the verification call still signs in at once.
+    pub fn verified_user_file(&self, slot: &str) -> PathBuf {
+        self.state.join(format!("verified_user_{slot}.json"))
+    }
+
     /// The log of the current run, replaced at every start.
     pub fn log_file(&self) -> PathBuf {
         self.state.join("spindle.log")

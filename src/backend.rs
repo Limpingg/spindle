@@ -2928,6 +2928,16 @@ impl Worker {
         let gateway = Arc::clone(&self.api);
         let commands = self.commands.clone();
         let attempt = self.authorization_attempt;
+        // Spindle: the account this grant verified as last time. Spotify
+        // throttles the shared app's /me for everyone at once, sometimes for
+        // minutes, and upstream waits that out on "Connecting to Spotify".
+        // A grant that verified before is trusted again while throttled; the
+        // next successful call still replaces the remembered answer.
+        let remembered_path = self.dirs.verified_user_file(match source {
+            ApiSource::Shared => "shared",
+            ApiSource::Personal => "personal",
+        });
+        let remembered_key = remembered_key(&token);
         tokio::spawn(async move {
             let mut wait = Duration::from_secs(2);
             let error = loop {
@@ -2937,6 +2947,7 @@ impl Worker {
                 }
                 match crate::api::client::unseen(client.me()).await {
                     Ok(user) => {
+                        remember_verified_user(&remembered_path, &remembered_key, &user).await;
                         let _ = commands.send(Command::WebVerified {
                             source,
                             token: Box::new(token),
@@ -2949,6 +2960,17 @@ impl Worker {
                     Err(error @ ApiError::SignInExpired { .. }) => break error,
                     Err(error) if error.status().is_some_and(|status| status < 500) => break error,
                     Err(error) => {
+                        if let Some(user) = remembered_verified_user(&remembered_path, &remembered_key).await {
+                            log::info!("Spotify sign-in verification throttled ({error}); using the remembered account");
+                            let _ = commands.send(Command::WebVerified {
+                                source,
+                                token: Box::new(token),
+                                user: Box::new(user),
+                                lease: lease.clone(),
+                                attempt,
+                            });
+                            return;
+                        }
                         log::warn!("Spotify sign-in verification will retry: {error}");
                         tokio::time::sleep(wait).await;
                         wait = (wait * 2).min(Duration::from_secs(60));
@@ -9612,4 +9634,35 @@ mod tests {
                 .any(|event| matches!(event, Event::Playback(LocalPlayback::Failed(_))))
         );
     }
+}
+
+
+/// What ties a remembered verification to one grant: the app it came from
+/// and its refresh token, hashed so the file holds no secret.
+fn remembered_key(token: &crate::auth::StoredToken) -> String {
+    use sha2::{Digest, Sha256};
+    let mut hasher = Sha256::new();
+    hasher.update(token.client_id.as_bytes());
+    hasher.update(b"\n");
+    hasher.update(token.refresh_token.as_bytes());
+    format!("{:x}", hasher.finalize())
+}
+
+#[derive(serde::Serialize, serde::Deserialize)]
+struct RememberedUser {
+    key: String,
+    user: User,
+}
+
+async fn remember_verified_user(path: &std::path::Path, key: &str, user: &User) {
+    let record = RememberedUser { key: key.to_owned(), user: user.clone() };
+    let Ok(bytes) = serde_json::to_vec(&record) else { return };
+    let path = path.to_owned();
+    let _ = tokio::task::spawn_blocking(move || fastframe_file::write(&path, bytes)).await;
+}
+
+async fn remembered_verified_user(path: &std::path::Path, key: &str) -> Option<User> {
+    let bytes = tokio::fs::read(path).await.ok()?;
+    let record: RememberedUser = serde_json::from_slice(&bytes).ok()?;
+    (record.key == key).then_some(record.user)
 }
