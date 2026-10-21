@@ -2940,12 +2940,24 @@ impl Worker {
         let remembered_key = remembered_key(&token);
         tokio::spawn(async move {
             let mut wait = Duration::from_secs(2);
+            let mut tries = 0u32;
             let error = loop {
                 if !lease.current() {
                     let _ = commands.send(Command::SignInEnded { source, attempt });
                     return;
                 }
-                match crate::api::client::unseen(client.me()).await {
+                // The first try does not wait out a throttle: a 429 comes
+                // back at once and the remembered account signs in now,
+                // instead of after the client's own waits of up to a minute,
+                // which is what made the start look stuck on "Connecting".
+                tries += 1;
+                let check = crate::api::client::unseen(client.me());
+                let checked = if tries == 1 {
+                    crate::api::client::impatient(check).await
+                } else {
+                    check.await
+                };
+                match checked {
                     Ok(user) => {
                         remember_verified_user(&remembered_path, &remembered_key, &user).await;
                         let _ = commands.send(Command::WebVerified {
@@ -4578,13 +4590,18 @@ impl Worker {
                 Duration::from_secs(15),
                 session_reads::friend_activity(engine.session(), &names),
             );
+            // Spindle: a read the session's end cuts short still answers,
+            // with a failure. Silence left the panel waiting for an answer
+            // that never came, and it never asked again (the in-flight flag
+            // stayed set), which is what made the feed go stale for good
+            // after a reconnect.
             let result = tokio::select! {
                 biased;
-                _ = cancelled.changed() => return,
-                result = read => result,
-            }
-            .map_err(|_| "Spotify took too long to answer.".to_string())
-            .and_then(|result| result.map_err(|error| error.to_string()));
+                _ = cancelled.changed() => Err("The playback session ended.".to_string()),
+                result = read => result
+                    .map_err(|_| "Spotify took too long to answer.".to_string())
+                    .and_then(|result| result.map_err(|error| error.to_string())),
+            };
             send(result);
         });
     }
@@ -4642,12 +4659,27 @@ impl Worker {
         let mut session = self.session.subscribe();
         let generation = *session.borrow_and_update();
         tokio::spawn(async move {
+            // Spindle: a read that keeps the user waiting is logged with
+            // what it was and how long it took, so the log says where the
+            // seconds go. The first word of the request's Debug form is
+            // its kind.
+            let what = format!("{request:?}");
+            let kind = what
+                .split(|character: char| !character.is_alphanumeric())
+                .next()
+                .unwrap_or("request")
+                .to_owned();
+            let started = Instant::now();
             let (response, expired) = tokio::select! {
                 _ = session.changed() => return,
                 result = async {
                     handle(&api, &made_for_you, &new_releases, &connect, engine.as_deref(), &background_session, request).await
                 } => result,
             };
+            let took = started.elapsed();
+            if took >= Duration::from_millis(700) {
+                log::info!("slow: {kind} answered after {} ms", took.as_millis());
+            }
             // Apply completion on the command loop. A late response cannot
             // clear or repopulate a session created after sign-out.
             let _ = commands.send(Command::ApiFinished {
@@ -5809,10 +5841,13 @@ fn same_account(username: &str, account: Option<&AccountId>) -> bool {
     account.is_some_and(|account| account.as_str() == username)
 }
 
-/// How long a session read may take before the Web API is asked instead:
-/// what the Web API's own requests get. A stalled line otherwise waits on
-/// the operating system, which is far longer than a page should spin.
-const SESSION_READ_TIMEOUT: Duration = Duration::from_secs(30);
+/// How long a session read may take before the Web API is asked instead.
+/// A stalled line otherwise waits on the operating system, which is far
+/// longer than a page should spin. Spindle: ten seconds, not upstream's
+/// thirty. A playlist comes over the session in one answer, normally well
+/// under a second on Nick's connection; past ten the line has dropped (the
+/// PC log shows Spotify closing it), and the Web API answers in two.
+const SESSION_READ_TIMEOUT: Duration = Duration::from_secs(10);
 
 /// Whether the playlist library is read from the playback session's
 /// rootlist: when the shared app, which lists it with every field, cannot

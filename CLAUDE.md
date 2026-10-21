@@ -139,6 +139,25 @@ Needs the PipeWire and ALSA headers only to run the test suite on Linux:
 - While the window is covered by other windows, screenshots are stale;
   take a display screenshot (which uncovers the app) before judging state.
 
+## Speed work (0.14.103)
+
+- `timeline.rs` logs at INFO: `startup: <milestone> at N ms` (first frame,
+  signed in, playback session ready, playlists listed, home loaded, friends
+  loaded), `play: sound after N ms (<uri>)` per play, and the backend logs
+  `slow: <ApiRequest kind> answered after N ms` for any read over 700 ms.
+  Read Nick's spindle.log for these before guessing at what is slow.
+- Sign in: the first /me check runs `api::client::impatient`, so a throttled
+  shared app answers at once and the remembered account
+  (verified_user_<source>.json in the data folder) signs in instantly; the
+  PC log showed the old path waiting 32 s inside the client's own retries
+  before the remembered account was even consulted.
+- Friends: polled every 15 s with the panel open and every 45 s with it
+  closed while the session is up, refreshed the moment the session comes
+  up or back. A read the session's end cut short now answers with a
+  failure; before, `friends_in_flight` stayed set forever and the panel
+  never refreshed again after a reconnect.
+- Session reads fall back to the Web API after 10 s, not 30.
+
 ## Facts from the live test (Windows PC, 2026-10-20)
 
 - Spindle 0.2.0 playing, window visible, no game: spindle.exe 0.1 percent

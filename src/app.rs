@@ -44,6 +44,10 @@ const REMOTE_POLL_UNSEEN: Duration = Duration::from_secs(30);
 const REMOTE_FRESH: Duration = Duration::from_secs(60);
 /// How often the open Friend activity panel asks for news.
 const FRIENDS_POLL: Duration = Duration::from_secs(15);
+/// Spindle: the feed is kept warm while the panel is closed too, so it is
+/// current the moment it opens, at a gentler pace. One session read every
+/// 45 seconds, nothing the Web API's rate limits see.
+const FRIENDS_POLL_HIDDEN: Duration = Duration::from_secs(45);
 const DEVICES_FRESH: Duration = Duration::from_secs(12);
 const SEARCH_DEBOUNCE: Duration = Duration::from_millis(280);
 /// How long a suspend or the end of the session waits for pending file
@@ -2700,6 +2704,7 @@ impl App {
     fn handle_auth(&mut self, status: AuthStatus) {
         match &status {
             AuthStatus::Connected { .. } => {
+                crate::timeline::milestone("signed in");
                 self.sign_in_url = None;
                 self.reset_data();
                 // `Me` follows and reads the cache, even for the same
@@ -2745,6 +2750,7 @@ impl App {
     fn handle_playback(&mut self, status: LocalPlayback) {
         match &status {
             LocalPlayback::Ready { device_id } => {
+                crate::timeline::milestone("playback session ready");
                 self.local_device_id = Some(device_id.clone());
                 let became_ready = !self.local_ready;
                 self.local_ready = true;
@@ -2763,6 +2769,12 @@ impl App {
                         self.load_new_releases();
                     }
                     self.load_hidden_songs();
+                    // Spindle: the friends feed needs the session; read it
+                    // as soon as there is one, and again after a reconnect.
+                    // A read the old session cut short is over.
+                    self.friends_in_flight = false;
+                    self.friends_fetched_at = None;
+                    self.refresh_friends();
                 }
                 self.replay_queued_play();
             }
@@ -3112,6 +3124,9 @@ impl App {
             self.optimistic_playing = None;
             if matches!(state.playback, Playback::Playing | Playback::Loading) {
                 self.clear_play_pending();
+            }
+            if state.playback == Playback::Playing {
+                crate::timeline::playing();
             }
         }
         if state.track != self.local.track {
@@ -3595,7 +3610,10 @@ impl App {
         self.friends_in_flight = false;
         self.friends_fetched_at = Some(Instant::now());
         match result {
-            Ok(friends) => self.friends = Loadable::Loaded(friends),
+            Ok(friends) => {
+                crate::timeline::milestone("friends loaded");
+                self.friends = Loadable::Loaded(friends);
+            }
             Err(error) => {
                 if !matches!(self.friends, Loadable::Loaded(_)) {
                     self.friends = Loadable::Failed(error);
@@ -3772,10 +3790,17 @@ impl App {
             {
                 self.refresh_queue(false);
             }
-            if self.show_friends_panel && !self.friends_in_flight {
+            // Spindle: friends are read whenever the session is up, not only
+            // with the panel open, so the panel never opens on a stale list.
+            if (self.show_friends_panel || self.local_ready) && !self.friends_in_flight {
+                let poll = if self.show_friends_panel {
+                    FRIENDS_POLL
+                } else {
+                    FRIENDS_POLL_HIDDEN
+                };
                 match self.friends_fetched_at.map(|at| at.elapsed()) {
-                    Some(elapsed) if elapsed < FRIENDS_POLL => {
-                        ctx.request_repaint_after(FRIENDS_POLL - elapsed);
+                    Some(elapsed) if elapsed < poll => {
+                        ctx.request_repaint_after(poll - elapsed);
                     }
                     _ => self.refresh_friends(),
                 }
@@ -4938,6 +4963,9 @@ impl App {
     /// refresh, keeps what arrived even when the shared app never answers.
     fn home_answered(&mut self, changed: bool) {
         self.home.awaiting = self.home.awaiting.saturating_sub(1);
+        if self.home.awaiting == 0 {
+            crate::timeline::milestone("home loaded");
+        }
         if changed {
             self.store_home_cache();
         }
@@ -6990,6 +7018,7 @@ impl App {
                             library.playlists_retry_at = Some(Instant::now());
                         }
                     } else {
+                        crate::timeline::milestone("playlists listed");
                         let generation = self.library.playlists_generation;
                         let library = &mut self.library;
                         if let Some(incoming) = library.playlists_incoming.take() {
@@ -8836,6 +8865,13 @@ impl App {
             }
             Target::Local => {
                 self.queued_play = None;
+                crate::timeline::play_requested(
+                    request
+                        .context_uri
+                        .clone()
+                        .or_else(|| request.uris.first().cloned())
+                        .unwrap_or_default(),
+                );
                 let mut load = local_load(&request, shuffle);
                 load.repeat = Some(self.local_repeat());
                 self.local_list = load.context_uri.is_none().then(|| load.uris.clone());

@@ -348,6 +348,7 @@ fn format_devices(snapshot: &str) -> String {
 }
 
 pub(crate) fn run() -> eframe::Result<()> {
+    spindle::timeline::start();
     // First of all: `--apply-update <job>` makes this process the update
     // helper, which installs and exits; otherwise the receipt and error an
     // update relaunch carries are taken out of the arguments.
@@ -1558,6 +1559,7 @@ impl eframe::App for Shell {
         let mut stalls = std::mem::take(&mut self.stalls);
         stalls.ui(|| self.draw(ui));
         self.stalls = stalls;
+        spindle::timeline::milestone("first frame");
     }
 
     /// The mini player's window is see-through where the skin leaves it

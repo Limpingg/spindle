@@ -329,6 +329,20 @@ impl NetActivity {
 
 tokio::task_local! {
     static UNSEEN: ();
+    static IMPATIENT: ();
+}
+
+/// Runs a request that would rather fail than wait: a Retry-After cooldown
+/// in force, or a 429 answer, returns [`ApiError::RateLimited`] at once
+/// instead of sleeping the cooldown out and trying again. For a request
+/// whose caller has a fallback worth more than a wait of up to a minute:
+/// the sign-in check, which trusts the account remembered from last time.
+pub async fn impatient<F: std::future::Future>(future: F) -> F::Output {
+    IMPATIENT.scope((), future).await
+}
+
+fn is_impatient() -> bool {
+    IMPATIENT.try_with(|_| ()).is_ok()
 }
 
 /// Runs requests nothing on screen waits for without showing them as
@@ -557,6 +571,9 @@ impl ApiClient {
                 .map_err(|_| ApiError::NotSignedIn)?;
             // After the permit: a 429 answered while this request queued has
             // extended the cooldown, and sending now would only earn another.
+            if is_impatient() && self.cooling_down().await {
+                return Err(ApiError::RateLimited);
+            }
             self.wait_for_cooldown().await;
             let token = provider.access_token().await?;
             let mut request = self
@@ -610,7 +627,7 @@ impl ApiClient {
                 );
                 drop(permit);
                 self.extend_cooldown(wait).await;
-                if !queue_write && attempt > RATE_LIMIT_RETRIES {
+                if !queue_write && (attempt > RATE_LIMIT_RETRIES || is_impatient()) {
                     return Err(ApiError::RateLimited);
                 }
                 continue;

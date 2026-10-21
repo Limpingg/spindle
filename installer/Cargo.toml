@@ -1,6 +1,6 @@
 [package]
 name = "spindle-setup"
-version = "0.14.102"
+version = "0.14.103"
 edition = "2024"
 description = "Installs Spindle for the current user"
 license = "MIT"
