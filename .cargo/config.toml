@@ -5,3 +5,7 @@ rustflags = ["-C", "target-feature=+crt-static"]
 
 [target.aarch64-pc-windows-msvc]
 rustflags = ["-C", "target-feature=+crt-static"]
+
+# fastframe-now-playing uses MediaPlayer on macOS but does not declare the framework link.
+[target.aarch64-apple-darwin]
+rustflags = ["-l", "framework=MediaPlayer"]

@@ -2290,6 +2290,13 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
                 app.actions
                     .push(Action::OpenUrl(widgets::AUTHOR_URL.to_owned()));
             }
+            ui.add_space(6.0);
+            theme::text(
+                ui,
+                "Spindle is a fork of Spotifast by Carmine Paolino, used under the MIT License. Not affiliated with Spotify AB.",
+                theme::regular(12.0),
+                palette.secondary,
+            );
         });
     }
 

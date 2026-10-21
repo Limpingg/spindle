@@ -504,7 +504,7 @@ impl Default for Settings {
             tray_icon: TrayIcon::Colour,
             mac_notch_widget: false,
             mac_show_in_dock: true,
-            check_for_updates: true,
+            check_for_updates: false,
             download_updates_automatically: false,
             pinned_contexts: Vec::new(),
             liked_songs_pinned: true,

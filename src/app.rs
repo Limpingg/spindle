@@ -12225,10 +12225,18 @@ impl App {
     /// The soonest that playback, a pending play or polling needs the logic
     /// to run again, if any of them does.
     fn next_pass(&self) -> Option<Duration> {
+        // Spindle: a game has the focus most of the time this app runs. The
+        // progress bar then moves once a second instead of four times, which
+        // is one draw of the whole window every second while music plays.
+        let progress = if self.window_focused {
+            Duration::from_millis(250)
+        } else {
+            Duration::from_millis(1000)
+        };
         let playing = self
             .now_playing()
             .is_some_and(|now| now.playing)
-            .then_some(Duration::from_millis(250));
+            .then_some(progress);
         let pending = self
             .any_play_pending()
             .then_some(Duration::from_millis(120));
@@ -12451,7 +12459,9 @@ impl App {
         self.sync_media_controls(ctx);
 
         if !self.toasts.is_empty() {
-            ctx.request_repaint_after(TOAST_FRAME);
+            // Spindle: a toast's countdown needs no 30 fps while a game has the focus.
+            let frame = if self.window_focused { TOAST_FRAME } else { Duration::from_millis(250) };
+            ctx.request_repaint_after(frame);
         }
         self.theme_transition.paint(ctx);
         self.frame_now = None;
