@@ -600,6 +600,118 @@ fn removal_changes(
     changes
 }
 
+/// Spindle: adds an empty folder named `name` at the top of the account's
+/// library, as Spotify's own apps do: two rootlist rows, a `start-group`
+/// marker carrying a fresh id and the name, and its `end-group`. The change
+/// is based on the rootlist's current revision and sent once, through a
+/// client that never retries, since a resent change would add a second
+/// folder.
+pub async fn create_folder(
+    session: &Session,
+    http: &reqwest::Client,
+    name: &str,
+) -> anyhow::Result<()> {
+    let bytes = session
+        .spclient()
+        .get_rootlist(0, Some(1))
+        .await
+        .map_err(|error| anyhow::anyhow!("rootlist: {error}"))?;
+    let revision = SelectedListContent::parse_from_bytes(&bytes)?
+        .revision()
+        .to_vec();
+    let username = session.username();
+    let changes = folder_changes(
+        &revision,
+        &username,
+        jiff::Timestamp::now().as_millisecond(),
+        &folder_id(),
+        name,
+    );
+    let endpoint = format!(
+        "{}/playlist/v2/user/{}/rootlist/changes",
+        session.spclient().base_url().await?,
+        username
+    );
+    let login = session.login5().auth_token().await?;
+    let client_token = session.spclient().client_token().await?;
+    let response = http
+        .post(endpoint)
+        .bearer_auth(&login.access_token)
+        .header("client-token", client_token)
+        .header(reqwest::header::CONTENT_TYPE, "application/x-protobuf")
+        .body(changes.write_to_bytes()?)
+        .send()
+        .await
+        .map_err(reqwest::Error::without_url)?;
+    anyhow::ensure!(
+        response.status() != reqwest::StatusCode::CONFLICT,
+        "Your library changed meanwhile. Try again."
+    );
+    anyhow::ensure!(
+        response.status().is_success(),
+        "Spotify did not add the folder (HTTP {}).",
+        response.status().as_u16()
+    );
+    Ok(())
+}
+
+/// A folder id as Spotify's apps make them: 16 hex digits.
+fn folder_id() -> String {
+    format!("{:016x}", rand::random::<u64>())
+}
+
+/// A folder name as the rootlist writes it: percent encoded, a space as `+`.
+fn encode_folder_name(name: &str) -> String {
+    let mut out = String::new();
+    for byte in name.bytes() {
+        match byte {
+            b' ' => out.push('+'),
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'*' => {
+                out.push(byte as char)
+            }
+            other => out.push_str(&format!("%{other:02X}")),
+        }
+    }
+    out
+}
+
+/// The change that puts a new empty folder first in the rootlist.
+fn folder_changes(
+    revision: &[u8],
+    user: &str,
+    timestamp_ms: i64,
+    id: &str,
+    name: &str,
+) -> librespot_protocol::playlist4_external::ListChanges {
+    use librespot_protocol::playlist4_external::{Add, ChangeInfo, Delta, ListChanges, Op, op};
+    let marker = |uri: String| {
+        let mut item = Item::new();
+        item.set_uri(uri);
+        item
+    };
+    let mut add = Add::new();
+    add.set_from_index(0);
+    add.set_add_first(true);
+    add.items.push(marker(format!(
+        "spotify:start-group:{id}:{}",
+        encode_folder_name(name)
+    )));
+    add.items.push(marker(format!("spotify:end-group:{id}")));
+    let mut op = Op::new();
+    op.set_kind(op::Kind::ADD);
+    op.add = protobuf::MessageField::some(add);
+    let mut info = ChangeInfo::new();
+    info.set_user(user.to_string());
+    info.set_timestamp(timestamp_ms);
+    let mut delta = Delta::new();
+    delta.ops.push(op);
+    delta.info = protobuf::MessageField::some(info);
+    let mut changes = ListChanges::new();
+    changes.set_base_revision(revision.to_vec());
+    changes.deltas.push(delta);
+    changes
+}
+
 /// A playlist's header: name, owner, cover, and snapshot.
 pub async fn playlist(session: &Session, id: &str) -> Result<Playlist, Failure> {
     let list = window(session, id, 0, 0).await?;
@@ -1025,6 +1137,126 @@ fn profile_from_json(json: &serde_json::Value) -> UserProfile {
         name: text("name"),
         image_url: text("image_url"),
     }
+}
+
+/// Spindle: a Jam this device hosts: the session's id, the link friends
+/// open to join it, and who is in it by display name.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct JamSession {
+    pub id: String,
+    pub join_url: String,
+    pub members: Vec<String>,
+}
+
+/// Spindle: starts a Jam hosted on this device, or reads the one it already
+/// hosts: Spotify's `current_or_new` answers the running session when there
+/// is one, so asking twice never makes a second Jam. Uses the same private
+/// social-connect service Spotify's own apps do (it has no public API), with
+/// `activate=true` so the Jam shows on the account's other devices.
+/// Friends join through https://open.spotify.com/socialsession/<token>.
+pub async fn start_jam(session: &Session, http: &reqwest::Client) -> anyhow::Result<JamSession> {
+    let path = format!(
+        "/social-connect/v2/sessions/current_or_new?activate=true&local_device_id={}&type=REMOTE",
+        session.device_id()
+    );
+    let response = jam_request(session, http, reqwest::Method::GET, &path).await?;
+    let status = response.status();
+    let body = response.text().await.unwrap_or_default();
+    anyhow::ensure!(
+        status.is_success(),
+        "{}",
+        jam_failure(status.as_u16(), &body)
+    );
+    parse_jam(&body).ok_or_else(|| anyhow::anyhow!("Spotify answered without a Jam. Try again."))
+}
+
+/// Spindle: ends the Jam `id` for everyone, as its host.
+pub async fn end_jam(session: &Session, http: &reqwest::Client, id: &str) -> anyhow::Result<()> {
+    let path = format!(
+        "/social-connect/v3/sessions/{id}?local_device_id={}",
+        session.device_id()
+    );
+    let response = jam_request(session, http, reqwest::Method::DELETE, &path).await?;
+    let status = response.status();
+    // Already gone counts as ended.
+    if status.is_success() || status == reqwest::StatusCode::NOT_FOUND {
+        return Ok(());
+    }
+    let body = response.text().await.unwrap_or_default();
+    anyhow::bail!("{}", jam_failure(status.as_u16(), &body))
+}
+
+/// One social-connect request, sent once with the session's tokens and the
+/// connection id that ties the Jam to this device.
+async fn jam_request(
+    session: &Session,
+    http: &reqwest::Client,
+    method: reqwest::Method,
+    path: &str,
+) -> anyhow::Result<reqwest::Response> {
+    let endpoint = format!("{}{path}", session.spclient().base_url().await?);
+    let login = session.login5().auth_token().await?;
+    let client_token = session.spclient().client_token().await?;
+    Ok(http
+        .request(method, endpoint)
+        .bearer_auth(&login.access_token)
+        .header("client-token", client_token)
+        .header("spotify-connection-id", session.connection_id())
+        .header(reqwest::header::ACCEPT, "application/json")
+        .header(reqwest::header::CONTENT_LENGTH, "0")
+        .send()
+        .await
+        .map_err(reqwest::Error::without_url)?)
+}
+
+/// What to tell the user when social-connect refuses: Spotify's own message
+/// when it gave one, the status otherwise. Every Spindle user has Premium,
+/// so a refusal is never blamed on the plan.
+fn jam_failure(status: u16, body: &str) -> String {
+    let message = serde_json::from_str::<serde_json::Value>(body)
+        .ok()
+        .and_then(|json| json.get("message")?.as_str().map(str::to_owned))
+        .filter(|message| !message.trim().is_empty());
+    match (status, message) {
+        (_, Some(message)) => format!("Spotify did not start the Jam: {message}"),
+        (status, None) => format!("Spotify did not start the Jam (HTTP {status})."),
+    }
+}
+
+/// The Jam in a social-connect answer, its keys in snake or camel case;
+/// `None` without a session id or a join token.
+fn parse_jam(body: &str) -> Option<JamSession> {
+    let json: serde_json::Value = serde_json::from_str(body).ok()?;
+    let field = |snake: &str, camel: &str| {
+        json.get(snake)
+            .or_else(|| json.get(camel))
+            .and_then(|value| value.as_str())
+            .filter(|value| !value.is_empty())
+            .map(str::to_owned)
+    };
+    let id = field("session_id", "sessionId")?;
+    let token = field("join_session_token", "joinSessionToken")?;
+    let members = json
+        .get("session_members")
+        .or_else(|| json.get("sessionMembers"))
+        .and_then(|members| members.as_array())
+        .map(|members| {
+            members
+                .iter()
+                .filter_map(|member| {
+                    ["display_name", "displayName", "username"]
+                        .iter()
+                        .find_map(|key| member.get(*key)?.as_str().filter(|name| !name.is_empty()))
+                        .map(str::to_owned)
+                })
+                .collect()
+        })
+        .unwrap_or_default();
+    Some(JamSession {
+        id,
+        join_url: format!("https://open.spotify.com/socialsession/{token}"),
+        members,
+    })
 }
 
 /// What one friend is listening to, or last played, with names to show.
@@ -1994,6 +2226,47 @@ mod tests {
             removals,
             vec![(4, 1, vec!["a"], false), (0, 1, vec!["a"], false)]
         );
+    }
+
+    #[test]
+fn a_jam_answer_gives_its_id_link_and_members() {
+        let body = r#"{"session_id":"abc","join_session_token":"tok123","join_session_url":"https://x/sessions/join/tok123","session_members":[{"username":"nick","display_name":"nick"},{"username":"tyler1","display_name":""}],"is_session_owner":true}"#;
+        let jam = parse_jam(body).unwrap();
+        assert_eq!(jam.id, "abc");
+        assert_eq!(jam.join_url, "https://open.spotify.com/socialsession/tok123");
+        assert_eq!(jam.members, ["nick", "tyler1"]);
+        let camel = r#"{"sessionId":"s","joinSessionToken":"t"}"#;
+        assert_eq!(parse_jam(camel).unwrap().members, Vec::<String>::new());
+        assert_eq!(parse_jam(r#"{"session_id":""}"#), None);
+        assert_eq!(
+            jam_failure(403, r#"{"error_type":"X","message":"Premium required"}"#),
+            "Spotify did not start the Jam: Premium required"
+        );
+        assert_eq!(jam_failure(403, ""), "Spotify did not start the Jam (HTTP 403).");
+    }
+
+    #[test]
+        fn a_new_folder_is_two_markers_at_the_top_that_read_back_as_the_folder() {
+        let changes = folder_changes(b"rev", "nick", 7, "0123456789abcdef", "Late Night & Co");
+        assert_eq!(changes.base_revision(), b"rev");
+        let add = changes.deltas[0].ops[0].add.as_ref().unwrap();
+        assert!(add.add_first());
+        let uris: Vec<String> = add.items.iter().map(|item| item.uri().to_string()).collect();
+        assert_eq!(
+            uris,
+            [
+                "spotify:start-group:0123456789abcdef:Late+Night+%26+Co",
+                "spotify:end-group:0123456789abcdef",
+            ]
+        );
+        assert_eq!(
+            crate::player::parse_rootlist(&uris)[0],
+            crate::player::RootlistEntry::FolderStart {
+                id: "0123456789abcdef".into(),
+                name: "Late Night & Co".into(),
+            }
+        );
+        assert_eq!(folder_id().len(), 16);
     }
 
     /// Another market's ranking must not replace the account's own or worldwide list.

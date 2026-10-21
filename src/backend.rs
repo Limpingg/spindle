@@ -836,6 +836,12 @@ pub enum Command {
     UserNames(Vec<String>),
     /// Spindle: an artist's monthly listeners, by artist id.
     ArtistListeners(String),
+    /// Spindle: add an empty folder with this name to the library.
+    CreateFolder(String),
+    /// Spindle: start a Jam hosted on this device, or read the one running.
+    StartJam,
+    /// Spindle: end the Jam with this session id.
+    EndJam(String),
     /// Read Spotify's play counts for an album's songs or an artist's
     /// popular songs, by the album's or the artist's URI.
     PlayCounts(String),
@@ -1040,6 +1046,15 @@ pub enum Event {
         id: String,
         listeners: Option<String>,
     },
+    /// Spindle: the folder named `name` was added, or why not.
+    FolderCreated {
+        name: String,
+        result: Result<(), String>,
+    },
+    /// Spindle: the Jam this device hosts, or why it did not start.
+    JamStarted(Result<session_reads::JamSession, String>),
+    /// Spindle: the Jam ended, or why ending it failed.
+    JamEnded(Result<(), String>),
     /// A user id resolved to a display name and avatar (each `None` when
     /// nothing answers).
     UserName {
@@ -2601,6 +2616,9 @@ impl Worker {
                 }
                 Command::UserNames(ids) => self.fetch_user_names(ids),
                 Command::ArtistListeners(id) => self.fetch_artist_listeners(id),
+                Command::CreateFolder(name) => self.create_folder(name),
+                Command::StartJam => self.start_jam(),
+                Command::EndJam(id) => self.end_jam(id),
                 Command::PlayCounts(uri) => self.fetch_play_counts(uri),
                 Command::FriendActivity(generation) => self.fetch_friend_activity(generation),
                 Command::LoadLikedSongsCache { generation } => {
@@ -4591,6 +4609,97 @@ impl Worker {
                 _ => None,
             };
             let _ = events.send(Event::ArtistListeners { id, listeners });
+            waker.wake();
+        });
+    }
+
+    fn start_jam(&self) {
+        let Some(engine) = self.engine.clone().filter(|_| self.signed_in) else {
+            self.emit(Event::JamStarted(Err(
+                "A Jam needs local playback. Try again when connected.".into(),
+            )));
+            return;
+        };
+        let http = crate::http::build_collection_client(&self.engine_config.proxy);
+        let events = self.events.clone();
+        let waker = self.waker.clone();
+        tokio::spawn(async move {
+            let result = match http {
+                Err(error) => Err(error),
+                Ok(http) => match tokio::time::timeout(
+                    RADIO_TIMEOUT,
+                    session_reads::start_jam(engine.session(), &http),
+                )
+                .await
+                {
+                    Ok(result) => result.map_err(|error| format!("{error:#}")),
+                    Err(_) => Err("Spotify took too long to start the Jam.".into()),
+                },
+            };
+            if let Err(error) = &result {
+                log::warn!("jam: did not start: {error}");
+            }
+            let _ = events.send(Event::JamStarted(result));
+            waker.wake();
+        });
+    }
+
+    fn end_jam(&self, id: String) {
+        let Some(engine) = self.engine.clone().filter(|_| self.signed_in) else {
+            self.emit(Event::JamEnded(Err(
+                "Ending the Jam needs local playback. Try again when connected.".into(),
+            )));
+            return;
+        };
+        let http = crate::http::build_collection_client(&self.engine_config.proxy);
+        let events = self.events.clone();
+        let waker = self.waker.clone();
+        tokio::spawn(async move {
+            let result = match http {
+                Err(error) => Err(error),
+                Ok(http) => match tokio::time::timeout(
+                    RADIO_TIMEOUT,
+                    session_reads::end_jam(engine.session(), &http, &id),
+                )
+                .await
+                {
+                    Ok(result) => result.map_err(|error| format!("{error:#}")),
+                    Err(_) => Err("Spotify took too long to end the Jam.".into()),
+                },
+            };
+            let _ = events.send(Event::JamEnded(result));
+            waker.wake();
+        });
+    }
+
+    fn create_folder(&self, name: String) {
+        let Some(engine) = self.engine.clone().filter(|_| self.signed_in) else {
+            self.emit(Event::FolderCreated {
+                name,
+                result: Err("Making a folder needs local playback. Try again when connected.".into()),
+            });
+            return;
+        };
+        let http = crate::http::build_collection_client(&self.engine_config.proxy);
+        let events = self.events.clone();
+        let waker = self.waker.clone();
+        let mut cancelled = self.session.subscribe();
+        tokio::spawn(async move {
+            let result = match http {
+                Err(error) => Err(error),
+                Ok(http) => tokio::select! {
+                    biased;
+                    _ = cancelled.changed() => Err("The playback session ended. Try again.".into()),
+                    result = tokio::time::timeout(
+                        RADIO_TIMEOUT,
+                        session_reads::create_folder(engine.session(), &http, &name),
+                    ) => match result {
+                        Ok(result) => result.map_err(|error| format!("{error:#}")),
+                        Err(_) => Err("Spotify took too long to answer. Check your library before trying again.".into()),
+                    },
+                },
+            };
+            let _ = events.send(Event::FolderCreated { name, result });
             waker.wake();
         });
     }

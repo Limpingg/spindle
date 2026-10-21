@@ -62,6 +62,8 @@ pub fn show(app: &mut App, ctx: &egui::Context) {
                     });
                 }
                 Dialog::CreatePlaylist { .. } => create_playlist(app, ui),
+                Dialog::CreateFolder { .. } => create_folder(app, ui),
+                Dialog::Jam => super::jam::dialog(app, ui),
                 Dialog::EditPlaylist { .. } => edit_playlist(app, ui),
                 Dialog::ConfirmDeletePlaylist { id, name, owned } => {
                     theme::text(
@@ -239,7 +241,7 @@ pub fn show(app: &mut App, ctx: &egui::Context) {
 }
 
 // Keep button rows content-sized when the shared modal area last held a taller dialog.
-fn buttons(ui: &mut egui::Ui, add_buttons: impl FnOnce(&mut egui::Ui)) {
+pub(super) fn buttons(ui: &mut egui::Ui, add_buttons: impl FnOnce(&mut egui::Ui)) {
     ui.allocate_ui_with_layout(
         egui::vec2(ui.available_width(), ui.spacing().interact_size.y),
         Layout::right_to_left(Align::Center),
@@ -427,6 +429,56 @@ fn create_playlist(app: &mut App, ui: &mut egui::Ui) {
                     public: public_value,
                     add_uris: uris.clone(),
                 });
+            }
+            if theme::pill_button(ui, &palette, &gettext(locale, "Cancel"), false).clicked() {
+                app.actions.push(Action::CloseDialog);
+            }
+        }
+    });
+}
+
+/// Spindle: names a new folder, which goes to the top of the library.
+fn create_folder(app: &mut App, ui: &mut egui::Ui) {
+    let palette = app.palette;
+    let locale = app.locale;
+    let busy = app.playlist_busy;
+    let Some(Dialog::CreateFolder { name }) = &mut app.dialog else {
+        return;
+    };
+    theme::text(
+        ui,
+        gettext(locale, "New folder"),
+        theme::bold(20.0),
+        palette.text,
+    );
+    ui.add_space(12.0);
+    theme::text(
+        ui,
+        gettext(locale, "Name"),
+        theme::medium(13.0),
+        palette.secondary,
+    );
+    let field = text_field(
+        ui,
+        &palette,
+        locale,
+        "folder-name",
+        name,
+        &gettext(locale, "New Folder"),
+        true,
+    );
+    ui.add_space(20.0);
+    let submit = field.lost_focus() && ui.input(|input| input.key_pressed(egui::Key::Enter));
+    let name_value = name.trim().to_string();
+    buttons(ui, |ui| {
+        if busy {
+            theme::spinner(ui, 18.0, palette.accent);
+        } else {
+            let create = theme::pill_button(ui, &palette, &gettext(locale, "Create"), true)
+                .clicked()
+                || submit;
+            if create && !name_value.is_empty() {
+                app.actions.push(Action::CreateFolder(name_value.clone()));
             }
             if theme::pill_button(ui, &palette, &gettext(locale, "Cancel"), false).clicked() {
                 app.actions.push(Action::CloseDialog);

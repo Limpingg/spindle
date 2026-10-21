@@ -1033,23 +1033,53 @@ fn contents(app: &mut App, ui: &mut egui::Ui, grid_art: Option<Rect>) {
             {
                 app.actions.push(Action::SetLibraryGrid(!grid));
             }
-            // One item never deserved a menu: the plus creates directly.
-            if theme::icon_button(
+            // Spindle: the plus opens Spotify's Create menu, with the parts
+            // an outside app can make: a playlist, a folder and a Jam.
+            let create = theme::icon_button(
                 ui,
                 Icon::Plus,
                 16.0,
                 palette.secondary,
                 palette.text,
-                &gettext(locale, "Create a playlist"),
-            )
-            .clicked()
-            {
-                app.actions.push(Action::ShowDialog(Dialog::CreatePlaylist {
-                    name: String::new(),
-                    public: false,
-                    add_uris: Vec::new(),
-                }));
-            }
+                &gettext(locale, "Create"),
+            );
+            egui::Popup::menu(&create)
+                .frame(super::widgets::menu_frame(&palette))
+                .show(|ui| {
+                    ui.set_min_width(200.0);
+                    ui.set_max_width(300.0);
+                    if super::widgets::menu_item(
+                        ui,
+                        &palette,
+                        Some(Icon::ListMusic),
+                        &gettext(locale, "Playlist"),
+                    ) {
+                        app.actions.push(Action::ShowDialog(Dialog::CreatePlaylist {
+                            name: String::new(),
+                            public: false,
+                            add_uris: Vec::new(),
+                        }));
+                    }
+                    if super::widgets::menu_item(
+                        ui,
+                        &palette,
+                        Some(Icon::Folder),
+                        &gettext(locale, "Folder"),
+                    ) {
+                        app.actions.push(Action::ShowDialog(Dialog::CreateFolder {
+                            name: String::new(),
+                        }));
+                    }
+                    super::widgets::menu_separator(ui, &palette);
+                    if super::widgets::menu_item(
+                        ui,
+                        &palette,
+                        Some(Icon::Users),
+                        &gettext(locale, "Jam"),
+                    ) {
+                        app.actions.push(Action::StartJam);
+                    }
+                });
             if theme::icon_button(
                 ui,
                 Icon::Search,
