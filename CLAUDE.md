@@ -56,17 +56,18 @@ installed that way. The Mac build is Apple silicon only
 
 ## The icon
 
-Nick's green mirror ball, hung upside down: packaging/icons/render-icon.py
-draws packaging/icons/spindle-1024.png (transparent) and
-spindle-mac-1024.png (dark rounded square). `util::app_icon_rgba` decodes
-the transparent PNG once and scales it for the window icon, the trays and
-`theme::logo`; packaging/windows/spindle.ico, packaging/macos/icon-1024.png
-and spindle.icns, installer/assets/window-icon.png and the Linux tray
-packaging/icons/spindle.svg are made from the same picture. Regenerate the
-binary ones with the Python snippet in the git history of this file's
-commit (PIL: ico with PNG entries, icns with icp4..ic14 chunks) when the
-master changes. Nick asked for a Spotify logo on the ball; it is Spotify's
-trademark, so the ball carries no mark.
+Nick's own picture, packaging/icons/source.png: neon green headphones on a
+head with a sound wave, on a dark green rounded square (it replaced the
+mirror ball on 2026-10-21). packaging/icons/make-icons.py cuts the square
+out and writes every icon from it: spindle-1024.png (rounded square, clear
+corners: window icon, Windows tray, `theme::logo` through
+`util::app_icon_rgba`), spindle-mac-1024.png and packaging/macos/icon-1024.png
+(Apple's grid), spindle-tray-1024.png (the neon lines alone, the macOS menu
+bar template through `util::tray_template_rgba`), spindle.svg (the Linux
+tray, a PNG inside an SVG without filters), packaging/windows/spindle.ico,
+packaging/macos/spindle.icns and installer/assets/window-icon.png. Rerun it
+when the picture changes. No Spotify mark on any icon: it is Spotify's
+trademark.
 
 ## What changed from upstream
 
