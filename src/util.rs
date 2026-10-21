@@ -251,6 +251,24 @@ pub fn app_icon_rgba(size: usize) -> Vec<u8> {
     resized.into_raw()
 }
 
+/// Spindle: the monthly listeners an artist's public page states, as
+/// written there ("70.2M", "1,234"), from its description: "Artist ·
+/// 70.2M monthly listeners."
+pub fn monthly_listeners(html: &str) -> Option<String> {
+    let end = html.find(" monthly listeners")?;
+    let before = &html[..end];
+    let start = before
+        .char_indices()
+        .rev()
+        .find(|(_, character)| {
+            !(character.is_ascii_alphanumeric() || *character == '.' || *character == ',')
+        })
+        .map_or(0, |(at, character)| at + character.len_utf8());
+    let count = before[start..].trim();
+    (!count.is_empty() && count.starts_with(|character: char| character.is_ascii_digit()))
+        .then(|| count.to_owned())
+}
+
 pub fn greeting(locale: Locale) -> Cow<'static, str> {
     match local_hour() {
         5..=11 => gettext(locale, "Good morning"),
@@ -340,6 +358,16 @@ mod tests {
         let template = tray_template_rgba(44);
         assert_eq!(pixel(&template, 44, 22, 22), [0, 0, 0, 255]);
         assert_eq!(pixel(&template, 44, 0, 0)[3], 0);
+    }
+
+    #[test]
+    fn monthly_listeners_are_read_from_the_artist_page() {
+        let page = r#"<meta property="og:description" content="Artist · 70.2M monthly listeners."/>"#;
+        assert_eq!(monthly_listeners(page).as_deref(), Some("70.2M"));
+        let small = r#"content="Artist · 1,234 monthly listeners.""#;
+        assert_eq!(monthly_listeners(small).as_deref(), Some("1,234"));
+        assert_eq!(monthly_listeners("no such line"), None);
+        assert_eq!(monthly_listeners("Artist · monthly listeners."), None);
     }
 
     #[test]

@@ -686,6 +686,9 @@ pub struct App {
     /// User ids resolved to display names; `None` while unknown, so an id
     /// is asked about only once per run.
     pub user_names: HashMap<String, Option<String>>,
+    /// Spindle: monthly listeners by artist id; `None` while asked or when
+    /// the artist page did not say.
+    pub artist_listeners: HashMap<String, Option<String>>,
     pub user_names_revision: u64,
     /// How often Spotify says each song was played, by track URI, for the
     /// albums and artists in `play_count_reads`.
@@ -1242,6 +1245,7 @@ impl App {
                 .filter_map(|(page, sort)| Some((Page::decode(page)?, *sort)))
                 .collect(),
             user_names: HashMap::new(),
+            artist_listeners: HashMap::new(),
             play_counts: HashMap::new(),
             play_count_reads: HashMap::new(),
             user_names_revision: 0,
@@ -2597,6 +2601,9 @@ impl App {
                 Event::FriendActivity { generation, result } => {
                     self.receive_friends(generation, result)
                 }
+                Event::ArtistListeners { id, listeners } => {
+                    self.artist_listeners.insert(id, listeners);
+                }
                 Event::UserName { id, name, image } => {
                     self.set_user_name(id.clone(), name);
                     self.set_user_image(id, image);
@@ -3636,6 +3643,17 @@ impl App {
 
     /// Asks for the playing track's lyrics unless they are here or on the
     /// way. Podcasts have no lyrics to ask for.
+    /// Spindle: an artist's monthly listeners, asked for once per artist
+    /// per run. `None` while the answer is on its way or when there is none.
+    pub fn artist_listeners(&mut self, id: &str) -> Option<String> {
+        if let Some(known) = self.artist_listeners.get(id) {
+            return known.clone();
+        }
+        self.artist_listeners.insert(id.to_string(), None);
+        self.backend.send(Command::ArtistListeners(id.to_string()));
+        None
+    }
+
     pub fn request_lyrics(&mut self) {
         let Some(now) = self.now_playing() else {
             return;
@@ -18476,7 +18494,8 @@ mod tests {
             write: None,
         }];
         let ctx = egui::Context::default();
-        // A Next up row, and an index that no longer holds its song, stay.
+        // An index that no longer holds its song stays. Spindle: a Next up
+        // row goes, out of the engine's upcoming list only.
         app.apply(
             Action::RemoveFromQueue {
                 rows: vec![
@@ -18487,7 +18506,7 @@ mod tests {
             &ctx,
         );
         assert_eq!(app.manual_queue.len(), 3);
-        assert_eq!(queue_uris(&app).1.len(), 4);
+        assert_eq!(queue_uris(&app).1.len(), 3);
 
         app.apply(
             Action::RemoveFromQueue {
@@ -18498,7 +18517,7 @@ mod tests {
         assert_eq!(app.manual_queue, ["spotify:track:a", "spotify:track:a"]);
         assert_eq!(
             queue_uris(&app).1,
-            ["spotify:track:a", "spotify:track:a", "spotify:track:ctx"]
+            ["spotify:track:a", "spotify:track:a"]
         );
         assert_eq!(app.queued_rows_len(), 2);
         assert_eq!(
