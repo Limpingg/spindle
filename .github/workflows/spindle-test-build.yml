@@ -1,0 +1,76 @@
+# Builds Spindle from any branch for trying it by hand, without a release:
+# the Mac app and the Windows setup program come out as run artifacts
+# (download them from the run's Summary page), so no installed copy's
+# updater ever sees them. Run it from Actions, picking the branch.
+
+name: Test build
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  macos:
+    name: macOS (Apple silicon)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: "1.98.0"
+          targets: aarch64-apple-darwin
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: macos-arm64
+      - name: Build Spindle
+        run: cargo build --locked --release --no-default-features --target aarch64-apple-darwin
+      - name: Bundle
+        run: |
+          set -euo pipefail
+          version=$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -1)
+          mkdir -p dist payload
+          packaging/macos/bundle.sh target/aarch64-apple-darwin/release/spindle "payload/Spindle.app" "$version"
+          ruby packaging/macos/dmg.rb payload "dist/spindle-v$version-test-macos-arm64.dmg"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: spindle-test-macos
+          path: dist/*
+
+  windows:
+    name: Windows (cross compiled with Zig)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: "1.98.0"
+          targets: x86_64-pc-windows-gnu
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: windows-gnu
+      - name: Install Zig and cargo-zigbuild
+        run: |
+          pip install ziglang
+          cargo install cargo-zigbuild --locked
+      - name: Build spindle.exe
+        run: cargo zigbuild --locked --release --no-default-features --target x86_64-pc-windows-gnu
+      - name: Build the setup program
+        working-directory: installer
+        env:
+          SPINDLE_EXE: ${{ github.workspace }}/target/x86_64-pc-windows-gnu/release/spindle.exe
+        run: cargo zigbuild --release --target x86_64-pc-windows-gnu
+      - name: Name it
+        run: |
+          set -euo pipefail
+          version=$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -1)
+          mkdir -p dist
+          cp installer/target/x86_64-pc-windows-gnu/release/spindle-setup.exe "dist/Spindle-$version-test-Setup.exe"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: spindle-test-windows
+          path: dist/*
