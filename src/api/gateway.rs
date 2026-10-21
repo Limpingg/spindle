@@ -113,6 +113,10 @@ fn session_serves(operation: Operation, personal_ready: bool) -> bool {
     ) && plan(operation, personal_ready) == ApiSource::Shared
 }
 
+/// How long a read waits for the personal app's sign-in verdict before it
+/// goes to the shared app after all.
+const PERSONAL_VERDICT_WAIT: std::time::Duration = std::time::Duration::from_secs(5);
+
 /// A playlist with unknown access dispatches to the shared app, which can
 /// serve anything; later requests move once a response reveals the owner.
 fn plan(operation: Operation, personal_ready: bool) -> ApiSource {
@@ -340,7 +344,28 @@ impl ApiGateway {
     }
 
     pub async fn client_for(&self, operation: Operation) -> Result<Arc<ApiClient>, ApiError> {
-        let source = plan(operation, self.personal_ready());
+        let mut source = plan(operation, self.personal_ready());
+        // Spindle: at start the shared app signs in first (from the
+        // remembered account, in a few milliseconds) while the personal app
+        // is still verifying, so the first reads of the library and Home
+        // planned for the shared app and sat out its throttle (32 s on the
+        // PC). A read the personal app will serve waits for its verdict
+        // instead, briefly.
+        if source == ApiSource::Shared
+            && plan(operation, true) == ApiSource::Personal
+            && matches!(self.state(ApiSource::Personal), SessionState::Authorizing)
+        {
+            let mut personal = self.session(ApiSource::Personal).state.subscribe();
+            let settled = async {
+                while matches!(personal.borrow_and_update().1, SessionState::Authorizing) {
+                    if personal.changed().await.is_err() {
+                        break;
+                    }
+                }
+            };
+            let _ = tokio::time::timeout(PERSONAL_VERDICT_WAIT, settled).await;
+            source = plan(operation, self.personal_ready());
+        }
         let session = self.session(source);
         let mut state = session.state.subscribe();
         let generation = state.borrow().0;
@@ -461,6 +486,39 @@ mod tests {
         let client = waiting.await.unwrap();
         assert!(Arc::ptr_eq(
             &client,
+            &gateway.verification_client(ApiSource::Shared)
+        ));
+    }
+
+    /// Spindle: a read the personal app serves, asked while that app is
+    /// still verifying and the shared app is ready, waits for the personal
+    /// verdict and then goes to the personal app.
+    #[tokio::test]
+    async fn personal_reads_wait_for_the_personal_verdict_instead_of_going_shared() {
+        let gateway = ApiGateway::new(reqwest::Client::new(), Arc::new(NetActivity::default()));
+        gateway.begin_verification(ApiSource::Shared, provider("shared", ApiSource::Shared));
+        gateway
+            .install(ApiSource::Shared, AccountId::new("same"))
+            .unwrap();
+        gateway.begin_verification(ApiSource::Personal, provider("personal", ApiSource::Personal));
+        let mut waiting = Box::pin(gateway.client_for(Operation::UserData));
+        std::future::poll_fn(|cx| {
+            assert!(waiting.as_mut().poll(cx).is_pending());
+            std::task::Poll::Ready(())
+        })
+        .await;
+        gateway
+            .install(ApiSource::Personal, AccountId::new("same"))
+            .unwrap();
+        let client = waiting.await.unwrap();
+        assert!(Arc::ptr_eq(
+            &client,
+            &gateway.verification_client(ApiSource::Personal)
+        ));
+        // A read only the shared app serves does not wait.
+        let shared = gateway.client_for(Operation::PlaylistLibrary).await.unwrap();
+        assert!(Arc::ptr_eq(
+            &shared,
             &gateway.verification_client(ApiSource::Shared)
         ));
     }
