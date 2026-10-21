@@ -76,6 +76,8 @@ const TOAST_LIFETIME: Duration = Duration::from_millis(3200);
 /// from delayed repaints, so 33 ms drives roughly one frame per 16 ms.
 const TOAST_FRAME: Duration = Duration::from_millis(33);
 const OPTIMISTIC_HOLD: Duration = Duration::from_millis(2500);
+/// Spindle: the most Next up rows one drag moves into Playing next.
+const ARRANGE_NEXT_UP_LIMIT: usize = 100;
 
 /// How long a newly started context remains visible while Spotify catches up.
 /// During local takeover, Spotify may briefly alternate between old and new
@@ -5898,7 +5900,82 @@ impl App {
     /// Whether the queue row at `index` is one of the manually queued
     /// songs the active local queue lets the user take out.
     pub fn can_remove_from_queue(&self, index: usize) -> bool {
-        self.queue_locally_reorderable() && index < self.queued_rows_len()
+        // Spindle: Next up rows too; librespot takes any upcoming row out.
+        self.queue_locally_reorderable()
+            && self.queue.get().is_some_and(|queue| index < queue.queue.len())
+    }
+
+    /// Moves a Next up row; see `Action::ArrangeNextUp`. The rows that leave
+    /// the context are taken out of the engine's upcoming list first, then
+    /// join `manual_queue`, which `resync_local_queue` writes back.
+    fn arrange_next_up(&mut self, from: usize, uri: &str, to: usize) {
+        if !self.queue_locally_reorderable() {
+            return;
+        }
+        let queued_len = self.queued_rows_len();
+        let Loadable::Loaded(queue) = &self.queue else {
+            return;
+        };
+        let len = queue.queue.len();
+        if from < queued_len || from >= len || to > len || queue.queue[from].uri() != uri {
+            return;
+        }
+        let (taken, ordered, position): (Vec<usize>, Vec<PlayableItem>, usize) =
+            if to <= queued_len {
+                (vec![from], vec![queue.queue[from].clone()], to)
+            } else {
+                if to == from || to == from + 1 {
+                    return;
+                }
+                let end = (from + 1).max(to).min(len);
+                if end - queued_len > ARRANGE_NEXT_UP_LIMIT {
+                    self.toast(gettext(
+                        self.locale,
+                        "Move it into Playing next first, then drag it from there",
+                    ));
+                    return;
+                }
+                let taken: Vec<usize> = (queued_len..end).collect();
+                let mut ordered: Vec<PlayableItem> =
+                    taken.iter().map(|&index| queue.queue[index].clone()).collect();
+                let moved = ordered.remove(from - queued_len);
+                let at = if to > from { to - 1 } else { to } - queued_len;
+                ordered.insert(at.min(ordered.len()), moved);
+                (taken, ordered, queued_len)
+            };
+        let removals: Vec<(usize, String)> = taken
+            .iter()
+            .rev()
+            .map(|&index| (index, queue.queue[index].uri().to_string()))
+            .collect();
+        // Bottom up, so the indexes still to go stay where they were.
+        for (index, uri) in removals {
+            self.backend
+                .player(PlayerCommand::RemoveNextTrack { index, uri });
+            if let Loadable::Loaded(queue) = &mut self.queue {
+                queue.queue.remove(index);
+            }
+        }
+        for (offset, item) in ordered.into_iter().enumerate() {
+            let at = (position + offset).min(self.manual_queue.len());
+            for addition in &mut self.pending_queue_adds {
+                if addition.manual_index >= at {
+                    addition.manual_index += 1;
+                }
+            }
+            self.pending_queue_adds.push(PendingQueueAdd {
+                item: item.clone(),
+                at: Instant::now(),
+                manual_index: at,
+                write: None,
+            });
+            if let Loadable::Loaded(queue) = &mut self.queue {
+                queue.queue.insert(at.min(queue.queue.len()), item.clone());
+            }
+            self.manual_queue.insert(at, item.uri().to_string());
+        }
+        self.session_dirty = true;
+        self.resync_local_queue();
     }
 
     /// Takes the chosen rows out of Playing next. Neither the Web API nor
@@ -5910,6 +5987,33 @@ impl App {
             return;
         }
         let queued_len = self.queued_rows_len();
+        let Loadable::Loaded(queue) = &self.queue else {
+            return;
+        };
+        // Spindle: Next up rows leave the engine's upcoming list directly,
+        // bottom up so the indexes still to go stay put. They sit below
+        // every queued row, so the queued rows' indexes do not move.
+        let mut next_up: Vec<(usize, String)> = rows
+            .iter()
+            .filter(|(index, uri)| {
+                *index >= queued_len
+                    && queue
+                        .queue
+                        .get(*index)
+                        .is_some_and(|item| item.uri() == uri)
+            })
+            .cloned()
+            .collect();
+        next_up.sort_unstable_by(|a, b| b.0.cmp(&a.0));
+        next_up.dedup_by_key(|(index, _)| *index);
+        let next_up_removed = !next_up.is_empty();
+        for (index, uri) in next_up {
+            self.backend
+                .player(PlayerCommand::RemoveNextTrack { index, uri });
+            if let Loadable::Loaded(queue) = &mut self.queue {
+                queue.queue.remove(index);
+            }
+        }
         let Loadable::Loaded(queue) = &self.queue else {
             return;
         };
@@ -5926,6 +6030,14 @@ impl App {
             .collect();
         indexes.sort_unstable();
         indexes.dedup();
+        if indexes.is_empty() && next_up_removed {
+            // Nothing of the user's own changed: no rewrite, just a fresh
+            // look at the engine's list once it has settled.
+            self.queue_seq += 1;
+            self.queue_stale_retries = 0;
+            self.queue_recheck_at = Some(Instant::now() + QUEUE_RECHECK);
+            return;
+        }
         let mut removed = std::collections::HashSet::new();
         // From the bottom up, so the rows still to go keep their indexes.
         for index in indexes.into_iter().rev() {
@@ -10774,6 +10886,7 @@ impl App {
                 self.resync_local_queue();
             }
             Action::RemoveFromQueue { rows } => self.remove_from_queue(rows),
+            Action::ArrangeNextUp { from, uri, to } => self.arrange_next_up(from, &uri, to),
             Action::InsertInQueue { items, position } => {
                 if !self.queue_locally_reorderable() {
                     let songs = items
@@ -30578,6 +30691,137 @@ mod tests {
         paused.playback = Playback::Paused;
         app.handle_local(paused);
         assert!(!app.now_playing().is_some_and(|now| now.playing));
+        app.backend.shutdown();
+    }
+
+    // ---- Spindle: arranging and removing Next up rows -------------------
+
+    fn arranging_app(manual: &[&str], context: &[&str]) -> App {
+        let mut app = headless_app();
+        app.remote = None;
+        app.selected_device = None;
+        app.auth = AuthStatus::Connected {
+            username: "alice".into(),
+        };
+        app.local_ready = true;
+        app.local.connected = true;
+        app.local.track = Some(crate::player::LocalTrack {
+            uri: "spotify:track:playing".into(),
+            ..Default::default()
+        });
+        app.local.playback = Playback::Playing;
+        app.manual_queue = manual.iter().map(|uri| uri.to_string()).collect();
+        let rows: Vec<&str> = manual.iter().chain(context).copied().collect();
+        app.queue = loaded_queue("spotify:track:playing", &rows);
+        app.backend.take_player_commands();
+        app
+    }
+
+    fn removals(commands: &[PlayerCommand]) -> Vec<(usize, &str)> {
+        commands
+            .iter()
+            .filter_map(|command| match command {
+                PlayerCommand::RemoveNextTrack { index, uri } => Some((*index, uri.as_str())),
+                _ => None,
+            })
+            .collect()
+    }
+
+    /// A Next up row dropped into Playing next leaves the context and plays
+    /// at the drop slot; the rest of Next up keeps its order.
+    #[test]
+    fn a_next_up_row_dropped_into_playing_next_plays_there() {
+        let mut app = arranging_app(&["spotify:track:q1"], &["spotify:track:c1", "spotify:track:c2", "spotify:track:c3"]);
+        assert!(app.queue_locally_reorderable());
+        let ctx = egui::Context::default();
+        app.apply(
+            Action::ArrangeNextUp { from: 3, uri: "spotify:track:c3".into(), to: 0 },
+            &ctx,
+        );
+        let sent = app.backend.take_player_commands();
+        assert_eq!(removals(&sent), [(3, "spotify:track:c3")]);
+        let removal_at = sent.iter().position(|c| matches!(c, PlayerCommand::RemoveNextTrack { .. })).unwrap();
+        let clear_at = sent.iter().position(|c| *c == PlayerCommand::ClearQueue).expect("queue rewritten");
+        assert!(removal_at < clear_at, "the row leaves the context before the queue is rewritten");
+        assert_eq!(app.manual_queue, ["spotify:track:c3", "spotify:track:q1"]);
+        assert_eq!(
+            queue_uris(&app).1,
+            ["spotify:track:c3", "spotify:track:q1", "spotify:track:c1", "spotify:track:c2"]
+        );
+        app.backend.shutdown();
+    }
+
+    /// Dragged within Next up, the rows above the drop join Playing next in
+    /// the new order, so what plays is what was drawn.
+    #[test]
+    fn a_next_up_row_dragged_within_next_up_plays_in_the_drawn_order() {
+        let mut app = arranging_app(&[], &["spotify:track:c1", "spotify:track:c2", "spotify:track:c3", "spotify:track:c4"]);
+        let ctx = egui::Context::default();
+        // c3 dropped between c1 and c2.
+        app.apply(
+            Action::ArrangeNextUp { from: 2, uri: "spotify:track:c3".into(), to: 1 },
+            &ctx,
+        );
+        let sent = app.backend.take_player_commands();
+        assert_eq!(
+            removals(&sent),
+            [(2, "spotify:track:c3"), (1, "spotify:track:c2"), (0, "spotify:track:c1")]
+        );
+        assert_eq!(app.manual_queue, ["spotify:track:c1", "spotify:track:c3", "spotify:track:c2"]);
+        assert_eq!(
+            queue_uris(&app).1,
+            ["spotify:track:c1", "spotify:track:c3", "spotify:track:c2", "spotify:track:c4"]
+        );
+
+        // Moving one later: c1 dropped after c3 of the new order is handled
+        // by Playing next's own move; within Next up, c4 dropped at the end
+        // of a two-row Next up moves nothing.
+        app.backend.take_player_commands();
+        let mut app = arranging_app(&[], &["spotify:track:c1", "spotify:track:c2"]);
+        app.apply(
+            Action::ArrangeNextUp { from: 1, uri: "spotify:track:c2".into(), to: 2 },
+            &ctx,
+        );
+        assert!(app.backend.take_player_commands().is_empty(), "dropped on its own edge");
+        // c1 dropped below c2.
+        app.apply(
+            Action::ArrangeNextUp { from: 0, uri: "spotify:track:c1".into(), to: 2 },
+            &ctx,
+        );
+        assert_eq!(app.manual_queue, ["spotify:track:c2", "spotify:track:c1"]);
+        app.backend.shutdown();
+    }
+
+    /// A row whose song moved on (playback advanced mid-drag) is left alone.
+    #[test]
+    fn arranging_a_row_that_changed_under_the_drag_does_nothing() {
+        let mut app = arranging_app(&[], &["spotify:track:c1", "spotify:track:c2"]);
+        let ctx = egui::Context::default();
+        app.apply(
+            Action::ArrangeNextUp { from: 1, uri: "spotify:track:gone".into(), to: 0 },
+            &ctx,
+        );
+        assert!(app.backend.take_player_commands().is_empty());
+        assert!(app.manual_queue.is_empty());
+        app.backend.shutdown();
+    }
+
+    /// Remove from queue on a Next up row takes it out of the engine's
+    /// upcoming list without rewriting the user's own queue.
+    #[test]
+    fn removing_a_next_up_row_takes_it_out_of_the_engine_only() {
+        let mut app = arranging_app(&["spotify:track:q1"], &["spotify:track:c1", "spotify:track:c2"]);
+        assert!(app.can_remove_from_queue(2), "Next up rows can be removed");
+        let ctx = egui::Context::default();
+        app.apply(
+            Action::RemoveFromQueue { rows: vec![(2, "spotify:track:c2".into()), (1, "spotify:track:c1".into())] },
+            &ctx,
+        );
+        let sent = app.backend.take_player_commands();
+        assert_eq!(removals(&sent), [(2, "spotify:track:c2"), (1, "spotify:track:c1")]);
+        assert!(!sent.contains(&PlayerCommand::ClearQueue), "the user's queue is not rewritten");
+        assert_eq!(app.manual_queue, ["spotify:track:q1"]);
+        assert_eq!(queue_uris(&app).1, ["spotify:track:q1"]);
         app.backend.shutdown();
     }
 

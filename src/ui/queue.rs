@@ -540,6 +540,16 @@ fn contents(app: &mut App, ui: &mut egui::Ui, compact: bool) {
                 && let Some(track) = egui::DragAndDrop::take_payload::<DragTrack>(ui.ctx())
             {
                 match track.from.as_ref() {
+                    // Spindle: a Next up row dropped into Playing next.
+                    Some((origin, from))
+                        if origin == "queue" && (*from as usize) >= queued_len =>
+                    {
+                        app.actions.push(Action::ArrangeNextUp {
+                            from: *from as usize,
+                            uri: track.items[0].uri().to_string(),
+                            to: slot,
+                        });
+                    }
                     Some((origin, from)) if origin == "queue" => {
                         let from = *from as usize;
                         let uri = track.items[0].uri();
@@ -587,9 +597,65 @@ fn contents(app: &mut App, ui: &mut egui::Ui, compact: bool) {
             palette.text,
         );
         ui.add_space(4.0);
-        widgets::virtual_rows(ui, queue_len - queued_len, row_height, |ui, index| {
-            queue_row(app, ui, queued_len + index, compact, 0.0);
+        // Spindle: a Next up row can be dragged within Next up too; see
+        // `Action::ArrangeNextUp`. Other drops do not land here.
+        let next_len = queue_len - queued_len;
+        let arranging = reorderable
+            && egui::DragAndDrop::payload::<DragTrack>(ui.ctx()).is_some_and(|track| {
+                matches!(&track.from, Some((origin, from))
+                    if origin == "queue" && (*from as usize) >= queued_len)
+            });
+        if arranging {
+            widgets::scroll_during_drag(ui);
+        }
+        let list_top = ui.cursor().top();
+        let section_rect = egui::Rect::from_min_max(
+            egui::pos2(ui.clip_rect().left(), list_top),
+            egui::pos2(
+                ui.clip_rect().right(),
+                list_top + next_len as f32 * row_height,
+            ),
+        );
+        let arrange_slot = arranging
+            .then(|| {
+                let pos = ui
+                    .ctx()
+                    .pointer_latest_pos()
+                    .filter(|pos| section_rect.contains(*pos))?;
+                let row = (pos.y - list_top) / row_height;
+                (row >= 0.0).then(|| (row.round() as usize).min(next_len))
+            })
+            .flatten();
+        widgets::virtual_rows(ui, next_len, row_height, |ui, index| {
+            let shift = ui.ctx().animate_value_with_time(
+                ui.id().with(("queue-arrange-shift", index)),
+                match arrange_slot {
+                    Some(slot) if index < slot => -4.0,
+                    Some(_) => 4.0,
+                    None => 0.0,
+                },
+                crate::motion::seconds(ui.ctx(), 0.12),
+            );
+            queue_row(app, ui, queued_len + index, compact, shift);
         });
+        if let Some(slot) = arrange_slot {
+            let y = list_top + slot as f32 * row_height;
+            ui.painter().hline(
+                ui.max_rect().x_range().shrink(8.0),
+                y,
+                egui::Stroke::new(2.0, palette.accent),
+            );
+            if ui.input(|input| input.pointer.button_released(egui::PointerButton::Primary))
+                && let Some(track) = egui::DragAndDrop::take_payload::<DragTrack>(ui.ctx())
+                && let Some((_, from)) = track.from.as_ref()
+            {
+                app.actions.push(Action::ArrangeNextUp {
+                    from: *from as usize,
+                    uri: track.items[0].uri().to_string(),
+                    to: queued_len + slot,
+                });
+            }
+        }
     }
 }
 
