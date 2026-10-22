@@ -13,11 +13,19 @@ pub fn dialog(app: &mut App, ui: &mut egui::Ui) {
     let locale = app.locale;
     theme::text(ui, gettext(locale, "Jam"), theme::bold(20.0), palette.text);
     ui.add_space(4.0);
-    theme::text(
-        ui,
-        gettext(locale, "Listen together from anywhere. Friends join with the link and add songs from their own Spotify."),
-        theme::regular(13.0),
-        palette.secondary,
+    // Spindle: wrapped, as in the other dialogs; one truncated line cut the
+    // sentence off at "add s..." on the PC.
+    ui.add(
+        egui::Label::new(
+            egui::RichText::new(gettext(
+                locale,
+                "Listen together from anywhere. Friends join with the link and add songs from their own Spotify.",
+            ))
+            .font(theme::regular(13.0))
+            .color(palette.secondary),
+        )
+        .wrap()
+        .selectable(false),
     );
     ui.add_space(16.0);
     match app.jam.clone() {

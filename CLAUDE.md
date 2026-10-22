@@ -268,6 +268,21 @@ spindle.exe to leave the task list (it slept a fixed 600 ms), and
 `<name>.old` (Windows allows that for a running exe). The next install and
 the uninstaller delete the `.old` files.
 
+## Live test of 0.14.126 (Windows PC, 2026-10-21)
+
+- Run normally (not elevated), every click and key landed at once, and the
+  log had no "RedrawRequested was overdue" line: the dropped input of the
+  0.14.124 session came from that copy running elevated.
+- Taskbar shows the small headphones drawing. Signed in at 196 ms,
+  playback session ready at 708 ms; Made for you and Recommendations took
+  60 s behind shared app throttling.
+- Connect panel, the GoXLR output list (five channels, Music ticked),
+  Start a Jam, the Jam box with QR code, the green strip, End Jam, synced
+  lyrics, queue, Listening activity, the round Home button and search all
+  work. The Jam description was one truncated line; it wraps since 0.14.127.
+- The search text stays in the field after leaving Search. That is
+  Spotifast's own behaviour (Back returns to the results), left as is.
+
 ## Facts from the live test (Windows PC, 2026-10-20)
 
 - Spindle 0.2.0 playing, window visible, no game: spindle.exe 0.1 percent
