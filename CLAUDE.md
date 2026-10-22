@@ -205,6 +205,29 @@ Needs the PipeWire and ALSA headers only to run the test suite on Linux:
   Limpingg/spindle ("Update asset does not belong to this release"); such a
   copy needs one manual install.
 
+## Spotify look (0.14.124, 2026-10-21)
+
+Nick asked for Spotify's own layout:
+- Top bar: round Home button before a centered search field (dropped on a
+  tight bar so `least_width` is unchanged); Listening activity sits beside
+  the profile picture in place of the gear (Settings is in the profile
+  menu). The player bar no longer has the friends button.
+- Lyrics button uses the tilted vocal mic (assets/icons/mic-vocal.svg).
+- The speaker button opens Connect as a right side panel
+  (`devices::side_panel`, shares the Queue width): the playing device in a
+  green card with this computer's sound output under its name, the arrow
+  for the output list, the Jam line (or Start a Jam), the other devices,
+  and Spotify's two help links. While another device plays, the output
+  row moves under the list.
+- A green strip under the player bar while a Jam runs or the music plays
+  on another device (`player_bar::connect_strip`): the Jam opens the Jam
+  box, the device opens Connect. Two old geometry tests set
+  `hide_connect_strip`, since the demo data plays on another device.
+- Jam box: the link copies on click and a QR code (qrcode crate, drawn as
+  squares) sits under it.
+- The setup program runs `ie4uinit.exe -show` so Windows redraws the new
+  icon instead of its cached one.
+
 ## Facts from the live test (Windows PC, 2026-10-20)
 
 - Spindle 0.2.0 playing, window visible, no game: spindle.exe 0.1 percent

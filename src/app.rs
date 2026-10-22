@@ -592,6 +592,9 @@ pub struct App {
     /// positioned itself at all for this track.
     pub lyrics_line_shown: Option<Option<usize>>,
     pub show_devices: bool,
+    /// Spindle: tests whose geometry predates the green Connect strip.
+    #[cfg(test)]
+    pub hide_connect_strip: bool,
     pub toasts: Vec<Toast>,
     pub actions: Vec<Action>,
     volume_before_mute: Option<u8>,
@@ -1193,6 +1196,8 @@ impl App {
             lyrics_following: true,
             lyrics_line_shown: None,
             show_devices: false,
+            #[cfg(test)]
+            hide_connect_strip: false,
             toasts: Vec::new(),
             actions: Vec::new(),
             volume_before_mute: None,
@@ -11452,6 +11457,7 @@ impl App {
             Action::ToggleQueuePanel => {
                 self.show_queue_panel = !self.show_queue_panel;
                 if self.show_queue_panel {
+                    self.show_devices = false;
                     self.show_lyrics_panel = false;
                     self.show_friends_panel = false;
                     self.refresh_queue(true);
@@ -11461,6 +11467,7 @@ impl App {
                 self.leave_lyrics_fullscreen(ctx);
                 self.show_lyrics_panel = !self.show_lyrics_panel;
                 if self.show_lyrics_panel {
+                    self.show_devices = false;
                     self.show_queue_panel = false;
                     self.show_friends_panel = false;
                     self.lyrics_following = true;
@@ -11470,6 +11477,7 @@ impl App {
             Action::ToggleFriendsPanel => {
                 self.show_friends_panel = !self.show_friends_panel;
                 if self.show_friends_panel {
+                    self.show_devices = false;
                     self.show_queue_panel = false;
                     self.show_lyrics_panel = false;
                     self.refresh_friends();
@@ -11525,6 +11533,10 @@ impl App {
             Action::ToggleDevicesPopup => {
                 self.show_devices = !self.show_devices;
                 if self.show_devices {
+                    // Spindle: Connect takes the right panel's place.
+                    self.show_queue_panel = false;
+                    self.show_lyrics_panel = false;
+                    self.show_friends_panel = false;
                     self.refresh_devices();
                     // Receivers waiting on the network are invisible to the
                     // Web API, so look for them ourselves.
@@ -13536,6 +13548,7 @@ mod tests {
         });
         app.attach(&ctx);
         crate::demo::populate(&mut app);
+        app.hide_connect_strip = true;
         app.settings.middle_click_autoscroll = chosen;
         app.open(Page::Playlist("pl1".into()));
         app.show_queue_panel = true;

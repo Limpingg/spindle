@@ -4243,7 +4243,7 @@ mod tests {
                         events,
                         ..Default::default()
                     },
-                    |_| crate::ui::devices::popup(app, &ctx),
+                    |ui| crate::ui::devices::side_panel(app, ui),
                 );
                 output.textures_delta.clear();
                 output
@@ -4302,7 +4302,7 @@ mod tests {
                     events,
                     ..Default::default()
                 },
-                |_| crate::ui::devices::popup(app, &ctx),
+                |ui| crate::ui::devices::side_panel(app, ui),
             );
             output.textures_delta.clear();
             output
@@ -4327,11 +4327,8 @@ mod tests {
             visible_speakers >= 5,
             "show several devices before scrolling, found {visible_speakers}"
         );
-        let popup = egui::AreaState::load(&ctx, egui::Id::new("devices-popup"))
-            .unwrap()
-            .rect();
-        assert!(screen.contains_rect(popup), "the popup must fit: {popup:?}");
-        let cursor = popup.center();
+        // Spindle: Connect is a side panel at the right edge.
+        let cursor = egui::pos2(screen.right() - 120.0, screen.center().y);
         draw(
             &mut app,
             vec![
@@ -4362,17 +4359,6 @@ mod tests {
         assert!(app.actions.iter().any(
             |action| matches!(action, crate::model::Action::Transfer(id) if id == "speaker-39")
         ));
-        app.devices.clear();
-        draw(&mut app, vec![]);
-        draw(&mut app, vec![]);
-        let popup = egui::AreaState::load(&ctx, egui::Id::new("devices-popup"))
-            .unwrap()
-            .rect();
-        assert!(
-            // Spindle: the Jam row adds about 45 points above the list.
-            popup.height() < 210.0,
-            "a list with only this computer should shrink to fit: {popup:?}"
-        );
         app.backend.shutdown();
     }
 
@@ -6787,6 +6773,57 @@ mod tests {
             "the dialog runs {} pixels past the bottom of a {height}-tall window",
             bottom - height
         );
+        app.backend.shutdown();
+    }
+
+    /// Spindle: a click outside the Jam box closes it, and a click on the
+    /// link copies it instead of closing.
+    #[test]
+    fn jam_closes_on_an_outside_click_and_its_link_copies() {
+        let (ctx, mut app) = accessible_app("jam-outside-click");
+        app.backend.set_offline(true);
+        let join_url = "https://open.spotify.com/socialsession/abc".to_string();
+        app.jam = crate::model::JamState::Live(crate::session_reads::JamSession {
+            id: "abc".into(),
+            join_url: join_url.clone(),
+            members: vec!["nick".into()],
+        });
+        app.dialog = Some(Dialog::Jam);
+        let screen = egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(1280.0, 800.0));
+        let draw = |app: &mut App, events: Vec<egui::Event>| {
+            let mut output = ctx.run_ui(
+                egui::RawInput {
+                    screen_rect: Some(screen),
+                    events,
+                    ..Default::default()
+                },
+                |ui| app.frame_ui(ui),
+            );
+            output.textures_delta.clear();
+            output
+        };
+        draw(&mut app, vec![]);
+        draw(&mut app, vec![]);
+        let dialog = app.dialog_rect.expect("the Jam box drew itself");
+
+        let output = draw(&mut app, vec![]);
+        let link = menu_text(&output)
+            .into_iter()
+            .find(|(text, _)| text.contains("socialsession"))
+            .map(|(_, rect)| rect.center())
+            .expect("the link is on screen");
+        let output = draw(&mut app, pointer_click(link, egui::PointerButton::Primary));
+        assert!(
+            output.platform_output.commands.iter().any(
+                |command| matches!(command, egui::OutputCommand::CopyText(text) if *text == join_url)
+            ),
+            "clicking the link copies it"
+        );
+        assert!(app.dialog.is_some(), "clicking the link keeps the box open");
+
+        let outside = egui::pos2(dialog.min.x - 60.0, dialog.center().y);
+        draw(&mut app, pointer_click(outside, egui::PointerButton::Primary));
+        assert!(app.dialog.is_none(), "a click outside the box closes it");
         app.backend.shutdown();
     }
 
@@ -9997,6 +10034,7 @@ mod tests {
         for compact in [false, true] {
             let (ctx, mut app) = accessible_app(&format!("sidebar-drag-scroll-{compact}"));
             app.settings.sidebar_compact = compact;
+            app.hide_connect_strip = true;
             app.rootlist.clear();
             app.settings.pinned_contexts.clear();
             let playlists: Vec<_> = (0..60)

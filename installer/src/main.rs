@@ -532,6 +532,11 @@ fn install_into(
     tolerate("Shortcuts", shortcuts(&places, desktop_shortcut))?;
     report("Registering with Windows");
     tolerate("Registration", register(&places, exe_bytes.len() + own_bytes.len()))?;
+    // Spindle: Windows keeps the picture it drew for an exe at this path,
+    // so a new icon showed the old one until sign out. Ask the shell to
+    // reload its icons. Best effort: a failure changes nothing else.
+    report("Refreshing icons");
+    let _ = quiet("ie4uinit.exe").arg("-show").status();
     report("Done");
     Ok(())
 }

@@ -43,6 +43,96 @@ pub(crate) fn end_tint_session(ctx: &egui::Context) {
     ctx.data_mut(|data| data.remove::<u64>(egui::Id::new(TINT_SESSION_ID)));
 }
 
+/// Spindle: the green strip under the player bar while a Jam runs or the
+/// music plays on another device, as in Spotify: the Jam, then where the
+/// sound is. Each half opens its own window.
+pub fn connect_strip(app: &mut App, ui: &mut egui::Ui) {
+    let jam = matches!(app.jam, crate::model::JamState::Live(_));
+    let remote = app.now_playing().filter(|now| !now.local);
+    if !jam && remote.is_none() {
+        return;
+    }
+    #[cfg(test)]
+    if app.hide_connect_strip {
+        return;
+    }
+    let palette = app.palette;
+    let locale = app.locale;
+    let ink = palette.on_accent;
+    let (device, kind) = match &remote {
+        Some(now) => (
+            now.device_name
+                .clone()
+                .unwrap_or_else(|| gettext(locale, "Another device").into_owned()),
+            now.device_kind.clone().unwrap_or_default(),
+        ),
+        None => (app.settings.device_name.clone(), "computer".to_string()),
+    };
+    egui::Panel::bottom("connect-strip")
+        .exact_size(26.0)
+        .resizable(false)
+        .show_separator_line(false)
+        .frame(
+            Frame::new()
+                .fill(palette.accent)
+                .inner_margin(Margin::symmetric(16, 0)),
+        )
+        .show(ui, |ui| {
+            ui.with_layout(
+                egui::Layout::right_to_left(egui::Align::Center),
+                |ui| {
+                    ui.spacing_mut().item_spacing.x = 8.0;
+                    let device_response = ui
+                        .scope(|ui| {
+                            ui.spacing_mut().item_spacing.x = 6.0;
+                            theme::text(ui, &device, theme::semibold(13.0), ink);
+                            theme::icon(
+                                ui,
+                                crate::ui::devices::device_icon(&kind),
+                                15.0,
+                                ink,
+                            );
+                        })
+                        .response
+                        .interact(egui::Sense::click())
+                        .on_hover_cursor(egui::CursorIcon::PointingHand);
+                    if device_response.clicked() && !app.show_devices {
+                        app.actions.push(Action::ToggleDevicesPopup);
+                    }
+                    if jam {
+                        let line = ui.available_rect_before_wrap();
+                        let x = ui.cursor().max.x - 4.0;
+                        ui.painter().vline(
+                            x,
+                            (line.center().y - 7.0)..=(line.center().y + 7.0),
+                            egui::Stroke::new(1.0, ink),
+                        );
+                        ui.add_space(8.0);
+                        let owner = app
+                            .user
+                            .as_ref()
+                            .map(|user| user.name().to_string())
+                            .unwrap_or_default();
+                        // Translators: {name} is the account's display name.
+                        let label = gettext(locale, "{name}'s Jam").replace("{name}", &owner);
+                        let jam_response = ui
+                            .scope(|ui| {
+                                ui.spacing_mut().item_spacing.x = 6.0;
+                                theme::text(ui, &label, theme::semibold(13.0), ink);
+                                theme::icon(ui, Icon::Users, 15.0, ink);
+                            })
+                            .response
+                            .interact(egui::Sense::click())
+                            .on_hover_cursor(egui::CursorIcon::PointingHand);
+                        if jam_response.clicked() {
+                            app.actions.push(Action::StartJam);
+                        }
+                    }
+                },
+            );
+        });
+}
+
 pub fn show(app: &mut App, ui: &mut egui::Ui) {
     let palette = app.palette;
     let fill = eased_fill(ui.ctx(), palette.panel, app.now_playing_tint());

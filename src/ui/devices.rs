@@ -244,6 +244,7 @@ fn saved_output_name<'a>(saved: &'a str, devices: &'a [DeviceInfo]) -> &'a str {
 /// shown by name and saved by its id in `audio_device` (#963). Choosing one
 /// restarts local playback on it. Listed only when asked, so the popup
 /// opens at once; a saved device lists them once, for its name.
+/// This computer's sound output as a row that opens the list.
 fn output_picker(app: &mut App, ui: &mut egui::Ui) {
     let palette = app.palette;
     let locale = app.locale;
@@ -314,6 +315,15 @@ fn output_picker(app: &mut App, ui: &mut egui::Ui) {
     if !open {
         return;
     }
+    output_choices(app, ui);
+}
+
+/// Spindle: this computer's sound outputs as a list to pick from.
+fn output_choices(app: &mut App, ui: &mut egui::Ui) {
+    let palette = app.palette;
+    let locale = app.locale;
+    let system_default = gettext(locale, "System default").into_owned();
+    let current = app.settings.audio_device.clone();
     match &app.output_devices {
         crate::model::Loadable::Loaded(devices) => {
             // The saved device's row: by its id, or by the name an older
@@ -373,253 +383,479 @@ fn output_picker(app: &mut App, ui: &mut egui::Ui) {
     }
 }
 
-pub fn popup(app: &mut App, ctx: &egui::Context) {
-    if !app.show_devices {
-        return;
+/// Every output the Connect panel offers, ranked, with this computer's id
+/// and the active output's id.
+fn output_rows(app: &App) -> (Vec<OutputRow>, Option<String>, Option<String>) {
+    let local_id = app.local_device_id.clone();
+    let mut devices: Vec<Device> = app.devices.clone();
+    if app.local_ready
+        && let Some(local_id) = &local_id
+        && !devices
+            .iter()
+            .any(|device| device.id.as_deref() == Some(local_id.as_str()))
+    {
+        devices.insert(
+            0,
+            Device {
+                id: Some(local_id.clone()),
+                // Named without its suffix; the row below adds it.
+                name: app.settings.device_name.clone(),
+                is_active: app.local.is_active(),
+                is_restricted: false,
+                volume_percent: Some(crate::app::volume_to_percent(app.local.volume)),
+                supports_volume: Some(true),
+                kind: "computer".into(),
+            },
+        );
     }
+    let active_id = match app.target() {
+        crate::app::Target::Local => local_id.clone(),
+        crate::app::Target::Remote(id) => id,
+    };
+    // Spotify leaves a Sonos out of its list; it is offered from
+    // the network instead and driven over Connect.
+    for receiver in &app.receivers {
+        let listed = devices
+            .iter()
+            .any(|device| device.id.is_some() && device.id == receiver.device_id);
+        if !listed
+            && let Some(row) =
+                crate::sonos::device_row(receiver, receiver.device_id == active_id)
+        {
+            devices.push(row);
+        }
+    }
+    name_devices(&mut devices, &app.receivers);
+    let mut seen = std::collections::HashSet::new();
+    devices
+        .retain(|device| device.id.as_ref().is_none_or(|id| seen.insert(id.clone())));
+
+    // Receivers on the network that Spotify has not listed yet.
+    // They are real speakers the user can see in the official
+    // client, so offering them here is the whole point.
+    let waiting: Vec<crate::zeroconf::Receiver> = app
+        .receivers
+        .iter()
+        .filter(|receiver| !receiver_is_listed(receiver, &devices))
+        .cloned()
+        .collect();
+
+    let mut rows: Vec<_> = devices
+        .into_iter()
+        .map(OutputRow::Device)
+        .chain(waiting.into_iter().map(OutputRow::Receiver))
+        .collect();
+    rank_outputs(
+        &mut rows,
+        &app.device_history,
+        app.user_id(),
+        active_id.as_deref(),
+    );
+
+    (rows, local_id, active_id)
+}
+
+/// One Spotify Connect device in the list.
+fn device_row(
+    app: &mut App,
+    ui: &mut egui::Ui,
+    device: &Device,
+    local_id: &Option<String>,
+    active_id: &Option<String>,
+) {
     let palette = app.palette;
     let locale = app.locale;
-    let button = ctx
-        .data(|data| data.get_temp::<Rect>(egui::Id::new(BUTTON_RECT_ID)))
-        .unwrap_or_else(|| Rect::from_min_size(pos2(400.0, 400.0), vec2(0.0, 0.0)));
-    let width = 320.0;
-    let position = pos2(
-        (button.right() - width).max(8.0),
-        (button.top() - 12.0).max(8.0),
+    let is_local = device.id.is_some() && device.id == *local_id;
+    let active = device.id.is_some() && device.id == *active_id;
+    let name = if is_local {
+        // Translators: {name} is the name this computer uses in Spotify Connect.
+        gettext(locale, "{name} (this computer)")
+            .replace("{name}", &device.name)
+    } else {
+        device.name.clone()
+    };
+    let (rect, response) = ui.allocate_exact_size(
+        vec2(ui.available_width(), 52.0),
+        Sense::click(),
     );
-    let area = egui::Area::new(egui::Id::new("devices-popup"))
-        .order(egui::Order::Foreground)
-        .fixed_pos(position)
-        .pivot(egui::Align2::LEFT_BOTTOM)
-        .show(ctx, |ui| {
-            super::widgets::menu_frame(&palette).show(ui, |ui| {
-                ui.set_width(width);
-                ui.horizontal(|ui| {
-                    ui.add_space(6.0);
-                    theme::text(
-                        ui,
-                        gettext(locale, "Connect to a device").as_ref(),
-                        theme::bold(16.0),
-                        palette.text,
-                    );
-                    ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                        if app.devices_loading {
-                            theme::spinner(ui, 16.0, palette.accent);
-                        } else if theme::icon_button(
-                            ui,
-                            Icon::Refresh,
-                            15.0,
-                            palette.secondary,
-                            palette.text,
-                            &gettext(locale, "Refresh"),
-                        )
-                        .clicked()
-                        {
-                            app.actions.push(Action::RefreshDevices);
-                        }
-                    });
-                });
+    if response.hovered() {
+        ui.painter().rect_filled(
+            rect,
+            CornerRadius::same(6),
+            palette.surface_hover,
+        );
+    }
+    let color = if active { palette.accent } else { palette.text };
+    let icon_rect = Rect::from_center_size(
+        pos2(rect.left() + 24.0, rect.center().y),
+        egui::Vec2::splat(22.0),
+    );
+    device_icon(&device.kind)
+        .image(color, 22.0)
+        .paint_at(ui, icon_rect);
+    let painter = ui.painter().with_clip_rect(rect);
+    crate::bidi::paint_line(
+        &painter,
+        rect.left() + 48.0,
+        rect.right() - 12.0,
+        rect.center().y - 9.0,
+        &name,
+        theme::medium(14.0),
+        color,
+    );
+    let status = if active {
+        gettext(locale, "Listening on this device").into_owned()
+    } else if device.is_restricted {
+        gettext(locale, "Restricted").into_owned()
+    } else if is_local {
+        gettext(locale, "Play here").into_owned()
+    } else {
+        device.kind.replace('_', " ")
+    };
+    painter.text(
+        pos2(rect.left() + 48.0, rect.center().y + 10.0),
+        egui::Align2::LEFT_CENTER,
+        status,
+        theme::regular(12.0),
+        if active {
+            palette.accent
+        } else {
+            palette.secondary
+        },
+    );
+    if active {
+        let dot = pos2(rect.right() - 16.0, rect.center().y);
+        ui.painter().circle_filled(dot, 4.0, palette.accent);
+    }
+    if response.clicked()
+        && !active
+        && let Some(id) = &device.id
+    {
+        app.actions.push(Action::Transfer(id.clone()));
+    }
+}
+
+/// Spindle: the Connect panel on the right, as in Spotify: the device
+/// playing now with its Jam and this computer's sound outputs, the other
+/// devices, and Spotify's help pages.
+pub fn side_panel(app: &mut App, ui: &mut egui::Ui) {
+    let palette = app.palette;
+    let locale = app.locale;
+    let fit = super::yielding_panel(
+        ui.ctx(),
+        "connect-panel",
+        theme::SIDE_PANEL_MIN_WIDTH..=560.0,
+        app.settings.queue_width,
+        ui.available_width() - super::topbar::least_width(ui.ctx()),
+    );
+    let panel = egui::Panel::right("connect-panel")
+        .resizable(true)
+        .default_size(app.settings.queue_width)
+        .size_range(fit.range.clone())
+        .show_separator_line(false)
+        .frame(
+            egui::Frame::new()
+                .fill(palette.panel)
+                .inner_margin(egui::Margin::symmetric(12, 12)),
+        );
+    let response = panel.show(ui, |ui| {
+        let window_controls =
+            super::window_controls_reservation(ui.ctx(), true, false, ui.available_width());
+        ui.add_space(window_controls.queue_top);
+        let mut close = false;
+        egui::Sides::new().shrink_left().show(
+            ui,
+            |ui| {
                 ui.add_space(4.0);
-                // Spindle: Jam lives with the speakers, as in Spotify's own
-                // Connect menu. It opens the running Jam when there is one.
-                let jam_label = if matches!(app.jam, crate::model::JamState::Live(_)) {
-                    gettext(locale, "Jam")
-                } else {
-                    gettext(locale, "Start a Jam")
-                };
-                if super::widgets::menu_item(ui, &palette, Some(Icon::Users), &jam_label) {
-                    app.show_devices = false;
-                    app.actions.push(Action::StartJam);
-                }
-                super::widgets::menu_separator(ui, &palette);
-                let local_id = app.local_device_id.clone();
-                let mut devices: Vec<Device> = app.devices.clone();
-                if app.local_ready
-                    && let Some(local_id) = &local_id
-                    && !devices
-                        .iter()
-                        .any(|device| device.id.as_deref() == Some(local_id.as_str()))
+                theme::text(ui, gettext(locale, "Connect"), theme::bold(16.0), palette.text);
+            },
+            |ui| {
+                close = theme::icon_button(
+                    ui,
+                    Icon::X,
+                    18.0,
+                    palette.secondary,
+                    palette.text,
+                    &gettext(locale, "Close"),
+                )
+                .clicked();
+                if app.devices_loading {
+                    theme::spinner(ui, 16.0, palette.accent);
+                } else if theme::icon_button(
+                    ui,
+                    Icon::Refresh,
+                    15.0,
+                    palette.secondary,
+                    palette.text,
+                    &gettext(locale, "Refresh"),
+                )
+                .clicked()
                 {
-                    devices.insert(
-                        0,
-                        Device {
-                            id: Some(local_id.clone()),
-                            // Named without its suffix; the row below adds it.
-                            name: app.settings.device_name.clone(),
-                            is_active: app.local.is_active(),
-                            is_restricted: false,
-                            volume_percent: Some(crate::app::volume_to_percent(app.local.volume)),
-                            supports_volume: Some(true),
-                            kind: "computer".into(),
-                        },
+                    app.actions.push(Action::RefreshDevices);
+                }
+            },
+        );
+        if close {
+            app.actions.push(Action::ToggleDevicesPopup);
+        }
+        ui.add_space(12.0);
+        let (rows, local_id, active_id) = output_rows(app);
+        let links_height = 2.0 * 44.0 + 12.0;
+        let list_height = (ui.available_height() - links_height).max(120.0);
+        egui::ScrollArea::vertical()
+            .id_salt("connect-device-list")
+            .auto_shrink([false, true])
+            .max_height(list_height)
+            .show(ui, |ui| {
+                current_card(app, ui, &rows, &local_id, &active_id);
+                ui.add_space(8.0);
+                if !app.local_ready {
+                    enable_playback_row(app, ui);
+                }
+                let others: Vec<&OutputRow> = rows
+                    .iter()
+                    .filter(|row| {
+                        active_id.is_none() || row.identity() != active_id.as_deref()
+                    })
+                    .collect();
+                if others.is_empty() && app.local_ready {
+                    ui.add_space(8.0);
+                    theme::subtle(
+                        ui,
+                        &palette,
+                        &gettext(
+                            locale,
+                            "No other devices found. Open Spotify on another device, then refresh.",
+                        ),
                     );
                 }
-                let active_id = match app.target() {
-                    crate::app::Target::Local => local_id.clone(),
-                    crate::app::Target::Remote(id) => id,
-                };
-                // Spotify leaves a Sonos out of its list; it is offered from
-                // the network instead and driven over Connect.
-                for receiver in &app.receivers {
-                    let listed = devices
-                        .iter()
-                        .any(|device| device.id.is_some() && device.id == receiver.device_id);
-                    if !listed
-                        && let Some(row) =
-                            crate::sonos::device_row(receiver, receiver.device_id == active_id)
-                    {
-                        devices.push(row);
-                    }
+                let local_active = active_id.is_none() || active_id == local_id;
+                for row in others {
+                    ui.push_id(row.widget_key(), |ui| match row {
+                        OutputRow::Device(device) => {
+                            device_row(app, ui, device, &local_id, &active_id)
+                        }
+                        OutputRow::Receiver(receiver) => receiver_row(app, ui, receiver),
+                    });
                 }
-                name_devices(&mut devices, &app.receivers);
-                let mut seen = std::collections::HashSet::new();
-                devices
-                    .retain(|device| device.id.as_ref().is_none_or(|id| seen.insert(id.clone())));
-
-                // Receivers on the network that Spotify has not listed yet.
-                // They are real speakers the user can see in the official
-                // client, so offering them here is the whole point.
-                let waiting: Vec<crate::zeroconf::Receiver> = app
-                    .receivers
-                    .iter()
-                    .filter(|receiver| !receiver_is_listed(receiver, &devices))
-                    .cloned()
-                    .collect();
-
-                let mut rows: Vec<_> = devices
-                    .into_iter()
-                    .map(OutputRow::Device)
-                    .chain(waiting.into_iter().map(OutputRow::Receiver))
-                    .collect();
-                rank_outputs(
-                    &mut rows,
-                    &app.device_history,
-                    app.user_id(),
-                    active_id.as_deref(),
-                );
-
-                let max_height = (position.y - ctx.content_rect().top() - 62.0).clamp(52.0, 416.0);
-                crate::autoscroll::show(
-                    ui,
-                    egui::ScrollArea::vertical()
-                        .id_salt("connect-device-list")
-                        // Grow past the Area's remembered height when discovery
-                        // adds devices. Short lists still shrink to their contents.
-                        .min_scrolled_height(max_height)
-                        .max_height(max_height),
-                    egui::Vec2b::new(false, true),
-                    |ui| {
-                        if !app.local_ready {
-                            enable_playback_row(app, ui);
-                        }
-                        if rows.is_empty() && app.local_ready {
-                            ui.add_space(8.0);
-                            theme::subtle(
-                                ui,
-                                &palette,
-                                &gettext(
-                                    locale,
-                                    "No devices found. Open Spotify on another device, then refresh.",
-                                ),
-                            );
-                            ui.add_space(8.0);
-                        }
-
-                        for row in &rows {
-                            ui.push_id(row.widget_key(), |ui| {
-                                let OutputRow::Device(device) = row else {
-                                    if let OutputRow::Receiver(receiver) = row {
-                                        receiver_row(app, ui, receiver);
-                                    }
-                                    return;
-                                };
-                                let is_local = device.id.is_some() && device.id == local_id;
-                                let active = device.id.is_some() && device.id == active_id;
-                                let name = if is_local {
-                                    // Translators: {name} is the name this computer uses in Spotify Connect.
-                                    gettext(locale, "{name} (this computer)")
-                                        .replace("{name}", &device.name)
-                                } else {
-                                    device.name.clone()
-                                };
-                                let (rect, response) = ui.allocate_exact_size(
-                                    vec2(ui.available_width(), 52.0),
-                                    Sense::click(),
-                                );
-                                if response.hovered() {
-                                    ui.painter().rect_filled(
-                                        rect,
-                                        CornerRadius::same(6),
-                                        palette.surface_hover,
-                                    );
-                                }
-                                let color = if active { palette.accent } else { palette.text };
-                                let icon_rect = Rect::from_center_size(
-                                    pos2(rect.left() + 24.0, rect.center().y),
-                                    egui::Vec2::splat(22.0),
-                                );
-                                device_icon(&device.kind)
-                                    .image(color, 22.0)
-                                    .paint_at(ui, icon_rect);
-                                let painter = ui.painter().with_clip_rect(rect);
-                                crate::bidi::paint_line(
-                                    &painter,
-                                    rect.left() + 48.0,
-                                    rect.right() - 12.0,
-                                    rect.center().y - 9.0,
-                                    &name,
-                                    theme::medium(14.0),
-                                    color,
-                                );
-                                let status = if active {
-                                    gettext(locale, "Listening on this device").into_owned()
-                                } else if device.is_restricted {
-                                    gettext(locale, "Restricted").into_owned()
-                                } else if is_local {
-                                    gettext(locale, "Play here").into_owned()
-                                } else {
-                                    device.kind.replace('_', " ")
-                                };
-                                painter.text(
-                                    pos2(rect.left() + 48.0, rect.center().y + 10.0),
-                                    egui::Align2::LEFT_CENTER,
-                                    status,
-                                    theme::regular(12.0),
-                                    if active {
-                                        palette.accent
-                                    } else {
-                                        palette.secondary
-                                    },
-                                );
-                                if active {
-                                    let dot = pos2(rect.right() - 16.0, rect.center().y);
-                                    ui.painter().circle_filled(dot, 4.0, palette.accent);
-                                }
-                                if response.clicked()
-                                    && !active
-                                    && let Some(id) = &device.id
-                                {
-                                    app.actions.push(Action::Transfer(id.clone()));
-                                }
-                            });
-                        }
-                    },
-                );
-                if app.local_ready {
+                // While another device plays, this computer's outputs stay
+                // a row away instead of behind the card's arrow.
+                if app.local_ready && !local_active {
                     output_picker(app, ui);
                 }
             });
+        ui.with_layout(Layout::bottom_up(Align::Min), |ui| {
+            help_link(
+                app,
+                ui,
+                &gettext(locale, "What can I connect to?"),
+                "https://connect.spotify.com/",
+            );
+            help_link(
+                app,
+                ui,
+                &gettext(locale, "Don't see your device?"),
+                "https://support.spotify.com/us/article/spotify-connect/",
+            );
         });
-    let popup_rect = area.response.rect;
-    let clicked_outside = ctx.input(|input| {
-        input.pointer.any_pressed()
-            && input
-                .pointer
-                .interact_pos()
-                .is_some_and(|pos| !popup_rect.contains(pos) && !button.contains(pos))
     });
-    if clicked_outside {
-        app.show_devices = false;
+    let width = response.response.rect.width();
+    if (width - app.settings.queue_width).abs() > 1.0
+        && super::panel_width_chosen(ui.ctx(), "connect-panel", &fit)
+    {
+        app.settings.queue_width = width;
+        app.actions.push(Action::SettingsChanged);
+    }
+}
+
+/// The device playing now, in green, with the Jam under it and, for this
+/// computer, its sound outputs behind the arrow.
+fn current_card(
+    app: &mut App,
+    ui: &mut egui::Ui,
+    rows: &[OutputRow],
+    local_id: &Option<String>,
+    active_id: &Option<String>,
+) {
+    let palette = app.palette;
+    let locale = app.locale;
+    let active = rows.iter().find_map(|row| match row {
+        OutputRow::Device(device)
+            if active_id.is_some() && device.id.as_deref() == active_id.as_deref() =>
+        {
+            Some(device.clone())
+        }
+        _ => None,
+    });
+    let is_local = active
+        .as_ref()
+        .map_or(app.local_ready, |device| device.id.is_some() && device.id == *local_id);
+    let (name, kind) = match &active {
+        Some(device) if !is_local => (device.name.clone(), device.kind.clone()),
+        _ => (app.settings.device_name.clone(), "computer".to_string()),
+    };
+    let open_id = ui.make_persistent_id("connect-outputs-open");
+    let mut open = ui.data(|data| data.get_temp::<bool>(open_id).unwrap_or(false));
+    egui::Frame::new()
+        .fill(palette.surface)
+        .corner_radius(CornerRadius::same(8))
+        .inner_margin(egui::Margin::symmetric(12, 10))
+        .show(ui, |ui| {
+            ui.set_width(ui.available_width());
+            // Under this computer's name: where its sound goes now.
+            let output = (is_local && app.local_ready).then(|| {
+                let listed = app.output_devices.get().map_or(&[][..], Vec::as_slice);
+                app.settings.audio_device.as_deref().map_or_else(
+                    || gettext(locale, "System default").into_owned(),
+                    |saved| saved_output_name(saved, listed).to_string(),
+                )
+            });
+            if app.settings.audio_device.is_some()
+                && matches!(app.output_devices, crate::model::Loadable::NotLoaded)
+            {
+                app.actions.push(Action::ListOutputDevices);
+            }
+            let height = if output.is_some() { 48.0 } else { 40.0 };
+            let (rect, response) =
+                ui.allocate_exact_size(vec2(ui.available_width(), height), Sense::click());
+            device_icon(&kind)
+                .image(palette.accent, 22.0)
+                .paint_at(
+                    ui,
+                    Rect::from_center_size(
+                        pos2(rect.left() + 12.0, rect.center().y),
+                        egui::Vec2::splat(22.0),
+                    ),
+                );
+            let painter = ui.painter().with_clip_rect(rect);
+            crate::bidi::paint_line(
+                &painter,
+                rect.left() + 36.0,
+                rect.right() - 32.0,
+                rect.center().y - if output.is_some() { 9.0 } else { 0.0 },
+                &name,
+                theme::medium(16.0),
+                palette.accent,
+            );
+            if let Some(output) = &output {
+                crate::bidi::paint_line(
+                    &painter,
+                    rect.left() + 36.0,
+                    rect.right() - 32.0,
+                    rect.center().y + 11.0,
+                    output,
+                    theme::regular(12.0),
+                    palette.secondary,
+                );
+            }
+            if is_local && app.local_ready {
+                let arrow = if open {
+                    Icon::ChevronDown
+                } else {
+                    Icon::ChevronRight
+                };
+                arrow.image(palette.secondary, 18.0).paint_at(
+                    ui,
+                    Rect::from_center_size(
+                        pos2(rect.right() - 10.0, rect.center().y),
+                        egui::Vec2::splat(18.0),
+                    ),
+                );
+                let label = gettext(locale, "Audio output");
+                response.widget_info(|| {
+                    egui::WidgetInfo::labeled(egui::WidgetType::Button, true, label.as_ref())
+                });
+                let response = response
+                    .on_hover_cursor(egui::CursorIcon::PointingHand)
+                    .on_hover_text(gettext(locale, "Sound output on this computer"));
+                if response.clicked() {
+                    open = !open;
+                    if open {
+                        app.actions.push(Action::ListOutputDevices);
+                    }
+                }
+            }
+            if open && is_local && app.local_ready {
+                ui.add_space(4.0);
+                output_choices(app, ui);
+            }
+            ui.add_space(6.0);
+            jam_line(app, ui);
+        });
+    ui.data_mut(|data| data.insert_temp(open_id, open));
+}
+
+/// The Jam under the playing device: its name while one runs, an offer to
+/// start one otherwise.
+fn jam_line(app: &mut App, ui: &mut egui::Ui) {
+    let palette = app.palette;
+    let locale = app.locale;
+    let live = matches!(app.jam, crate::model::JamState::Live(_));
+    let label = if live {
+        let owner = app
+            .user
+            .as_ref()
+            .map(|user| user.name().to_string())
+            .unwrap_or_default();
+        // Translators: {name} is the account's display name.
+        gettext(locale, "{name}'s Jam").replace("{name}", &owner)
+    } else {
+        gettext(locale, "Start a Jam").into_owned()
+    };
+    let (rect, response) = ui.allocate_exact_size(vec2(ui.available_width(), 28.0), Sense::click());
+    if response.hovered() {
+        ui.painter()
+            .rect_filled(rect, CornerRadius::same(6), palette.surface_hover);
+    }
+    Icon::Users
+        .image(if live { palette.text } else { palette.secondary }, 16.0)
+        .paint_at(
+            ui,
+            Rect::from_center_size(pos2(rect.left() + 12.0, rect.center().y), egui::Vec2::splat(16.0)),
+        );
+    ui.painter().with_clip_rect(rect).text(
+        pos2(rect.left() + 32.0, rect.center().y),
+        egui::Align2::LEFT_CENTER,
+        label,
+        if live {
+            theme::semibold(13.0)
+        } else {
+            theme::regular(13.0)
+        },
+        if live { palette.text } else { palette.secondary },
+    );
+    if response
+        .on_hover_cursor(egui::CursorIcon::PointingHand)
+        .clicked()
+    {
+        app.actions.push(Action::StartJam);
+    }
+}
+
+/// A row that opens one of Spotify's help pages in the browser.
+fn help_link(app: &mut App, ui: &mut egui::Ui, label: &str, url: &str) {
+    let palette = app.palette;
+    let (rect, response) = ui.allocate_exact_size(vec2(ui.available_width(), 44.0), Sense::click());
+    if response.hovered() {
+        ui.painter()
+            .rect_filled(rect, CornerRadius::same(6), palette.surface_hover);
+    }
+    ui.painter().with_clip_rect(rect).text(
+        pos2(rect.left() + 12.0, rect.center().y),
+        egui::Align2::LEFT_CENTER,
+        label,
+        theme::semibold(14.0),
+        palette.text,
+    );
+    Icon::ExternalLink.image(palette.secondary, 16.0).paint_at(
+        ui,
+        Rect::from_center_size(pos2(rect.right() - 16.0, rect.center().y), egui::Vec2::splat(16.0)),
+    );
+    if response
+        .on_hover_cursor(egui::CursorIcon::PointingHand)
+        .clicked()
+    {
+        app.actions.push(Action::OpenUrl(url.to_string()));
     }
 }
 

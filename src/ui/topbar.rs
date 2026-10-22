@@ -88,9 +88,7 @@ pub fn least_width(ctx: &egui::Context) -> f32 {
 }
 
 fn least_width_after(lead: f32) -> f32 {
-    lead + HOME_SIZE
-        + ITEM_SPACING
-        + SEARCH_MIN
+    lead + SEARCH_MIN
         + RIGHT_CONTROLS_WIDTH
         + SPINNER_SIZE
         + ITEM_SPACING
@@ -225,7 +223,7 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
     let width = ui.available_width();
     let mut window_controls = super::window_controls_reservation(
         ui.ctx(),
-        app.show_queue_panel || app.show_friends_panel,
+        app.show_queue_panel || app.show_friends_panel || app.show_devices,
         app.show_lyrics_panel,
         width,
     );
@@ -358,10 +356,18 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
                 };
 
             // Spindle: a round Home button sits before the field, as in
-            // Spotify, and the pair is centered on the bar when it fits.
-            let home_width = HOME_SIZE + ITEM_SPACING;
-            let search_room =
-                (ui.available_width() - window_controls.topbar_width - home_width).max(0.0);
+            // Spotify, and the pair is centered on the bar when it fits. A
+            // tight bar drops the button first (the sidebar has Home too),
+            // so the least width the panels keep for the bar is unchanged.
+            let full_room = (ui.available_width() - window_controls.topbar_width).max(0.0);
+            let show_home =
+                full_room - HOME_SIZE - ITEM_SPACING - controls - badges(false) >= SEARCH_FLOOR;
+            let home_width = if show_home {
+                HOME_SIZE + ITEM_SPACING
+            } else {
+                0.0
+            };
+            let search_room = (full_room - home_width).max(0.0);
             // What sits before the field: the page padding, the navigation
             // buttons, and any window buttons. The panels beside the page
             // keep room for it (`least_width`).
@@ -381,8 +387,9 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
                 let shift = (centered.min(latest) - left_edge).max(0.0);
                 ui.add_space(shift);
             }
-            if home_button(ui, &palette, matches!(app.page(), Page::Home), &gettext(locale, "Home"))
-                .clicked()
+            if show_home
+                && home_button(ui, &palette, matches!(app.page(), Page::Home), &gettext(locale, "Home"))
+                    .clicked()
             {
                 app.actions.push(Action::Open(Page::Home));
             }
