@@ -228,6 +228,22 @@ Nick asked for Spotify's own layout:
 - The setup program runs `ie4uinit.exe -show` so Windows redraws the new
   icon instead of its cached one.
 
+## Dropped clicks on Windows (0.14.125, 2026-10-21)
+
+On the PC, 0.14.124 drew one frame and then ignored clicks, typing and its
+own window buttons, while the logic kept running (session.json kept being
+saved). Play showed its tooltip and never played. Cause: crmne/egui's
+eframe asks for a redraw and, if `RedrawRequested` has not come within
+250 ms (`MISSED_REDRAW_TIMEOUT`, written for Wayland), runs
+`App::logic` alone. That pass takes the queued input and drops it, and
+nothing is painted. Windows delivers `RedrawRequested` through WM_PAINT,
+which comes only when the thread's queue is empty, so a late one is
+common there. vendor/eframe is the same revision packaged with `cargo
+package` (a standalone manifest), patched in src/native/run.rs so that on
+Windows an overdue redraw runs `run_ui_and_paint` instead; it logs one
+"RedrawRequested was overdue" warning per run. When Spotifast moves the
+crmne/egui revision, repackage eframe from it and carry the change over.
+
 ## Facts from the live test (Windows PC, 2026-10-20)
 
 - Spindle 0.2.0 playing, window visible, no game: spindle.exe 0.1 percent

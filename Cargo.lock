@@ -1549,7 +1549,6 @@ dependencies = [
 [[package]]
 name = "eframe"
 version = "0.36.2"
-source = "git+https://github.com/crmne/egui?rev=6ce633ba5f7f64d19ef6d204f9377da560bb546b#6ce633ba5f7f64d19ef6d204f9377da560bb546b"
 dependencies = [
  "ahash",
  "bytemuck",
@@ -6100,7 +6099,7 @@ dependencies = [
 
 [[package]]
 name = "spindle"
-version = "0.14.124"
+version = "0.14.125"
 dependencies = [
  "aes 0.8.4",
  "anyhow",
