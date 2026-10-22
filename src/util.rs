@@ -216,6 +216,9 @@ pub fn tray_template_rgba(size: usize) -> Vec<u8> {
     rgba
 }
 
+/// The largest icon side, in pixels, drawn from the small drawing.
+const SMALL_ICON_MAX: u32 = 40;
+
 /// Spindle's icon: Nick's neon headphones of `packaging/icons/spindle-1024.png`,
 /// made by `packaging/icons/make-icons.py`, decoded once and scaled to
 /// `size` for the window icon, the trays and the logo drawn in the app
@@ -223,12 +226,24 @@ pub fn tray_template_rgba(size: usize) -> Vec<u8> {
 pub fn app_icon_rgba(size: usize) -> Vec<u8> {
     use std::sync::OnceLock;
     static MASTER: OnceLock<image::RgbaImage> = OnceLock::new();
-    let master = MASTER.get_or_init(|| {
-        image::load_from_memory(include_bytes!("../packaging/icons/spindle-1024.png"))
-            .expect("packaging/icons/spindle-1024.png decodes")
-            .to_rgba8()
-    });
+    static SMALL: OnceLock<image::RgbaImage> = OnceLock::new();
     let side = size.max(1) as u32;
+    // At 40 px and under the picture's thin lines run into a green blob, so
+    // the tray and the title bar get the simpler drawing make-icons.py
+    // makes for those sizes.
+    let master = if side <= SMALL_ICON_MAX {
+        SMALL.get_or_init(|| {
+            image::load_from_memory(include_bytes!("../packaging/icons/spindle-small-256.png"))
+                .expect("packaging/icons/spindle-small-256.png decodes")
+                .to_rgba8()
+        })
+    } else {
+        MASTER.get_or_init(|| {
+            image::load_from_memory(include_bytes!("../packaging/icons/spindle-1024.png"))
+                .expect("packaging/icons/spindle-1024.png decodes")
+                .to_rgba8()
+        })
+    };
     if master.width() == side {
         return master.as_raw().clone();
     }

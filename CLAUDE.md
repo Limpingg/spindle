@@ -73,6 +73,17 @@ packaging/macos/spindle.icns and installer/assets/window-icon.png. Rerun it
 when the picture changes. No Spotify mark on any icon: it is Spotify's
 trademark.
 
+At 16 to 32 px the picture's thin lines run into a round green blob, which
+Nick saw as the old mirror ball in the taskbar, Task Manager and Explorer
+(the exe and every cache were fine). Since 0.14.126 make-icons.py draws a
+simpler version for those sizes (`small()`: the dark green square, neon
+headband, ear cups and a short wave; no wave at 16): the .ico's 16, 24 and
+32 entries, and spindle-small-256.png, which `util::app_icon_rgba` scales
+for 40 px and under (tray, title bar, small in-app logo). On Windows
+`window::use_exe_icons` also sets the window's WM_SETICON icons from the
+exe's resource 1 at the display's sizes, since winit hands Windows only the
+one 128 px picture to shrink.
+
 ## What changed from upstream
 
 - The rename is scripts/rename-upstream.py (see above): Spotifast ->
@@ -243,6 +254,19 @@ package` (a standalone manifest), patched in src/native/run.rs so that on
 Windows an overdue redraw runs `run_ui_and_paint` instead; it logs one
 "RedrawRequested was overdue" warning per run. When Spotifast moves the
 crmne/egui revision, repackage eframe from it and carry the change over.
+
+Caveat found after shipping it: the same session showed `taskkill` from the
+setup program failing to stop Spindle, which points to Spindle running
+elevated that time. Windows blocks input from a normal process (computer
+use) to an elevated window, which alone explains tooltips on hover with no
+clicks. The eframe change is kept as a guard; confirm the dropped input
+with Spindle not elevated before building more on it.
+
+Setup program (0.14.126): `close_running_app` waits up to 10 s for
+spindle.exe to leave the task list (it slept a fixed 600 ms), and
+`write_replacing` retries for 5 s, then moves a locked file aside to
+`<name>.old` (Windows allows that for a running exe). The next install and
+the uninstaller delete the `.old` files.
 
 ## Facts from the live test (Windows PC, 2026-10-20)
 

@@ -501,6 +501,8 @@ fn install_into(
     report("Creating the install folder");
     std::fs::create_dir_all(&places.install_dir)
         .map_err(|error| format!("Couldn't create {}: {error}", places.install_dir.display()))?;
+    remove_set_aside(&places.exe);
+    remove_set_aside(&places.uninstaller);
     report("Unpacking spindle.exe");
     let exe_bytes = payload()?;
     write_replacing(&places.exe, &exe_bytes)?;
@@ -568,7 +570,7 @@ fn remove(report: &dyn Fn(&str)) -> Result<(), String> {
             let path = entry.path();
             if path.is_dir() && name.starts_with(".spindle-update-") {
                 let _ = std::fs::remove_dir_all(&path);
-            } else if path.is_file() && name.ends_with(".tmp") {
+            } else if path.is_file() && (name.ends_with(".tmp") || name.ends_with(".exe.old")) {
                 let _ = std::fs::remove_file(&path);
             }
         }
@@ -616,20 +618,65 @@ fn write_replacing(path: &Path, bytes: &[u8]) -> Result<(), String> {
     std::fs::write(&temporary, bytes)
         .map_err(|error| format!("Couldn't write {}: {error}", temporary.display()))?;
     if path.exists() {
-        std::fs::remove_file(path)
+        remove_or_move_aside(path)
             .map_err(|error| format!("Couldn't replace {}: {error}", path.display()))?;
     }
     std::fs::rename(&temporary, path)
         .map_err(|error| format!("Couldn't move {} into place: {error}", path.display()))
 }
 
-/// Asks a running Spindle to close, then makes sure it is gone before the
-/// exe is replaced. taskkill is part of every Windows install.
+/// Spindle: Windows holds a running exe until its process has fully gone,
+/// which took longer than the old fixed 600 ms on Nick's PC ("Access is
+/// denied", os error 5, with Spindle open). Retry for a few seconds, then
+/// move the file aside, which Windows allows for an exe that is running;
+/// `remove_set_aside` deletes it on the next install.
+fn remove_or_move_aside(path: &Path) -> std::io::Result<()> {
+    let mut last = None;
+    for _ in 0..20 {
+        match std::fs::remove_file(path) {
+            Ok(()) => return Ok(()),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+            Err(error) => last = Some(error),
+        }
+        std::thread::sleep(std::time::Duration::from_millis(250));
+    }
+    let aside = set_aside_path(path);
+    let _ = std::fs::remove_file(&aside);
+    std::fs::rename(path, &aside).map_err(|error| last.unwrap_or(error))
+}
+
+fn set_aside_path(path: &Path) -> std::path::PathBuf {
+    let mut name = path.file_name().unwrap_or_default().to_os_string();
+    name.push(".old");
+    path.with_file_name(name)
+}
+
+/// Deletes what `remove_or_move_aside` set aside last time, if it is free.
+fn remove_set_aside(path: &Path) {
+    let _ = std::fs::remove_file(set_aside_path(path));
+}
+
+/// Asks a running Spindle to close, then waits until it is gone before the
+/// exe is replaced. taskkill and tasklist are part of every Windows install.
 fn close_running_app() {
     let _ = quiet("taskkill")
         .args(["/IM", "spindle.exe", "/F"])
         .output();
-    std::thread::sleep(std::time::Duration::from_millis(600));
+    for _ in 0..40 {
+        let running = quiet("tasklist")
+            .args(["/FI", "IMAGENAME eq spindle.exe", "/NH"])
+            .output()
+            .map(|output| {
+                String::from_utf8_lossy(&output.stdout)
+                    .to_ascii_lowercase()
+                    .contains("spindle.exe")
+            })
+            .unwrap_or(false);
+        if !running {
+            break;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(250));
+    }
 }
 
 /// Runs a PowerShell script without a console window.

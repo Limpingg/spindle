@@ -695,6 +695,16 @@ pub(crate) fn run() -> eframe::Result<()> {
                 }
                 app.attach(&cc.egui_ctx);
                 #[cfg(windows)]
+                {
+                    use raw_window_handle::{HasWindowHandle, RawWindowHandle};
+                    if let Ok(handle) = cc.window_handle()
+                        && let RawWindowHandle::Win32(window) = handle.as_raw()
+                    {
+                        // SAFETY: the window was just created on this thread.
+                        unsafe { spindle::window::use_exe_icons(window.hwnd.get()) };
+                    }
+                }
+                #[cfg(windows)]
                 let thumbbar = {
                     use raw_window_handle::{HasWindowHandle, RawWindowHandle};
                     let mut toolbar = spindle::thumbbar::ThumbBar::new();

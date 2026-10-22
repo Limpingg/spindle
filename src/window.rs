@@ -88,6 +88,44 @@ pub fn report_missing_opengl(locale: crate::i18n::Locale) {
     }
 }
 
+/// Spindle: gives the window the icons built into the exe (resource 1, from
+/// packaging/windows/spindle.ico) at the sizes this display wants. winit
+/// hands Windows the one 128 px picture, which Windows shrank to 16 and 24
+/// px for the title, Alt+Tab and the taskbar, where the thin neon lines ran
+/// into a green blob. The .ico has a simpler drawing made for those sizes.
+/// # Safety
+/// `hwnd` must be a live window owned by this thread.
+#[cfg(windows)]
+pub unsafe fn use_exe_icons(hwnd: isize) {
+    use windows_sys::Win32::System::LibraryLoader::GetModuleHandleW;
+    use windows_sys::Win32::UI::HiDpi::{GetDpiForWindow, GetSystemMetricsForDpi};
+    use windows_sys::Win32::UI::WindowsAndMessaging::{
+        ICON_BIG, ICON_SMALL, IMAGE_ICON, LR_DEFAULTCOLOR, LoadImageW, SM_CXICON, SM_CXSMICON,
+        SendMessageW, WM_SETICON,
+    };
+    if hwnd == 0 {
+        return;
+    }
+    // SAFETY: the caller vouches for `hwnd`; the module handle is this exe,
+    // and resource 1 is the icon build.rs links into it. A failed load
+    // returns null and leaves winit's icon in place.
+    unsafe {
+        let module = GetModuleHandleW(std::ptr::null());
+        let dpi = GetDpiForWindow(hwnd as _).max(96);
+        for (kind, metric) in [(ICON_SMALL, SM_CXSMICON), (ICON_BIG, SM_CXICON)] {
+            let side = GetSystemMetricsForDpi(metric, dpi);
+            let icon = LoadImageW(module, 1usize as *const u16, IMAGE_ICON, side, side, LR_DEFAULTCOLOR);
+            if icon.is_null() {
+                log::debug!("exe icon {side} px did not load");
+                continue;
+            }
+            // The window keeps these for its life; they are freed with the
+            // process.
+            SendMessageW(hwnd as _, WM_SETICON, kind as usize, icon as isize);
+        }
+    }
+}
+
 /// Minimize the active window without leaving egui's macOS viewport flag stale
 /// when the user later restores it from the Dock.
 pub fn minimize_window(ctx: &egui::Context) {
