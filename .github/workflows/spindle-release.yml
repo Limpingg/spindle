@@ -6,6 +6,16 @@
 #   spindle-v<version>-macos-arm64.dmg                    Apple silicon Macs
 #   checksums.txt                                         sha256 of each
 #
+# Beside those, the same files under plain names for people downloading by
+# hand, without a version so /releases/latest/download/<name> always works:
+#
+#   Spindle-Setup.exe             Spindle-Windows-Portable.zip
+#   Spindle-Mac.dmg
+#
+# The updater matches assets by exact name (fastframe-update's release.rs),
+# so the updater's names above must never change; the plain copies are
+# extra, and GitHub shows each file under a label set at upload.
+#
 # The Windows build is cross compiled from Linux with Zig, exactly as the
 # repository's CLAUDE.md describes, so the exe here is the one tested on
 # Nick's PC. The names say "msvc" because that is the target name the
@@ -107,6 +117,9 @@ jobs:
           cp packaging/spindle-portable.txt "portable/$stem/" 2>/dev/null || echo "spindle-portable-v1" > "portable/$stem/spindle-portable.txt"
           cp README.md LICENSE "portable/$stem/"
           (cd portable && zip -qr "../dist/$stem.zip" "$stem")
+          # The plain names people download by hand.
+          cp "dist/$stem-setup.exe" dist/Spindle-Setup.exe
+          cp "dist/$stem.zip" dist/Spindle-Windows-Portable.zip
           ls -la dist
       - uses: actions/upload-artifact@v4
         with:
@@ -142,6 +155,7 @@ jobs:
           mkdir -p dist payload
           packaging/macos/bundle.sh target/aarch64-apple-darwin/release/spindle "payload/Spindle.app" "$VERSION"
           ruby packaging/macos/dmg.rb payload "dist/spindle-v$VERSION-macos-arm64.dmg"
+          cp "dist/spindle-v$VERSION-macos-arm64.dmg" dist/Spindle-Mac.dmg
           ls -la dist
       - uses: actions/upload-artifact@v4
         with:
@@ -172,28 +186,40 @@ jobs:
       - name: Write the release notes
         env:
           VERSION: ${{ needs.tag.outputs.version }}
+          TAG: ${{ needs.tag.outputs.tag }}
+          REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
+          base="https://github.com/$REPO/releases/download/$TAG"
           {
-            echo "Spindle $VERSION"
+            echo "Spindle is a fast, lightweight Spotify player for Windows and Mac, built to run next to a game without stutters."
+            echo
+            echo "## Download"
+            echo
+            echo "| | |"
+            echo "|---|---|"
+            echo "| **Windows** | [Spindle-Setup.exe]($base/Spindle-Setup.exe) |"
+            echo "| Windows, no install | [Spindle-Windows-Portable.zip]($base/Spindle-Windows-Portable.zip) |"
+            if [ -f dist/Spindle-Mac.dmg ]; then
+              echo "| **Mac** (Apple silicon: M1 and newer) | [Spindle-Mac.dmg]($base/Spindle-Mac.dmg) |"
+            fi
+            echo
+            echo "## Before you start"
+            echo
+            echo "- You need Spotify Premium. Spindle signs in through your browser the first time."
+            echo "- **Windows:** setup installs for your account only, with no administrator prompt. Spindle is not code signed yet, so SmartScreen warns the first time: choose **More info**, then **Run anyway**. Start Spindle normally, not as administrator."
+            echo "- **Mac:** drag Spindle into Applications. On first open macOS blocks it because it is not notarized yet: open **System Settings > Privacy & Security**, scroll down and choose **Open Anyway**. If macOS says Spindle is damaged, run \`xattr -dr com.apple.quarantine /Applications/Spindle.app\` in Terminal, then open it again."
+            echo "- Spindle updates itself: it checks when it starts and offers the new version."
             echo
             # The Spotifast release this build carries: the newest one merged.
             spotifast=$(git log --format=%s | grep -m1 -oE '^Merge Spotifast [0-9.]+' | awk '{print $3}' || true)
             if [ -n "$spotifast" ]; then
-              echo "Carries Spotifast $spotifast. Spotifast's own notes: https://github.com/crmne/spotifast/releases/tag/v$spotifast"
+              echo "Carries Spotifast $spotifast ([its notes](https://github.com/crmne/spotifast/releases/tag/v$spotifast))."
               echo
             fi
-            echo "Files:"
-            for f in dist/*; do
-              case "$(basename "$f")" in
-                *-setup.exe) echo "- $(basename "$f"): Windows setup program (installs for your user, no admin prompt)";;
-                *.zip) echo "- $(basename "$f"): Windows portable exe";;
-                *.dmg) echo "- $(basename "$f"): macOS, Apple silicon";;
-                checksums.txt) echo "- checksums.txt: sha256 of every file, read by Spindle's updater";;
-              esac
-            done
+            echo "The files named \`spindle-v$VERSION-...\` and checksums.txt are what Spindle's built in updater downloads. You do not need them."
             echo
-            echo "Spindle is a fork of Spotifast by Carmine Paolino, MIT."
+            echo "Spindle is a fork of [Spotifast](https://github.com/crmne/spotifast) by Carmine Paolino, MIT. Not affiliated with Spotify."
           } > notes.md
           cat notes.md
       - name: Create the GitHub release
@@ -202,9 +228,25 @@ jobs:
           TAG: ${{ needs.tag.outputs.tag }}
         run: |
           set -euo pipefail
+          # Each file with the label GitHub shows for it (file#label).
+          files=()
+          for f in dist/*; do
+            name=$(basename "$f")
+            case "$name" in
+              Spindle-Setup.exe) label="Spindle for Windows (installer)";;
+              Spindle-Windows-Portable.zip) label="Spindle for Windows (portable, no install)";;
+              Spindle-Mac.dmg) label="Spindle for Mac (Apple silicon)";;
+              *-setup.exe) label="Updater file: Windows installer";;
+              *.zip) label="Updater file: Windows portable";;
+              *.dmg) label="Updater file: Mac";;
+              checksums.txt) label="Updater file: checksums";;
+              *) label="$name";;
+            esac
+            files+=("$f#$label")
+          done
           if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release upload "$TAG" dist/* --clobber
+            gh release upload "$TAG" "${files[@]}" --clobber
             gh release edit "$TAG" --notes-file notes.md --draft=false --prerelease=false
           else
-            gh release create "$TAG" dist/* --title "Spindle ${TAG#v}" --notes-file notes.md --latest
+            gh release create "$TAG" "${files[@]}" --title "Spindle ${TAG#v}" --notes-file notes.md --latest
           fi

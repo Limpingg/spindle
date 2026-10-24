@@ -207,6 +207,14 @@ Needs the PipeWire and ALSA headers only to run the test suite on Linux:
   minutes for it (credentials.rs TIMEOUT); at 20 seconds two of the three
   grants timed out and playback and the personal app had to be approved
   again.
+- Since 0.14.129 each release also carries plain named copies for people
+  downloading by hand: Spindle-Setup.exe, Spindle-Windows-Portable.zip and
+  Spindle-Mac.dmg, without a version so
+  /releases/latest/download/<name> (the README's Download links) always
+  works. The updater's spindle-v<version>-... names must never change:
+  fastframe-update matches assets by exact name. Every file is uploaded
+  with a label (file#label), the notes are written for testers, and both
+  exes carry CompanyName "Nick Austin" in their version info.
 - Two releases dispatched close together publish in either order, and
   GitHub marks the last published as Latest: check that the newest version
   is Latest (edit the release, Set as the latest) or the updater offers

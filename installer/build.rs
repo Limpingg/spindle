@@ -68,9 +68,11 @@ BEGIN
   BEGIN
     BLOCK "040904b0"
     BEGIN
+      VALUE "CompanyName", "Nick Austin"
       VALUE "FileDescription", "Spindle Setup"
       VALUE "FileVersion", "{version}"
       VALUE "InternalName", "spindle-setup"
+      VALUE "LegalCopyright", "Spindle is a fork of Spotifast by Carmine Paolino, MIT"
       VALUE "OriginalFilename", "spindle-setup.exe"
       VALUE "ProductName", "Spindle"
       VALUE "ProductVersion", "{version}"

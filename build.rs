@@ -77,6 +77,7 @@ BEGIN
   BEGIN
     BLOCK "040904b0"
     BEGIN
+      VALUE "CompanyName", "Nick Austin"
       VALUE "FileDescription", "Spindle"
       VALUE "FileVersion", "{version}"
       VALUE "InternalName", "spindle"

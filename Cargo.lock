@@ -6099,7 +6099,7 @@ dependencies = [
 
 [[package]]
 name = "spindle"
-version = "0.14.128"
+version = "0.14.129"
 dependencies = [
  "aes 0.8.4",
  "anyhow",

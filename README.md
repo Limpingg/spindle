@@ -7,17 +7,33 @@ audio device, and hides Spotify's rate limit noise on the home page.
 Everything below this section is Spotifast's own README and still applies
 to the code.
 
-## Install on Windows
+## Download
 
-Run `Spindle-<version>-Setup.exe`. It installs for your user only (no
+| | |
+|---|---|
+| **Windows** | [Spindle-Setup.exe](https://github.com/Limpingg/spindle/releases/latest/download/Spindle-Setup.exe) |
+| Windows, no install | [Spindle-Windows-Portable.zip](https://github.com/Limpingg/spindle/releases/latest/download/Spindle-Windows-Portable.zip) |
+| **Mac** (Apple silicon: M1 and newer) | [Spindle-Mac.dmg](https://github.com/Limpingg/spindle/releases/latest/download/Spindle-Mac.dmg) |
+
+You need Spotify Premium. Spindle signs in through your browser the first
+time and updates itself after that.
+
+**Windows:** the setup program installs for your user only (no
 administrator prompt), adds a Start menu shortcut and, if you leave the box
 checked, a desktop shortcut, and registers in Settings > Apps so you can
 remove it the normal way. Windows SmartScreen warns the first time because
 the files are not code signed: choose "More info", then "Run anyway".
+Start Spindle normally, not as administrator.
+
+**Mac:** drag Spindle into Applications. macOS blocks the first open
+because the app is not notarized: open System Settings > Privacy &
+Security, scroll down and choose "Open Anyway". If macOS says Spindle is
+damaged, run `xattr -dr com.apple.quarantine /Applications/Spindle.app` in
+Terminal, then open it again.
 
 Settings and your Spotify sign in are kept under
-`%APPDATA%\paolino\spindle` and `%LOCALAPPDATA%\paolino\spindle`, so
-reinstalling or updating keeps them.
+`%APPDATA%\paolino\spindle` and `%LOCALAPPDATA%\paolino\spindle` on
+Windows, so reinstalling or updating keeps them.
 
 ## Build
 
