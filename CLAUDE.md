@@ -239,6 +239,11 @@ Nick asked for Spotify's own layout:
 - The setup program runs `ie4uinit.exe -show` so Windows redraws the new
   icon instead of its cached one.
 
+- Player bar (0.14.128): Nick keeps his songs in playlists and does not
+  use Liked Songs, so the heart by the title is a plus (Icon::CirclePlus,
+  "Add to playlist") that opens the playlist picker on every song and
+  never likes or unlikes. Song rows and menus keep their own like toggles.
+
 ## Dropped clicks on Windows (0.14.125, 2026-10-21)
 
 On the PC, 0.14.124 drew one frame and then ignored clicks, typing and its

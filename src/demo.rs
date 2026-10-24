@@ -2159,8 +2159,8 @@ mod tests {
                 let tree = accessible_frame(&ctx, &mut app, vec![]);
                 accessible_node(&tree, &gettext(locale, next), Role::Button);
             }
-            // A liked song's heart opens Add to playlist, whose Remove from
-            // Liked Songs unlikes it; the heart then likes it at once (#792).
+            // Spindle: the plus by the title opens Add to playlist on every
+            // song, liked or not, and never changes the like.
             let click = |ctx: &egui::Context, app: &mut App, label: &'static str| {
                 let tree = accessible_frame(ctx, app, vec![]);
                 let button = accessible_node(&tree, &gettext(locale, label), Role::Button);
@@ -2173,22 +2173,22 @@ mod tests {
                 accessible_frame(ctx, app, vec![]);
             };
             let now = app.now_playing().unwrap().uri;
-            assert_eq!(app.is_saved(&now), Some(true));
-            click(&ctx, &mut app, "Add to playlist");
-            let tree = accessible_frame(&ctx, &mut app, vec![]);
-            accessible_node(&tree, &gettext(locale, "Filter playlists"), Role::TextInput);
-            assert_eq!(app.is_saved(&now), Some(true), "opening it keeps the like");
-            click(&ctx, &mut app, "Remove from Liked Songs");
-            assert_eq!(app.is_saved(&now), Some(false));
-            click(&ctx, &mut app, "Save to Liked Songs");
-            assert_eq!(app.is_saved(&now), Some(true));
-            let tree = accessible_frame(&ctx, &mut app, vec![]);
-            assert!(
-                !tree.nodes.iter().any(|(_, node)| {
-                    node.label() == Some(gettext(locale, "Filter playlists").as_ref())
-                }),
-                "liking a song does not open the menu"
-            );
+            for liked in [true, false] {
+                app.saved.insert(now.clone(), liked);
+                let before = app.is_saved(&now);
+                click(&ctx, &mut app, "Add to playlist");
+                let tree = accessible_frame(&ctx, &mut app, vec![]);
+                accessible_node(&tree, &gettext(locale, "Filter playlists"), Role::TextInput);
+                assert!(
+                    !tree.nodes.iter().any(|(_, node)| {
+                        node.label() == Some(gettext(locale, "Remove from Liked Songs").as_ref())
+                    }),
+                    "the menu has no Liked Songs entry"
+                );
+                assert_eq!(app.is_saved(&now), before, "the button keeps the like as it was");
+                // Close the menu before the next round.
+                click(&ctx, &mut app, "Add to playlist");
+            }
 
             app.remote = None;
             assert!(app.now_playing().is_none());
@@ -10777,13 +10777,13 @@ mod tests {
 
     #[test]
     fn saved_toggles_stay_green_while_hovered() {
-        // alb0 is saved, its first song is liked, and so is the song in
-        // the player bar, so all three save toggles show their on state.
+        // alb0 is saved and its first song is liked, so both save toggles
+        // show their on state. Spindle: the player bar's button is Add to
+        // playlist, with no saved state to show.
         type Pick = fn(&egui::accesskit::Rect) -> bool;
-        let targets: [(&str, &str, Pick); 3] = [
+        let targets: [(&str, &str, Pick); 2] = [
             ("album header", "Remove from Your Library", |_| true),
             ("song row", "Remove from Liked Songs", |b| b.y1 < 700.0),
-            ("player bar", "Add to playlist", |b| b.y0 > 700.0),
         ];
         for theme in ["dark", "light"] {
             for (place, label, pick) in targets {
