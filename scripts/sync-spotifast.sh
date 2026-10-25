@@ -86,6 +86,10 @@ if ! git merge --no-commit --no-ff "$renamed_commit" >/dev/null 2>&1; then
     :
 fi
 git checkout --theirs -- Cargo.toml Cargo.lock 2>/dev/null || true
+# Spindle's README is its own (Nick wants only Spindle there), so Spotifast's
+# README changes never come in.
+git checkout HEAD -- README.md
+git add README.md
 sed -i.bak "s/^version = \"$upstream_version\"/version = \"$spindle_version\"/" Cargo.toml && rm -f Cargo.toml.bak
 python3 - "$upstream_version" "$spindle_version" <<'EOF'
 import re, sys

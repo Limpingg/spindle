@@ -211,15 +211,9 @@ jobs:
             echo "- **Mac:** drag Spindle into Applications. On first open macOS blocks it because it is not notarized yet: open **System Settings > Privacy & Security**, scroll down and choose **Open Anyway**. If macOS says Spindle is damaged, run \`xattr -dr com.apple.quarantine /Applications/Spindle.app\` in Terminal, then open it again."
             echo "- Spindle updates itself: it checks when it starts and offers the new version."
             echo
-            # The Spotifast release this build carries: the newest one merged.
-            spotifast=$(git log --format=%s | grep -m1 -oE '^Merge Spotifast [0-9.]+' | awk '{print $3}' || true)
-            if [ -n "$spotifast" ]; then
-              echo "Carries Spotifast $spotifast ([its notes](https://github.com/crmne/spotifast/releases/tag/v$spotifast))."
-              echo
-            fi
             echo "The files named \`spindle-v$VERSION-...\` and checksums.txt are what Spindle's built in updater downloads. You do not need them."
             echo
-            echo "Spindle is a fork of [Spotifast](https://github.com/crmne/spotifast) by Carmine Paolino, MIT. Not affiliated with Spotify."
+            echo "Spindle is not affiliated with Spotify."
           } > notes.md
           cat notes.md
       - name: Create the GitHub release

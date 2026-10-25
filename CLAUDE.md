@@ -38,6 +38,11 @@ conflict only where Spindle's own changes meet Spotifast's.
   only change on top is 0.14.102). Always above the Spotifast release it
   carries and below the next, so the updater orders them. The tag must
   equal Cargo.toml's version.
+- README.md is Spindle's own: Nick wants only Spindle on the repo page and
+  the release notes, nothing about Spotifast (2026-10-25). The sync script
+  restores README.md from HEAD after each merge, so Spotifast's README
+  changes never come in. LICENSE stays as it is: MIT requires keeping
+  Carmine Paolino's copyright notice with the code.
 - Never change the rename rules casually: a changed rule makes the next
   renamed base differ from the one main was built on. If a rule must
   change, apply it to main in the same commit.
