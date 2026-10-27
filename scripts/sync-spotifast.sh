@@ -74,7 +74,14 @@ fi
 # every release and is set by the rule above.
 IFS=. read -r major minor patch <<<"$upstream_version"
 spindle_version="$major.$minor.$((patch * 100 + 1))"
+# A conflict still starts the merge (MERGE_HEAD exists); any other refusal
+# (a shallow clone's "unrelated histories", a dirty tree) must stop here,
+# or the commit below would carry Spotifast's version without its code.
 git merge --no-commit --no-ff "$renamed_commit" >/dev/null 2>&1 || true
+if ! git rev-parse --verify --quiet MERGE_HEAD >/dev/null; then
+    echo "git did not start the merge of $renamed_commit (shallow clone or dirty tree?)" >&2
+    exit 1
+fi
 
 # Spindle's README is its own (Nick wants only Spindle there), so Spotifast's
 # README changes never come in.
