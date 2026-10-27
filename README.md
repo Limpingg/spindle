@@ -23,8 +23,10 @@ Spindle is not affiliated with Spotify.
 | Windows, no install | [Spindle-Windows-Portable.zip](https://github.com/Limpingg/spindle/releases/latest/download/Spindle-Windows-Portable.zip) |
 | **Mac** (Apple silicon: M1 and newer) | [Spindle-Mac.dmg](https://github.com/Limpingg/spindle/releases/latest/download/Spindle-Mac.dmg) |
 
-You need Spotify Premium. Spindle signs in through your browser the first
-time and updates itself after that.
+You need Spotify Premium. The first time, Spindle walks you through
+making a free app of your own on Spotify's developer dashboard (a few
+minutes, with each step shown on the sign-in screen) and signs you in
+through your browser. After that it signs in by itself and updates itself.
 
 **Windows:** the setup program installs for your user only (no
 administrator prompt), adds a Start menu shortcut and, if you leave the box

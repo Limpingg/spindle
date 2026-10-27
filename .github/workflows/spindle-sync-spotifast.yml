@@ -85,7 +85,7 @@ jobs:
         run: |
           set -euo pipefail
           git push origin main spotifast-renamed
-          gh workflow run spindle-release.yml --ref main -f "tag=v$VERSION"
+          gh workflow run spindle-release.yml --repo "$GITHUB_REPOSITORY" --ref main -f "tag=v$VERSION"
           echo "Spindle $VERSION is on its way: the Release workflow was started."
       - name: Open an issue for conflicts
         if: steps.merge.outputs.status == '2'
@@ -96,11 +96,11 @@ jobs:
           set -euo pipefail
           title="Spotifast merge needs a hand"
           body=$(printf 'The daily Spotifast sync hit conflicts. Run `scripts/sync-spotifast.sh` locally, resolve, commit and push main and spotifast-renamed.\n\n```\n%s\n```\n' "$OUTPUT")
-          existing=$(gh issue list --state open --search "$title in:title" --json number --jq '.[0].number')
+          existing=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --search "$title in:title" --json number --jq '.[0].number')
           if [ -n "$existing" ]; then
-            gh issue comment "$existing" --body "$body"
+            gh issue comment "$existing" --repo "$GITHUB_REPOSITORY" --body "$body"
           else
-            gh issue create --title "$title" --body "$body"
+            gh issue create --repo "$GITHUB_REPOSITORY" --title "$title" --body "$body"
           fi
       - name: Fail loudly on any other problem
         if: steps.merge.outputs.status != '0' && steps.merge.outputs.status != '2'

@@ -43,6 +43,14 @@ conflict only where Spindle's own changes meet Spotifast's.
   restores README.md from HEAD after each merge, so Spotifast's README
   changes never come in. LICENSE stays as it is: MIT requires keeping
   Carmine Paolino's copyright notice with the code.
+- The sync (since 2026-10-27) merges Cargo.toml three ways and settles
+  only its version conflict (scripts/settle-version.py); Cargo.lock starts
+  from Spotifast's and `cargo metadata` adds Spindle's extras (qrcode, the
+  path eframe). It stops when Spotifast moves the crmne/egui revision away
+  from vendor/eframe/SPINDLE_EGUI_REV, and when git refuses the merge (a
+  shallow clone gives "unrelated histories"; clone with full history).
+  The workflow's gh calls name --repo: the script adds Spotifast as the
+  `upstream` remote, which gh otherwise picks.
 - Never change the rename rules casually: a changed rule makes the next
   renamed base differ from the one main was built on. If a rule must
   change, apply it to main in the same commit.
@@ -256,6 +264,16 @@ Nick asked for Spotify's own layout:
   use Liked Songs, so the heart by the title is a plus (Icon::CirclePlus,
   "Add to playlist") that opens the playlist picker on every song and
   never likes or unlikes. Song rows and menus keep their own like toggles.
+
+## Spotifast 0.14.2 (Spindle 0.14.201, 2026-10-27)
+
+ncspot's Web API app, which Spotifast used as the shared app, takes no new
+sign-ins. New listeners sign in with a personal app of their own, guided on
+the sign-in screen; the shared app keeps working only for grants from
+before (Nick's). Nick's friends testing Spindle each make their own free
+app. Spindle's two gateway changes are carried into Spotifast's new
+`client_for`: the wait for the personal app's verdict and the playlist
+search on the personal app while the shared one waits.
 
 ## Dropped clicks on Windows (0.14.125, 2026-10-21)
 

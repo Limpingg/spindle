@@ -96,18 +96,23 @@ pub enum Operation {
     CatalogSearch,
     Catalog,
     ArtistTopTracks,
+    RelatedArtists,
     PlaylistMetadata(PlaylistAccess),
     PlaylistItems(PlaylistAccess),
     PlaylistMutation(PlaylistAccess),
     UnsupportedDevelopmentMode,
 }
 
-/// The streaming session reads popular tracks and every playlist the shared app would have
-/// been asked for: other people's, which no personal app may read, and the
-/// account's own when it has no personal app. A personal app keeps its own
-/// playlists, which it reads quickly and with every field.
+/// The streaming session reads popular tracks, related artists and every
+/// playlist the shared app would have been asked for: other people's, which
+/// no personal app may read, and the account's own when it has no personal
+/// app. A personal app keeps its own playlists, which it reads quickly and
+/// with every field.
 fn session_serves(operation: Operation, personal_ready: bool) -> bool {
-    if operation == Operation::ArtistTopTracks {
+    if matches!(
+        operation,
+        Operation::ArtistTopTracks | Operation::RelatedArtists
+    ) {
         return true;
     }
     matches!(
@@ -130,6 +135,7 @@ fn plan(operation: Operation, personal_ready: bool) -> ApiSource {
         | PlaylistSearch
         | MadeForYouSearch
         | ArtistTopTracks
+        | RelatedArtists
         | UnsupportedDevelopmentMode => ApiSource::Shared,
         PlaylistMetadata(PlaylistAccess::External | PlaylistAccess::Unknown)
         | PlaylistItems(PlaylistAccess::External | PlaylistAccess::Unknown)
@@ -347,15 +353,34 @@ impl ApiGateway {
             .map(|source| self.verification_client(source))
     }
 
+    /// Whether a shared grant is signed in or being restored. Only listeners
+    /// who signed in before Spindle stopped offering shared access have one.
+    pub fn has_shared(&self) -> bool {
+        self.state(ApiSource::Shared) != SessionState::Unavailable
+    }
+
+    /// Where an operation goes: as planned, except that without a shared
+    /// grant the personal app answers everything it is asked.
+    fn route(&self, operation: Operation) -> ApiSource {
+        let source = plan(operation, self.personal_ready());
+        if source == ApiSource::Shared
+            && !self.has_shared()
+            && self.state(ApiSource::Personal) != SessionState::Unavailable
+        {
+            ApiSource::Personal
+        } else {
+            source
+        }
+    }
+
     pub async fn client_for(&self, operation: Operation) -> Result<Arc<ApiClient>, ApiError> {
-        let mut source = plan(operation, self.personal_ready());
         // Spindle: at start the shared app signs in first (from the
         // remembered account, in a few milliseconds) while the personal app
         // is still verifying, so the first reads of the library and Home
         // planned for the shared app and sat out its throttle (32 s on the
         // PC). A read the personal app will serve waits for its verdict
         // instead, briefly.
-        if source == ApiSource::Shared
+        if self.route(operation) == ApiSource::Shared
             && plan(operation, true) == ApiSource::Personal
             && matches!(self.state(ApiSource::Personal), SessionState::Authorizing)
         {
@@ -368,14 +393,18 @@ impl ApiGateway {
                 }
             };
             let _ = tokio::time::timeout(PERSONAL_VERDICT_WAIT, settled).await;
-            source = plan(operation, self.personal_ready());
         }
-        // Spindle: the shared app is Spotifast's, split among all its users,
-        // and on Nick's Mac it sat out rate limits for minutes while search
-        // showed nothing. While it waits, the playlist half of a search goes
-        // to the personal app: the account's and other people's playlists,
-        // without Spotify's own, which search could not find anyway when it
-        // never answered.
+        // The counters remember a sign-out even if a new sign-in becomes
+        // ready before a waiting request wakes up.
+        let shared_generation = self.shared.state.borrow().0;
+        let personal_generation = self.personal.state.borrow().0;
+        let mut source = self.route(operation);
+        // Spindle: the shared app is split among all its users, and on
+        // Nick's Mac it sat out rate limits for minutes while search showed
+        // nothing. While it waits, the playlist half of a search goes to the
+        // personal app: the account's and other people's playlists, without
+        // Spotify's own, which search could not find anyway when it never
+        // answered.
         if operation == Operation::PlaylistSearch
             && source == ApiSource::Shared
             && self.personal_ready()
@@ -384,26 +413,40 @@ impl ApiGateway {
             log::info!("playlist search on the personal app while the shared app waits");
             source = ApiSource::Personal;
         }
-        let session = self.session(source);
-        let mut state = session.state.subscribe();
-        let generation = state.borrow().0;
-        loop {
-            let (current, status) = state.borrow_and_update().clone();
-            if current != generation {
-                return Err(ApiError::NotSignedIn);
-            }
-            match status {
-                SessionState::Ready { .. } => break,
-                SessionState::Unavailable => return Err(ApiError::NotSignedIn),
-                // A personal grant can open the app before the shared grant
-                // finishes verification. Keep shared-only views loading.
-                SessionState::Authorizing => {
-                    state.changed().await.map_err(|_| ApiError::NotSignedIn)?;
+        'route: loop {
+            let session = self.session(source);
+            let generation = match source {
+                ApiSource::Shared => shared_generation,
+                ApiSource::Personal => personal_generation,
+            };
+            let mut state = session.state.subscribe();
+            loop {
+                let (current, status) = state.borrow_and_update().clone();
+                if current != generation || status == SessionState::Unavailable {
+                    // Shared access went away, because there was no grant to
+                    // restore or Spotify refused it, without a sign-out: the
+                    // personal app takes over what was waiting for it.
+                    if source == ApiSource::Shared
+                        && self.personal.state.borrow().0 == personal_generation
+                        && self.state(ApiSource::Personal) != SessionState::Unavailable
+                    {
+                        source = ApiSource::Personal;
+                        continue 'route;
+                    }
+                    return Err(ApiError::NotSignedIn);
+                }
+                match status {
+                    SessionState::Ready { .. } => break 'route,
+                    // A personal grant can open the app before the shared grant
+                    // finishes verification. Keep shared-only views loading.
+                    SessionState::Authorizing | SessionState::Unavailable => {
+                        state.changed().await.map_err(|_| ApiError::NotSignedIn)?;
+                    }
                 }
             }
         }
         log::debug!("Spotify route operation={operation:?} source={source}");
-        Ok(session.client())
+        Ok(self.session(source).client())
     }
 
     /// Spindle: the shared app, for a read the personal app was asked for
@@ -663,6 +706,14 @@ mod tests {
     }
 
     #[test]
+    fn related_artists_prefer_the_session_and_keep_the_shared_fallback() {
+        for personal in [false, true] {
+            assert!(session_serves(Operation::RelatedArtists, personal));
+            assert_eq!(plan(Operation::RelatedArtists, personal), ApiSource::Shared);
+        }
+    }
+
+    #[test]
     fn routing_matrix_selects_source() {
         let personal = true;
         for operation in [
@@ -706,6 +757,90 @@ mod tests {
         ] {
             assert_eq!(plan(operation, false), ApiSource::Shared);
         }
+    }
+
+    /// A listener with only their own app, the only way to sign in now,
+    /// gets every request answered by it, including those the plan gives
+    /// to shared access. A shared grant still signed in keeps its share.
+    #[tokio::test]
+    async fn without_a_shared_grant_the_personal_app_answers_everything() {
+        let gateway = ApiGateway::new(reqwest::Client::new(), Arc::new(NetActivity::default()));
+        gateway.begin_verification(
+            ApiSource::Personal,
+            provider("only-personal", ApiSource::Personal),
+        );
+        gateway
+            .install(ApiSource::Personal, AccountId::new("same"))
+            .unwrap();
+        assert!(!gateway.has_shared());
+        let personal = gateway.verification_client(ApiSource::Personal);
+        for operation in [
+            Operation::CanonicalAccount,
+            Operation::PlaylistLibrary,
+            Operation::PlaylistSearch,
+            Operation::PlaylistItems(PlaylistAccess::External),
+            Operation::UnsupportedDevelopmentMode,
+            Operation::Catalog,
+        ] {
+            let client = gateway.client_for(operation).await.unwrap();
+            assert!(Arc::ptr_eq(&client, &personal), "{operation:?}");
+        }
+
+        gateway.begin_verification(ApiSource::Shared, provider("legacy", ApiSource::Shared));
+        gateway
+            .install(ApiSource::Shared, AccountId::new("same"))
+            .unwrap();
+        assert!(gateway.has_shared());
+        let shared = gateway.verification_client(ApiSource::Shared);
+        let client = gateway
+            .client_for(Operation::PlaylistLibrary)
+            .await
+            .unwrap();
+        assert!(Arc::ptr_eq(&client, &shared));
+    }
+
+    /// Restoring a sign-in marks shared access as authorizing before it is
+    /// known whether there is a grant. A request waiting on it goes to the
+    /// personal app when it turns out there is none, but a sign-out still
+    /// ends it.
+    #[tokio::test]
+    async fn a_request_waiting_on_shared_access_that_never_comes_goes_to_the_personal_app() {
+        let gateway = Arc::new(ApiGateway::new(
+            reqwest::Client::new(),
+            Arc::new(NetActivity::default()),
+        ));
+        gateway.set_state(ApiSource::Shared, SessionState::Authorizing);
+        gateway.begin_verification(
+            ApiSource::Personal,
+            provider("restored-personal", ApiSource::Personal),
+        );
+        gateway
+            .install(ApiSource::Personal, AccountId::new("same"))
+            .unwrap();
+        let waiting = tokio::spawn({
+            let gateway = Arc::clone(&gateway);
+            async move { gateway.client_for(Operation::PlaylistLibrary).await }
+        });
+        tokio::task::yield_now().await;
+        gateway.clear(ApiSource::Shared);
+        let client = waiting.await.unwrap().unwrap();
+        assert!(Arc::ptr_eq(
+            &client,
+            &gateway.verification_client(ApiSource::Personal)
+        ));
+
+        gateway.set_state(ApiSource::Shared, SessionState::Authorizing);
+        let waiting = tokio::spawn({
+            let gateway = Arc::clone(&gateway);
+            async move { gateway.client_for(Operation::PlaylistLibrary).await }
+        });
+        tokio::task::yield_now().await;
+        gateway.clear_all();
+        gateway.begin_verification(
+            ApiSource::Personal,
+            provider("next-account", ApiSource::Personal),
+        );
+        assert!(matches!(waiting.await.unwrap(), Err(ApiError::NotSignedIn)));
     }
 
     #[test]

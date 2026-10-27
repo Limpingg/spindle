@@ -206,7 +206,7 @@ jobs:
             echo
             echo "## Before you start"
             echo
-            echo "- You need Spotify Premium. Spindle signs in through your browser the first time."
+            echo "- You need Spotify Premium. The first time, Spindle walks you through making a free app of your own on Spotify's developer dashboard, then signs you in through your browser."
             echo "- **Windows:** setup installs for your account only, with no administrator prompt. Spindle is not code signed yet, so SmartScreen warns the first time: choose **More info**, then **Run anyway**. Start Spindle normally, not as administrator."
             echo "- **Mac:** drag Spindle into Applications. On first open macOS blocks it because it is not notarized yet: open **System Settings > Privacy & Security**, scroll down and choose **Open Anyway**. If macOS says Spindle is damaged, run \`xattr -dr com.apple.quarantine /Applications/Spindle.app\` in Terminal, then open it again."
             echo "- Spindle updates itself: it checks when it starts and offers the new version."
