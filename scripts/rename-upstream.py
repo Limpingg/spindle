@@ -98,17 +98,35 @@ def rename_lock(path: Path) -> None:
     def key(block: str):
         name = re.search(r'^name = "([^"]+)"', block, re.M)
         version = re.search(r'^version = "([^"]+)"', block, re.M)
-        parts = []
-        for part in (version.group(1) if version else "").replace("+", ".").replace("-", ".").split("."):
-            parts.append((0, int(part), "") if part.isdigit() else (1, 0, part))
-        return (name.group(1) if name else "", parts)
+        # semver order, as cargo sorts: numbers, then a pre-release sorts
+        # before its release, and build metadata does not count.
+        text = (version.group(1) if version else "").split("+", 1)[0]
+        release, _, prerelease = text.partition("-")
+        numbers = tuple(int(part) if part.isdigit() else 0 for part in release.split("."))
+        pre = tuple(
+            (0, int(part), "") if part.isdigit() else (1, 0, part)
+            for part in prerelease.split(".")
+        ) if prerelease else ()
+        return (name.group(1) if name else "", numbers, 0 if prerelease else 1, pre)
 
     renamed.sort(key=key)
     path.write_text(head + "\n".join(renamed), encoding="utf-8")
 
 
+# Spotifast's GitHub workflows (CI, packaging, releases, the website) would
+# run in Spindle's repository and fail; they are dropped, and Spindle's own
+# live beside them under names that start with "spindle-".
+DROPPED = [".github/workflows"]
+
+
 def main() -> None:
     os.chdir(ROOT)
+    for dropped in DROPPED:
+        path = Path(dropped)
+        if path.is_dir():
+            for file in sorted(path.iterdir()):
+                if file.is_file() and not file.name.startswith("spindle-"):
+                    file.unlink()
     for source, target in RENAMES:
         if Path(source).exists() and not Path(target).exists():
             Path(target).parent.mkdir(parents=True, exist_ok=True)
