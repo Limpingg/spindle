@@ -70,36 +70,40 @@ git worktree remove --force "$scratch"
 trap - EXIT
 fi
 
-# Spindle's own lock changes (a dependency only main has) would be lost to
-# the "theirs" resolution below; stop for a person instead.
-lock_changes=$( (git diff "$previous_renamed" HEAD -- Cargo.lock | grep -E '^[-+][^-+]' || true) \
-    | grep -vcE '^[-+]version = "' || true)
-if [ "${lock_changes:-0}" != "0" ]; then
-    echo "Cargo.lock differs from Spotifast's beyond Spindle's version: merge $tag by hand" >&2
-    exit 2
-fi
-
-# Merge it. The version lines always conflict: Spindle's follows the rule.
+# Merge it. Every file merges three ways; the version line conflicts on
+# every release and is set by the rule above.
 IFS=. read -r major minor patch <<<"$upstream_version"
 spindle_version="$major.$minor.$((patch * 100 + 1))"
-if ! git merge --no-commit --no-ff "$renamed_commit" >/dev/null 2>&1; then
-    :
-fi
-git checkout --theirs -- Cargo.toml Cargo.lock 2>/dev/null || true
+git merge --no-commit --no-ff "$renamed_commit" >/dev/null 2>&1 || true
+
 # Spindle's README is its own (Nick wants only Spindle there), so Spotifast's
 # README changes never come in.
 git checkout HEAD -- README.md
 git add README.md
-sed -i.bak "s/^version = \"$upstream_version\"/version = \"$spindle_version\"/" Cargo.toml && rm -f Cargo.toml.bak
-python3 - "$upstream_version" "$spindle_version" <<'EOF'
-import re, sys
-upstream, spindle = sys.argv[1:3]
-path = "Cargo.lock"
-text = open(path).read()
-text = re.sub(r'(name = "spindle"\nversion = ")' + re.escape(upstream) + '"', r'\g<1>' + spindle + '"', text)
-open(path, "w").write(text)
-EOF
-git add Cargo.toml Cargo.lock
+
+# Cargo.toml: merged like any file, so Spindle's own dependencies (qrcode,
+# the vendored eframe) stay. A conflict that only touches version lines is
+# settled here; any other is left for a person.
+python3 scripts/settle-version.py Cargo.toml "$spindle_version"
+if ! grep -q '^<<<<<<< ' Cargo.toml; then
+    git add Cargo.toml
+fi
+
+# vendor/eframe is a copy of eframe at the crmne/egui revision Spotifast
+# pins. If Spotifast moved the revision, the copy must be refreshed first.
+pinned=$(grep -m1 -oE 'github.com/crmne/egui", rev = "[0-9a-f]+' Cargo.toml | grep -oE '[0-9a-f]{40}' || true)
+if [ -n "$pinned" ] && [ "$pinned" != "$(cat vendor/eframe/SPINDLE_EGUI_REV)" ]; then
+    echo "Spotifast moved crmne/egui to $pinned: repackage vendor/eframe from it (CLAUDE.md), then commit" >&2
+    exit 2
+fi
+
+# Cargo.lock: Spotifast's, then cargo adds what Spindle's Cargo.toml has on
+# top (qrcode, the path eframe) and keeps every other locked version.
+git show "$renamed_commit:Cargo.lock" > Cargo.lock
+if ! grep -q '^<<<<<<< ' Cargo.toml; then
+    cargo metadata --format-version 1 >/dev/null
+    git add Cargo.lock
+fi
 
 conflicts=$(git diff --name-only --diff-filter=U)
 if [ -n "$conflicts" ]; then
