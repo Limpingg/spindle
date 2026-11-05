@@ -71,16 +71,16 @@ impl Palette {
             window: Color32::from_rgb(0xf8, 0xf9, 0xfb),
             panel: Color32::from_rgb(0xff, 0xff, 0xff),
             surface: Color32::from_rgb(0xee, 0xf0, 0xf3),
-            surface_hover: Color32::from_rgb(0xe3, 0xe6, 0xeb),
+            surface_hover: Color32::from_rgb(0xd8, 0xdd, 0xe4),
             surface_active: Color32::from_rgb(0xd7, 0xdb, 0xe1),
             // Spindle: field and pill edges that show on the pale panes.
-            outline: Color32::from_rgb(0xc6, 0xcb, 0xd2),
+            outline: Color32::from_rgb(0xaa, 0xb1, 0xba),
             text: Color32::from_rgb(0x14, 0x17, 0x1a),
             secondary: Color32::from_rgb(0x53, 0x5b, 0x66),
             // Spindle: green that reads as text on white (5:1); #15a64a was 3:1.
-            dim: Color32::from_rgb(0x6f, 0x77, 0x82),
-            accent: Color32::from_rgb(0x15, 0x80, 0x3d),
-            accent_hover: Color32::from_rgb(0x11, 0x6c, 0x33),
+            dim: Color32::from_rgb(0x5c, 0x64, 0x70),
+            accent: Color32::from_rgb(0x11, 0x6b, 0x34),
+            accent_hover: Color32::from_rgb(0x0d, 0x5c, 0x2c),
             on_accent: Color32::WHITE,
             danger: Color32::from_rgb(0xd6, 0x3b, 0x4c),
             warning: Color32::from_rgb(0xb8, 0x7a, 0x14),
@@ -891,7 +891,7 @@ pub fn segmented<R>(
         .fill(palette.surface)
         .stroke(egui::Stroke::new(1.0, palette.outline))
         .corner_radius(18)
-        .inner_margin(egui::Margin::same(2))
+        .inner_margin(egui::Margin::same(1))
         .show(ui, |ui| {
             ui.spacing_mut().item_spacing.x = 2.0;
             ui.horizontal(add_contents).inner
@@ -1154,7 +1154,8 @@ pub fn link(
 }
 
 pub fn section_title(ui: &mut egui::Ui, palette: &Palette, label: &str) -> Response {
-    text(ui, label, bold(17.0), palette.text)
+    // Spindle: section headings a clear step under the page title.
+    text(ui, label, bold(20.0), palette.text)
 }
 
 pub fn subtle(ui: &mut egui::Ui, palette: &Palette, label: &str) -> Response {

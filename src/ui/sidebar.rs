@@ -3100,6 +3100,8 @@ fn chip_row(ui: &mut egui::Ui, id: &str, add: impl FnOnce(&mut egui::Ui)) {
         .scroll_bar_visibility(egui::scroll_area::ScrollBarVisibility::AlwaysHidden)
         .auto_shrink([false, true])
         .show(ui, |ui| {
-            ui.horizontal(add);
+            ui.horizontal(|ui| {
+                add(ui);
+            });
         });
 }

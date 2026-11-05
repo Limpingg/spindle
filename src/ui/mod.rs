@@ -543,7 +543,10 @@ fn header_wash(
 ) -> Option<(Color32, Color32)> {
     if let Some(art) = art {
         let strength = if overview { 0.45 } else { 0.85 };
-        return Some((blend(palette.window, art, strength), palette.window));
+        // Spindle: from and to the pane's own fill, so the wash ends on
+        // the colour under it with no step.
+        let base = palette.pane();
+        return Some((blend(base, art, strength), base));
     }
     (palette.tint.a() > 0).then_some((palette.tint, Color32::TRANSPARENT))
 }
@@ -553,7 +556,8 @@ fn header_wash(
 fn header_rect(panel: Rect, scrolled: f32) -> Rect {
     Rect::from_min_size(
         panel.min - vec2(0.0, scrolled.max(0.0)),
-        vec2(panel.width(), 340.0),
+        // Spindle: long enough to fade out well below the action row.
+        vec2(panel.width(), 480.0),
     )
 }
 
@@ -841,9 +845,9 @@ mod tests {
         assert_eq!(header_rect(panel, 0.0).min, panel.min);
         assert_eq!(header_rect(panel, 0.0).width(), 800.0);
         assert_eq!(header_rect(panel, 120.0).min.y, panel.min.y - 120.0);
-        assert_eq!(header_rect(panel, 120.0).max.y, panel.min.y + 220.0);
+        assert_eq!(header_rect(panel, 120.0).max.y, panel.min.y + 360.0);
         assert!(
-            header_rect(panel, 400.0).max.y < panel.min.y,
+            header_rect(panel, 500.0).max.y < panel.min.y,
             "gone once scrolled past"
         );
         assert_eq!(

@@ -108,7 +108,7 @@ pub fn connect_strip(app: &mut App, ui: &mut egui::Ui) {
         .frame(
             Frame::new()
                 .fill(fill)
-                .inner_margin(Margin::symmetric(24, 0)),
+                .inner_margin(Margin::symmetric(20, 0)),
         )
         .show(ui, |ui| {
             // Spindle: a status line read left to right from under the

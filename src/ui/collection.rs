@@ -164,7 +164,8 @@ pub(super) fn hero(app: &mut App, ui: &mut egui::Ui, hero: Hero<'_>) {
             let width = ui.available_width();
             ui.set_width(width);
             ui.spacing_mut().item_spacing.y = 6.0;
-            ui.add_space(2.0);
+            // Spindle: the meta line sits on the cover's bottom edge.
+            ui.add_space(-6.0);
             ui.horizontal_wrapped(|ui| {
                 ui.spacing_mut().item_spacing.x = 4.0;
                 if let Some(avatar) = &hero.avatar {

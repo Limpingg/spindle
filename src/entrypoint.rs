@@ -97,6 +97,12 @@ struct Cli {
     #[cfg(feature = "demo")]
     #[arg(long, value_name = "X,Y", value_parser = parse_demo_point, conflicts_with = "demo_drag")]
     demo_click: Option<egui::Pos2>,
+
+    /// Rest the pointer at `X,Y` in points for `--demo-shot`, without a
+    /// click, so the shot shows one chosen hover and no accidental one.
+    #[cfg(feature = "demo")]
+    #[arg(long, value_name = "X,Y", value_parser = parse_demo_point, conflicts_with_all = ["demo_drag", "demo_click"])]
+    demo_hover: Option<egui::Pos2>,
 }
 
 /// Remote control of the running instance, for Raycast scripts, launchers,
@@ -586,12 +592,21 @@ pub(crate) fn run() -> eframe::Result<()> {
             to,
             frame: 0,
             click: false,
+            hover: false,
         })
         .or(cli.demo_click.map(|at| DemoDrag {
             from: at,
             to: at,
             frame: 0,
             click: true,
+            hover: false,
+        }))
+        .or(cli.demo_hover.map(|at| DemoDrag {
+            from: at,
+            to: at,
+            frame: 0,
+            click: false,
+            hover: true,
         }));
     #[cfg(feature = "demo")]
     let demo_inner = cli.demo_size;
@@ -1195,6 +1210,7 @@ mod native_window_tests {
             to,
             frame: 0,
             click: false,
+            hover: false,
         };
         let frames: Vec<_> = (0..=DemoDrag::REST + DemoDrag::GLIDE + 5)
             .map(|_| drag.events())
@@ -1226,6 +1242,7 @@ mod native_window_tests {
             to: at,
             frame: 0,
             click: true,
+            hover: false,
         };
         let events: Vec<_> = (0..=DemoDrag::REST + DemoDrag::GLIDE + 5)
             .flat_map(|_| click.events())
@@ -1448,6 +1465,8 @@ struct DemoDrag {
     to: egui::Pos2,
     frame: u32,
     click: bool,
+    /// Only move the pointer: no press at all.
+    hover: bool,
 }
 
 #[cfg(feature = "demo")]
@@ -1467,6 +1486,9 @@ impl DemoDrag {
             self.from.lerp(self.to, t)
         };
         let mut events = vec![egui::Event::PointerMoved(pos)];
+        if self.hover {
+            return events;
+        }
         if frame == Self::REST || (self.click && frame == Self::REST + 1) {
             events.push(egui::Event::PointerButton {
                 pos,

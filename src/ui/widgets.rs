@@ -1592,9 +1592,7 @@ fn track_row_contents(
         ui.painter().rect_filled(
             rect,
             CornerRadius::same(6),
-            palette
-                .surface_hover
-                .gamma_multiply(if palette.dark { 0.7 } else { 1.0 }),
+            palette.surface_hover,
         );
     }
     // The row highlight also shows keyboard focus. Do not add an outline
@@ -3178,7 +3176,7 @@ pub fn thin_slider(
         let bar = Rect::from_center_size(rect.center(), vec2(rect.width(), 4.0));
         // Spindle: 3:1 against the bar, so the track reads as a control.
         let track_color = if palette.dark {
-            Color32::from_rgb(0x6a, 0x6f, 0x76)
+            Color32::from_rgb(0x4d, 0x53, 0x5c)
         } else {
             Color32::from_black_alpha(125)
         };
@@ -3189,7 +3187,7 @@ pub fn thin_slider(
         );
         // Spindle: a softer white at rest, so the bar does not glow.
         let rest = if palette.dark {
-            Color32::from_rgb(0xb3, 0xb9, 0xc1)
+            palette.text
         } else {
             palette.text
         };
@@ -3315,9 +3313,9 @@ pub fn search_field(
         palette.surface
     };
     ui.painter().rect_filled(rect, height / 2.0, fill);
-    // Spindle: on the light theme the field's fill is barely darker than
-    // the pane, so a hairline edge outlines it.
-    if !palette.dark && !has_focus {
+    // Spindle: a hairline edge, so the field still reads as one over a
+    // cover's wash or a pane of nearly its own grey.
+    if !has_focus {
         ui.painter().rect_stroke(
             rect,
             height / 2.0,
@@ -4444,9 +4442,7 @@ mod tests {
                             .secondary
                             .gamma_multiply(if focused { 0.30 } else { 0.20 })
                     } else {
-                        palette
-                            .surface_hover
-                            .gamma_multiply(if palette.dark { 0.7 } else { 1.0 })
+                        palette.surface_hover
                     }]
                 );
                 if focused {

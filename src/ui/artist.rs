@@ -30,7 +30,7 @@ pub fn show(app: &mut App, ui: &mut egui::Ui, id: &str) {
 
             // Popular.
             theme::section_title(ui, &palette, &gettext(locale, "Popular"));
-            ui.add_space(4.0);
+            ui.add_space(10.0);
             match &page.top_tracks {
                 Loadable::Loaded(tracks) if !tracks.is_empty() => {
                     let uris: Arc<[String]> = tracks
@@ -86,7 +86,6 @@ pub fn show(app: &mut App, ui: &mut egui::Ui, id: &str) {
                         // Spindle: a quiet text link, as Spotify has it.
                         if ui
                             .horizontal(|ui| {
-                            ui.add_space(8.0);
                             theme::link(
                                 ui,
                                 if page.show_all_top {

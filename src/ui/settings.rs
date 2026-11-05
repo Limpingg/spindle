@@ -78,8 +78,8 @@ fn eq_preset_controls(app: &mut App, ui: &mut egui::Ui, current: Option<&str>) {
             .fill(palette.surface)
             // Spindle: a pill with a hairline edge, like the search fields.
             .corner_radius(CornerRadius::same(16))
-            .stroke(egui::Stroke::new(1.0, palette.outline))
-            .inner_margin(Margin::symmetric(14, 1))
+            .stroke(egui::Stroke::new(1.0, field_edge(&palette)))
+            .inner_margin(Margin::symmetric(14, 2))
             .show(ui, |ui| {
                 widgets::text_edit(
                     ui,
@@ -321,16 +321,16 @@ fn section(
     theme::text(ui, title, theme::bold(18.0), palette.text);
     ui.add_space(8.0);
     Frame::new()
-        .fill(
-            palette
-                .surface
-                .gamma_multiply(if palette.dark { 0.7 } else { 1.0 }),
-        )
+        .fill(if palette.dark {
+            egui::Color32::from_rgb(0x1a, 0x1e, 0x24)
+        } else {
+            palette.surface
+        })
         // Spindle: a quiet edge; the fill already sets the card apart.
         .stroke(Stroke::new(
             1.0,
             if palette.dark {
-                palette.surface_hover
+                egui::Color32::from_rgb(0x2e, 0x34, 0x3d)
             } else {
                 palette.outline
             },
@@ -538,8 +538,8 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
                     .fill(palette.surface)
                     // Spindle: a pill with a hairline edge, like the search fields.
                     .corner_radius(CornerRadius::same(16))
-                    .stroke(egui::Stroke::new(1.0, palette.outline))
-                    .inner_margin(Margin::symmetric(14, 1))
+                    .stroke(egui::Stroke::new(1.0, field_edge(&palette)))
+                    .inner_margin(Margin::symmetric(14, 2))
                     .show(ui, |ui| {
                         widgets::text_edit(
                             ui,
@@ -789,8 +789,8 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
                     .fill(palette.surface)
                     // Spindle: a pill with a hairline edge, like the search fields.
                     .corner_radius(CornerRadius::same(16))
-                    .stroke(egui::Stroke::new(1.0, palette.outline))
-                    .inner_margin(Margin::symmetric(14, 1))
+                    .stroke(egui::Stroke::new(1.0, field_edge(&palette)))
+                    .inner_margin(Margin::symmetric(14, 2))
                     .show(ui, |ui| {
                         widgets::text_edit(
                             ui,
@@ -2674,6 +2674,15 @@ fn eq_curve(ui: &mut egui::Ui, palette: &Palette, settings: &crate::eq::EqSettin
     painter.add(Shape::line(points, Stroke::new(2.0, color)));
     for (hz, db) in crate::eq::BANDS.iter().zip(settings.bands_db) {
         painter.circle_filled(pos2(x_of(*hz), y_of(db + settings.preamp_db)), 3.0, color);
+    }
+}
+
+/// Spindle: an input's edge, 3:1 against its card so it reads as a field.
+fn field_edge(palette: &Palette) -> egui::Color32 {
+    if palette.dark {
+        egui::Color32::from_rgb(0x5a, 0x61, 0x6c)
+    } else {
+        palette.outline
     }
 }
 

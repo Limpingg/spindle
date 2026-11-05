@@ -41,7 +41,10 @@ pub fn side_panel(app: &mut App, ui: &mut egui::Ui) {
     let art = app
         .now_playing()
         .and_then(|now| now.art_small.or(now.art_url));
-    let tint = app.tint_for(art.as_deref());
+    // Spindle: the plain pane, as the Queue and Connect panels have it; a
+    // cover wash read as a grey slab beside them.
+    let _ = app.tint_for(art.as_deref());
+    let tint = None;
     let fit = super::yielding_panel(
         ui.ctx(),
         "lyrics-panel",
@@ -151,7 +154,7 @@ pub fn side_panel(app: &mut App, ui: &mut egui::Ui) {
                 palette.secondary,
             );
         }
-        ui.add_space(8.0);
+        ui.add_space(16.0);
         contents(app, ui);
     });
     let current_width = response.response.rect.width();
@@ -254,12 +257,12 @@ fn contents(app: &mut App, ui: &mut egui::Ui) {
     // Spindle: every line stays readable (4.5:1 or more); the sung line
     // stands out by white, weight and size.
     let sung = if palette.dark {
-        palette.secondary
+        egui::Color32::from_rgb(0x7d, 0x85, 0x90)
     } else {
         palette.dim
     };
     let upcoming = if palette.dark {
-        egui::Color32::from_rgb(0xb8, 0xbe, 0xc6)
+        egui::Color32::from_rgb(0x96, 0x9e, 0xa9)
     } else {
         palette.secondary
     };
@@ -302,11 +305,10 @@ fn contents(app: &mut App, ui: &mut egui::Ui) {
                     upcoming
                 };
                 let color = blend(quiet, sung_line, lit);
-                let font = if lit > 0.5 {
-                    theme::bold(LINE_SIZE + 2.0)
-                } else {
-                    theme::regular(LINE_SIZE)
-                };
+                // Spindle: one size and weight for every line, so nothing
+                // reflows as the song moves on; colour alone marks the line.
+                let _ = lit;
+                let font = theme::semibold(LINE_SIZE);
                 // A timed line with no words is the band playing on.
                 let text = if line.text.is_empty() && lyrics.synced {
                     "\u{266a}"
@@ -332,7 +334,7 @@ fn contents(app: &mut App, ui: &mut egui::Ui) {
                 } else {
                     // Spindle: a line that needs two rows breaks near its
                     // middle, so no word is left alone on the second.
-                    let width = balanced_width(ui, text, &font, ui.available_width());
+                    let width = ui.available_width();
                     ui.scope(|ui| {
                         ui.set_max_width(width);
                         ui.add(
@@ -382,8 +384,8 @@ fn contents(app: &mut App, ui: &mut egui::Ui) {
         let art = app
             .now_playing()
             .and_then(|now| now.art_small.or(now.art_url));
-        let tint = app.tint_for(art.as_deref());
-        let fill = lyrics_fill(&palette, tint);
+        let _ = app.tint_for(art.as_deref());
+        let fill = lyrics_fill(&palette, None);
         let rect = scroll.inner_rect;
         let painter = ui.painter_at(rect);
         let fade = 40.0_f32.min(rect.height() / 4.0);
@@ -1002,6 +1004,7 @@ mod tests {
 /// Spindle: the width to wrap a lyric line at so its rows come out about
 /// even: the whole width when it fits on one row, else its length over the
 /// rows it needs, with a little slack.
+#[allow(dead_code)]
 fn balanced_width(ui: &egui::Ui, text: &str, font: &egui::FontId, available: f32) -> f32 {
     let single = ui
         .painter()
