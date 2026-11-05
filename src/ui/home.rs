@@ -193,7 +193,13 @@ fn quick_access(app: &mut App, ui: &mut egui::Ui) {
     let palette = app.palette;
     let tiles = quick_access_tiles(app);
     let available = ui.available_width();
-    let columns = ((available / 300.0).floor() as usize).clamp(2, 4);
+    // Spindle: as many columns as fit, then fewer if that leaves a hole in
+    // the last row (8 tiles fill 4 columns, not 3).
+    let most = ((available / 240.0).floor() as usize).clamp(2, 4);
+    let columns = (2..=most)
+        .rev()
+        .find(|columns| tiles.len() % columns == 0)
+        .unwrap_or(most);
     let gap = 10.0;
     let tile_width = (available - gap * (columns as f32 - 1.0)) / columns as f32;
     let rows = tiles.len().div_ceil(columns);

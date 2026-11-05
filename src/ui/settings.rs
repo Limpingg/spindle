@@ -76,8 +76,10 @@ fn eq_preset_controls(app: &mut App, ui: &mut egui::Ui, current: Option<&str>) {
         ui.spacing_mut().item_spacing = Vec2::splat(8.0);
         let field = Frame::new()
             .fill(palette.surface)
-            .corner_radius(CornerRadius::same(6))
-            .inner_margin(Margin::symmetric(10, 6))
+            // Spindle: a pill with a hairline edge, like the search fields.
+            .corner_radius(CornerRadius::same(16))
+            .stroke(egui::Stroke::new(1.0, palette.outline))
+            .inner_margin(Margin::symmetric(14, 6))
             .show(ui, |ui| {
                 widgets::text_edit(
                     ui,
@@ -525,8 +527,10 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
             filtered_row(ui, &palette, &needle, &account, &account_rows[0], |ui| {
                 let response = Frame::new()
                     .fill(palette.surface)
-                    .corner_radius(CornerRadius::same(6))
-                    .inner_margin(Margin::symmetric(10, 6))
+                    // Spindle: a pill with a hairline edge, like the search fields.
+                    .corner_radius(CornerRadius::same(16))
+                    .stroke(egui::Stroke::new(1.0, palette.outline))
+                    .inner_margin(Margin::symmetric(14, 6))
                     .show(ui, |ui| {
                         widgets::text_edit(
                             ui,
@@ -774,8 +778,10 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
             filtered_row(ui, &palette, &needle, &playback, &playback_rows[1], |ui| {
                 let response = Frame::new()
                     .fill(palette.surface)
-                    .corner_radius(CornerRadius::same(6))
-                    .inner_margin(Margin::symmetric(10, 6))
+                    // Spindle: a pill with a hairline edge, like the search fields.
+                    .corner_radius(CornerRadius::same(16))
+                    .stroke(egui::Stroke::new(1.0, palette.outline))
+                    .inner_margin(Margin::symmetric(14, 6))
                     .show(ui, |ui| {
                         widgets::text_edit(
                             ui,

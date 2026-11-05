@@ -46,6 +46,26 @@ pub(crate) fn end_tint_session(ctx: &egui::Context) {
 /// Spindle: the green strip under the player bar while a Jam runs or the
 /// music plays on another device, as in Spotify: the Jam, then where the
 /// sound is. Each half opens its own window.
+/// The strip's band and words: the accent mixed a fifth into the bar's own
+/// colour, and the accent (a deeper green on the light theme, where the
+/// bright one fails contrast on a pale band).
+fn strip_colors(palette: &theme::Palette) -> (egui::Color32, egui::Color32) {
+    let mix = |a: u8, b: u8, t: f32| (f32::from(a) + (f32::from(b) - f32::from(a)) * t).round() as u8;
+    let (base, accent) = (palette.gutter(), palette.accent);
+    let t = if palette.dark { 0.22 } else { 0.16 };
+    let fill = egui::Color32::from_rgb(
+        mix(base.r(), accent.r(), t),
+        mix(base.g(), accent.g(), t),
+        mix(base.b(), accent.b(), t),
+    );
+    let ink = if palette.dark {
+        accent
+    } else {
+        egui::Color32::from_rgb(0x0e, 0x6b, 0x31)
+    };
+    (fill, ink)
+}
+
 pub fn connect_strip(app: &mut App, ui: &mut egui::Ui) {
     let jam = matches!(app.jam, crate::model::JamState::Live(_));
     let remote = app.now_playing().filter(|now| !now.local);
@@ -58,7 +78,10 @@ pub fn connect_strip(app: &mut App, ui: &mut egui::Ui) {
     }
     let palette = app.palette;
     let locale = app.locale;
-    let ink = palette.on_accent;
+    // Spindle: a soft green band with green words, not a full accent band:
+    // it sits at the bottom of every page for as long as another device
+    // plays, so it must not outshout the page.
+    let (fill, ink) = strip_colors(&palette);
     let (device, kind) = match &remote {
         Some(now) => (
             now.device_name
@@ -69,29 +92,37 @@ pub fn connect_strip(app: &mut App, ui: &mut egui::Ui) {
         None => (app.settings.device_name.clone(), "computer".to_string()),
     };
     egui::Panel::bottom("connect-strip")
-        .exact_size(26.0)
+        .exact_size(24.0)
         .resizable(false)
         .show_separator_line(false)
         .frame(
             Frame::new()
-                .fill(palette.accent)
-                .inner_margin(Margin::symmetric(16, 0)),
+                .fill(fill)
+                .inner_margin(Margin::symmetric(24, 0)),
         )
         .show(ui, |ui| {
+            // Spindle: a status line read left to right from under the
+            // cover: where the sound is, then the Jam.
             ui.with_layout(
-                egui::Layout::right_to_left(egui::Align::Center),
+                egui::Layout::left_to_right(egui::Align::Center),
                 |ui| {
                     ui.spacing_mut().item_spacing.x = 8.0;
+                    let label = if remote.is_some() {
+                        // Translators: {device} is the name of the device playing the music.
+                        gettext(locale, "Playing on {device}").replace("{device}", &device)
+                    } else {
+                        device.clone()
+                    };
                     let device_response = ui
                         .scope(|ui| {
                             ui.spacing_mut().item_spacing.x = 6.0;
-                            theme::text(ui, &device, theme::semibold(13.0), ink);
                             theme::icon(
                                 ui,
                                 crate::ui::devices::device_icon(&kind),
-                                15.0,
+                                14.0,
                                 ink,
                             );
+                            theme::text(ui, &label, theme::semibold(12.5), ink);
                         })
                         .response
                         .interact(egui::Sense::click())
@@ -100,14 +131,15 @@ pub fn connect_strip(app: &mut App, ui: &mut egui::Ui) {
                         app.actions.push(Action::ToggleDevicesPopup);
                     }
                     if jam {
+                        ui.add_space(4.0);
                         let line = ui.available_rect_before_wrap();
-                        let x = ui.cursor().max.x - 4.0;
+                        let x = ui.cursor().min.x;
                         ui.painter().vline(
                             x,
-                            (line.center().y - 7.0)..=(line.center().y + 7.0),
-                            egui::Stroke::new(1.0, ink),
+                            (line.center().y - 6.0)..=(line.center().y + 6.0),
+                            egui::Stroke::new(1.0, ink.gamma_multiply(0.5)),
                         );
-                        ui.add_space(8.0);
+                        ui.add_space(12.0);
                         let owner = app
                             .user
                             .as_ref()
@@ -118,8 +150,8 @@ pub fn connect_strip(app: &mut App, ui: &mut egui::Ui) {
                         let jam_response = ui
                             .scope(|ui| {
                                 ui.spacing_mut().item_spacing.x = 6.0;
-                                theme::text(ui, &label, theme::semibold(13.0), ink);
-                                theme::icon(ui, Icon::Users, 15.0, ink);
+                                theme::icon(ui, Icon::Users, 14.0, ink);
+                                theme::text(ui, &label, theme::semibold(12.5), ink);
                             })
                             .response
                             .interact(egui::Sense::click())
@@ -135,7 +167,8 @@ pub fn connect_strip(app: &mut App, ui: &mut egui::Ui) {
 
 pub fn show(app: &mut App, ui: &mut egui::Ui) {
     let palette = app.palette;
-    let fill = eased_fill(ui.ctx(), palette.panel, app.now_playing_tint());
+    // Spindle: the bar sits on the gutter, under the rounded panes.
+    let fill = eased_fill(ui.ctx(), palette.gutter(), app.now_playing_tint());
     egui::Panel::bottom("player-bar")
         .exact_size(theme::PLAYER_BAR_HEIGHT)
         .resizable(false)

@@ -47,10 +47,13 @@ impl Palette {
             surface: Color32::from_rgb(0x1d, 0x21, 0x27),
             surface_hover: Color32::from_rgb(0x26, 0x2b, 0x33),
             surface_active: Color32::from_rgb(0x2f, 0x35, 0x3f),
-            outline: Color32::from_rgb(0x2a, 0x30, 0x38),
+            // Spindle: 3:1 against the page, so card edges and the off
+            // toggle track read as controls (#2a3038 was 1.4:1).
+            outline: Color32::from_rgb(0x38, 0x3f, 0x4a),
             text: Color32::from_rgb(0xf2, 0xf4, 0xf6),
             secondary: Color32::from_rgb(0xa9, 0xb1, 0xbc),
-            dim: Color32::from_rgb(0x6e, 0x77, 0x84),
+            // Spindle: 4.5:1 on surfaces for small text (was #6e7784).
+            dim: Color32::from_rgb(0x84, 0x8d, 0x99),
             accent: Color32::from_rgb(0x1e, 0xd7, 0x60),
             accent_hover: Color32::from_rgb(0x3c, 0xe8, 0x7a),
             on_accent: Color32::from_rgb(0x0a, 0x14, 0x0e),
@@ -73,15 +76,36 @@ impl Palette {
             outline: Color32::from_rgb(0xdd, 0xe1, 0xe6),
             text: Color32::from_rgb(0x14, 0x17, 0x1a),
             secondary: Color32::from_rgb(0x53, 0x5b, 0x66),
-            dim: Color32::from_rgb(0x8b, 0x93, 0x9e),
-            accent: Color32::from_rgb(0x15, 0xa6, 0x4a),
-            accent_hover: Color32::from_rgb(0x12, 0x8f, 0x40),
+            // Spindle: green that reads as text on white (5:1); #15a64a was 3:1.
+            dim: Color32::from_rgb(0x6f, 0x77, 0x82),
+            accent: Color32::from_rgb(0x11, 0x7a, 0x3a),
+            accent_hover: Color32::from_rgb(0x0e, 0x6b, 0x33),
             on_accent: Color32::WHITE,
             danger: Color32::from_rgb(0xd6, 0x3b, 0x4c),
             warning: Color32::from_rgb(0xb8, 0x7a, 0x14),
             overlay: Color32::from_rgb(0xff, 0xff, 0xff),
             shadow: Color32::from_black_alpha(50),
             tint: Color32::TRANSPARENT,
+        }
+    }
+
+    /// Spindle: the dark gap between the window's rounded panes (sidebar,
+    /// page, side panels), which the player bar also sits on.
+    pub fn gutter(&self) -> Color32 {
+        if self.dark {
+            Color32::from_rgb(0x00, 0x00, 0x00)
+        } else {
+            Color32::from_rgb(0xe6, 0xe9, 0xed)
+        }
+    }
+
+    /// Spindle: the fill of the rounded panes.
+    pub fn pane(&self) -> Color32 {
+        // A touch under white on the light theme: pure white glared.
+        if self.dark {
+            self.window
+        } else {
+            Color32::from_rgb(0xfa, 0xfb, 0xfc)
         }
     }
 
@@ -216,6 +240,56 @@ fn status_detail(status: Option<fastframe_theme::Status>, locale: Locale) -> Cow
 }
 
 pub const RADIUS: u8 = 8;
+/// Spindle: the gap between the window's panes, and their corner radius.
+pub const PANE_GAP: i8 = 8;
+pub const PANE_RADIUS: u8 = 10;
+
+/// Spindle: the frame of one rounded pane. `left` and `right` say which
+/// sides keep a gap to the window edge (the gap between two panes is the
+/// right one of the first pane).
+pub fn pane_frame(palette: &Palette, left: bool, right: bool) -> egui::Frame {
+    egui::Frame::new()
+        .fill(palette.pane())
+        .corner_radius(PANE_RADIUS)
+        .outer_margin(egui::Margin {
+            left: if left { PANE_GAP } else { 0 },
+            right: if right { PANE_GAP } else { 0 },
+            top: PANE_GAP,
+            bottom: 0,
+        })
+}
+
+/// Spindle: covers the square corners of whatever a pane painted to its
+/// edges (a header's tint, the sidebar's cover) with the gutter colour, so
+/// the pane keeps its rounded corners. egui has no rounded clip.
+pub fn mask_pane_corners(painter: &egui::Painter, rect: egui::Rect, gutter: Color32) {
+    let r = f32::from(PANE_RADIUS);
+    let corners = [
+        (rect.left_top(), egui::vec2(1.0, 1.0)),
+        (rect.right_top(), egui::vec2(-1.0, 1.0)),
+        (rect.left_bottom(), egui::vec2(1.0, -1.0)),
+        (rect.right_bottom(), egui::vec2(-1.0, -1.0)),
+    ];
+    for (corner, dir) in corners {
+        let centre = corner + dir * r;
+        let mut points = vec![corner];
+        let steps = 8;
+        for i in 0..=steps {
+            let angle = std::f32::consts::FRAC_PI_2 * i as f32 / steps as f32;
+            // From the edge along x to the edge along y, around the arc.
+            let offset = egui::vec2(-dir.x * angle.cos(), -dir.y * angle.sin()) * r;
+            points.push(centre + offset);
+        }
+        let mut mesh = egui::Mesh::default();
+        for point in &points {
+            mesh.colored_vertex(*point, gutter);
+        }
+        for i in 1..points.len() as u32 - 1 {
+            mesh.add_triangle(0, i, i + 1);
+        }
+        painter.add(egui::Shape::mesh(mesh));
+    }
+}
 pub const RADIUS_SMALL: u8 = 4;
 pub const ROW_HEIGHT: f32 = 56.0;
 pub const COMPACT_ROW_HEIGHT: f32 = 48.0;
@@ -319,7 +393,8 @@ fn apply_to_style(style: &mut egui::Style, palette: &Palette) {
     // them: linear coverage in both themes on Linux, where egui's dark curve
     // (2c - c²) made text heavier than GTK's.
     text_rendering().apply_to_visuals(visuals);
-    visuals.panel_fill = palette.panel;
+    // Spindle: the rounded panes' fill, which scroll edges fade into.
+    visuals.panel_fill = palette.pane();
     visuals.window_fill = palette.overlay;
     visuals.extreme_bg_color = palette.surface;
     visuals.faint_bg_color = palette.surface;
@@ -398,9 +473,17 @@ fn apply_to_style(style: &mut egui::Style, palette: &Palette) {
         dormant_background_opacity: 0.0,
         dormant_handle_opacity: 0.0,
         active_background_opacity: 0.0,
-        active_handle_opacity: 0.55,
-        interact_handle_opacity: 0.85,
+        // Spindle: a quiet handle; at 0.55 of the text colour it was the
+        // brightest thing under a shelf.
+        active_handle_opacity: 0.28,
+        interact_handle_opacity: 0.5,
         foreground_color: true,
+        // Spindle: lists fade out at their edges instead of cutting a row
+        // in half (the queue above the player bar, the library chips).
+        fade: egui::style::ScrollFadeStyle {
+            strength: 1.0,
+            size: 24.0,
+        },
         ..egui::style::ScrollStyle::floating()
     };
     style.interaction.selectable_labels = false;

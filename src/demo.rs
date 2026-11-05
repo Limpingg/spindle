@@ -2529,13 +2529,25 @@ mod tests {
             assert!(app.manual_queue.is_empty());
             assert_eq!(app.queue.get().unwrap().queue, rows[2..]);
             let tree = accessible_frame(&ctx, &mut app, vec![]);
-            let recent = accessible_node(&tree, &gettext(locale, "Recent"), Role::Button);
+            // The queue panel's tab, on the right: in Chinese "Recent" and the
+            // sidebar's "Recently played" sort share one label.
+            let label = gettext(locale, "Recent");
+            let recent = tree
+                .nodes
+                .iter()
+                .filter(|(_, node)| node.label() == Some(&*label) && node.role() == Role::Button)
+                .max_by(|(_, a), (_, b)| {
+                    let x = |node: &egui::accesskit::Node| node.bounds().map_or(0.0, |bounds| bounds.x0);
+                    x(a).total_cmp(&x(b))
+                })
+                .map(|(id, _)| *id)
+                .expect("the queue panel's Recent tab");
             accessible_frame(
                 &ctx,
                 &mut app,
                 vec![accessible_action(recent, AccessibleAction::Click, None)],
             );
-            assert_eq!(app.queue_tab, QueueTab::Recents);
+            assert_eq!(app.queue_tab, QueueTab::Recents, "{locale:?}");
             let tree = accessible_frame(&ctx, &mut app, vec![]);
             let close = accessible_node(&tree, &gettext(locale, "Close"), Role::Button);
             accessible_frame(
@@ -2955,6 +2967,8 @@ mod tests {
     #[test]
     fn the_podcasts_shelf_leaves_out_audiobooks() {
         let (ctx, mut app) = accessible_app("library-podcasts-audiobooks");
+        // Spindle: wide enough that every filter chip shows.
+        app.settings.sidebar_width = 420.0;
         let view = crate::ui::sidebar::show;
         view_frame(&ctx, &mut app, vec![], view);
         let painted = view_frame(&ctx, &mut app, vec![], view);
@@ -3406,6 +3420,9 @@ mod tests {
             (LibraryShelf::Podcasts, "Podcasts", Page::Podcasts),
         ] {
             let (ctx, mut app) = accessible_app(&format!("library-sort-paging-{shelf:?}"));
+            // Spindle: wide enough that every filter chip shows; at 250 the
+            // chip row scrolls sideways.
+            app.settings.sidebar_width = 420.0;
             let view = crate::ui::sidebar::show;
             app.settings.library_sort.insert(shelf, LibrarySort::Name);
             app.library.albums.next_offset = Some(50);
@@ -3679,41 +3696,29 @@ mod tests {
     /// #596: clearing the global search from another page empties the field
     /// without leaving that page.
     #[test]
-    fn clearing_the_global_search_stays_on_the_current_page() {
-        use egui::accesskit::{Action as AccessibleAction, Role};
-        let (ctx, mut app) = accessible_app("global-search-clear");
+    fn away_from_search_the_global_search_shows_empty_and_keeps_the_query() {
+        // Spindle: an old query does not sit over Home; it waits for the
+        // way back, and typing starts a new one.
+        use egui::accesskit::Role;
+        let (ctx, mut app) = accessible_app("global-search-away");
         app.open(Page::Home);
         accessible_frame(&ctx, &mut app, vec![]);
         let tree = accessible_frame(&ctx, &mut app, vec![]);
-        assert!(!app.search.query.is_empty());
-        let clear = tree
-            .nodes
-            .iter()
-            .find(|(_, node)| {
+        let kept = app.search.query.clone();
+        assert!(!kept.is_empty());
+        assert!(
+            !tree.nodes.iter().any(|(_, node)| {
                 node.label() == Some("Clear")
                     && node.role() == Role::Button
                     && node.bounds().is_some_and(|bounds| bounds.y1 < 80.0)
-            })
-            .expect("Clear beside the global search")
-            .0;
-        accessible_frame(
-            &ctx,
-            &mut app,
-            vec![accessible_action(clear, AccessibleAction::Click, None)],
+            }),
+            "no Clear beside an empty-looking field"
         );
-        for _ in 0..3 {
-            accessible_frame(&ctx, &mut app, vec![]);
-        }
-        assert!(app.search.query.is_empty());
-        assert!(
-            matches!(app.page(), Page::Home),
-            "clearing must not open the search page"
-        );
-        assert!(
-            ctx.memory(|memory| memory.has_focus(egui::Id::new("global-search"))),
-            "the field stays ready for the next query"
-        );
-        // Typing a new query still goes to the search page.
+        assert!(matches!(app.page(), Page::Home), "showing Home does not open Search");
+        assert_eq!(app.search.query, kept, "the query is kept for the way back");
+        // Typing a new query replaces it and goes to the search page.
+        ctx.memory_mut(|memory| memory.request_focus(egui::Id::new("global-search")));
+        accessible_frame(&ctx, &mut app, vec![]);
         accessible_frame(&ctx, &mut app, vec![egui::Event::Text("Rework".into())]);
         accessible_frame(&ctx, &mut app, vec![]);
         assert_eq!(app.search.query, "Rework");
@@ -3765,7 +3770,9 @@ mod tests {
             .iter()
             .filter(|(_, node)| node.label() == Some("Clear") && node.role() == Role::Button)
             .collect();
-        assert_eq!(clear_buttons.len(), 2, "both searches have a Clear button");
+        // Spindle: away from Search the global field shows empty, so only
+        // Search settings has a Clear button.
+        assert_eq!(clear_buttons.len(), 1, "Search settings has a Clear button");
         let clear = clear_buttons
             .iter()
             .find(|(_, node)| {
@@ -11075,12 +11082,9 @@ mod tests {
                         + FIELD_RIGHT_INSET;
                     // Collapsed to an icon a badge keeps its label for a screen
                     // reader, so it is found at every width.
-                    let device = badge("Playing on").expect("the device badge");
-                    assert!(
-                        device >= field,
-                        "the device badge covers {} px of the search field at {width} px",
-                        field - device
-                    );
+                    // Spindle: the green strip under the player bar says where
+                    // the music plays; the top bar carries no device badge.
+                    assert!(badge("Playing on").is_none(), "no device badge in the top bar");
                     if let Some(label) = label {
                         let release = badge(label).expect("the update badge");
                         assert!(

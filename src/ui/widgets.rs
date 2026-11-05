@@ -2785,9 +2785,12 @@ fn shelf_cards(ui: &mut Ui, id: &str, add_contents: impl FnOnce(&mut Ui)) {
                 ui.spacing_mut().item_spacing.x = CARD_GAP / 2.0;
                 add_contents(ui);
             });
+            // Spindle: room under the captions, so the floating scrollbar
+            // runs below the words instead of across them.
+            ui.add_space(12.0);
         },
     );
-    ui.add_space(12.0);
+    ui.add_space(4.0);
 }
 
 /// A wrapping grid of cards.
@@ -3092,10 +3095,11 @@ pub fn thin_slider(
             || response.dragged()
             || dragging_value.is_some();
         let bar = Rect::from_center_size(rect.center(), vec2(rect.width(), 4.0));
+        // Spindle: 3:1 against the bar, so the track reads as a control.
         let track_color = if palette.dark {
-            Color32::from_white_alpha(50)
+            Color32::from_white_alpha(95)
         } else {
-            Color32::from_black_alpha(40)
+            Color32::from_black_alpha(85)
         };
         ui.painter().rect_filled(bar, 2.0, track_color);
         let filled = Rect::from_min_max(
@@ -3223,6 +3227,16 @@ pub fn search_field(
         palette.surface
     };
     ui.painter().rect_filled(rect, height / 2.0, fill);
+    // Spindle: on the light theme the field's fill is barely darker than
+    // the pane, so a hairline edge outlines it.
+    if !palette.dark && !has_focus {
+        ui.painter().rect_stroke(
+            rect,
+            height / 2.0,
+            Stroke::new(1.0, palette.outline),
+            egui::StrokeKind::Inside,
+        );
+    }
     if has_focus {
         ui.painter().rect_stroke(
             rect,

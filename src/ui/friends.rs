@@ -33,11 +33,7 @@ pub fn side_panel(app: &mut App, ui: &mut egui::Ui) {
         .default_size(app.settings.queue_width)
         .size_range(fit.range.clone())
         .show_separator_line(false)
-        .frame(
-            Frame::new()
-                .fill(palette.panel)
-                .inner_margin(Margin::symmetric(12, 12)),
-        );
+        .frame(theme::pane_frame(&palette, true, true).inner_margin(Margin::symmetric(12, 12)));
     let response = panel.show(ui, |ui| {
         // The panel sits where the Queue would, under the same controls.
         let window_controls =

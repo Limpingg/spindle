@@ -47,8 +47,9 @@ const LEAD_GUESS: f32 = super::widgets::PAGE_PADDING + 2.0 * 32.0 + 3.0 * ITEM_S
 /// A badge collapsed to its icon: a square as tall as its 12.5 pt label.
 const BADGE_CHIP: f32 = 15.0 + BADGE_PADDING_Y;
 
-/// Spindle: the round Home button before the search field.
-const HOME_SIZE: f32 = 44.0;
+/// Spindle: the round Home button before the search field, close to the
+/// field's 34 px so the two read as one control.
+const HOME_SIZE: f32 = 36.0;
 
 fn home_button(ui: &mut egui::Ui, palette: &Palette, active: bool, hint: &str) -> egui::Response {
     let (rect, response) = ui.allocate_exact_size(Vec2::splat(HOME_SIZE), Sense::click());
@@ -195,10 +196,11 @@ fn nav_button(
         },
     );
     if ui.is_rect_visible(rect) {
-        let fill = if palette.dark {
-            egui::Color32::from_black_alpha(90)
+        // Spindle: raised like the Home button, not sunk into the pane.
+        let fill = if response.hovered() && enabled {
+            palette.surface_hover
         } else {
-            egui::Color32::from_black_alpha(20)
+            palette.surface
         };
         ui.painter().circle_filled(rect.center(), 16.0, fill);
         let color = if !enabled {
@@ -302,7 +304,12 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
 
             // The badges sit at the right end but grow with their text, so
             // measure them here, before the search field takes its share.
-            let remote_now = app.now_playing().filter(|now| !now.local);
+            // Spindle: the green strip under the player bar already says
+            // where the music plays, so the bar carries no second badge.
+            let remote_now = app
+                .now_playing()
+                .filter(|now| !now.local)
+                .filter(|_| false);
             let device_icon = remote_now
                 .as_ref()
                 .and_then(|now| now.device_kind.as_deref())
@@ -394,6 +401,14 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
                 app.actions.push(Action::Open(Page::Home));
             }
             let id = egui::Id::new("global-search");
+            // Spindle: away from Search the field shows empty, as in
+            // Spotify, so an old query does not sit over Home or Settings.
+            // The query is kept for the way back; typing here starts anew.
+            let on_search = matches!(app.page(), Page::Search);
+            let mut stored = None;
+            if !on_search && !app.search.query.is_empty() {
+                stored = Some(std::mem::take(&mut app.search.query));
+            }
             let before = app.search.query.clone();
             let selected = egui::TextEdit::load_state(ui.ctx(), id)
                 .and_then(|state| state.cursor.char_range())
@@ -407,6 +422,15 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
                 &gettext(locale, "What do you want to play?"),
                 search_width,
             );
+            // Nothing typed: the kept query goes back, and counts as the
+            // field's text before and after, so it changes nothing.
+            let before = match stored {
+                Some(stored) if app.search.query.is_empty() => {
+                    app.search.query = stored.clone();
+                    stored
+                }
+                _ => before,
+            };
             if app.search.focus_requested {
                 app.search.focus_requested = false;
                 response.request_focus();

@@ -22214,7 +22214,8 @@ mod tests {
         );
         assert_eq!(ctx.theme(), egui::Theme::Light);
         assert!(!ctx.global_style().visuals.dark_mode);
-        assert_eq!(ctx.global_style().visuals.panel_fill, palette.panel);
+        // Spindle: egui's panel colour is the rounded panes' fill.
+        assert_eq!(ctx.global_style().visuals.panel_fill, palette.pane());
         let accepted = app.settings.clone();
         app.apply(Action::SetCustomTheme("missing.json".into()), &ctx);
         assert_eq!(

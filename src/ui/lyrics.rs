@@ -9,8 +9,10 @@ use crate::theme::{self, Icon};
 
 use super::widgets;
 
-const LINE_SIZE: f32 = 19.0;
-const LINE_GAP: f32 = 10.0;
+const LINE_SIZE: f32 = 20.0;
+// Spindle: more room between lines than inside a wrapped one, so each
+// line reads as one unit.
+const LINE_GAP: f32 = 14.0;
 /// Where the line being sung sits, as a fraction of the visible lyrics from
 /// the top: high up, so the lines to come fill most of the view.
 const SUNG_LINE_AT: f32 = 0.2;
@@ -47,11 +49,7 @@ pub fn side_panel(app: &mut App, ui: &mut egui::Ui) {
         .default_size(app.settings.lyrics_width)
         .size_range(fit.range.clone())
         .show_separator_line(false)
-        .frame(
-            Frame::new()
-                .fill(palette.panel)
-                .inner_margin(Margin::symmetric(12, 12)),
-        );
+        .frame(theme::pane_frame(&palette, true, true).inner_margin(Margin::symmetric(12, 12)));
     let response = panel.show(ui, |ui| {
         let window_controls = super::window_controls_reservation(
             ui.ctx(),
@@ -205,10 +203,12 @@ fn contents(app: &mut App, ui: &mut egui::Ui) {
 
     let active = lyrics.active_line(now.position_ms);
     let follow = app.lyrics_following && app.lyrics_line_shown != Some(active);
-    // The line being sung is bold and in the accent colour; every other
-    // line is quiet, regular text, the same before and after it has been
-    // sung. A line takes 220 ms to light up or fade, as in omarchy-lyrics.
-    let quiet = palette.text.gamma_multiply(0.45);
+    // The line being sung is bold; every other line is quiet, regular
+    // text. A line takes 220 ms to light up or fade, as in omarchy-lyrics.
+    // Spindle: lines already sung step back further than the ones to come,
+    // and the sung line is full white, so the eye finds it at once.
+    let sung = palette.text.gamma_multiply(0.52);
+    let upcoming = palette.text.gamma_multiply(0.72);
     let scroll = crate::autoscroll::show(
         ui,
         egui::ScrollArea::vertical()
@@ -233,7 +233,12 @@ fn contents(app: &mut App, ui: &mut egui::Ui) {
                     is_active,
                     crate::motion::seconds(ui.ctx(), LIGHT_UP_SECONDS),
                 );
-                let color = blend(quiet, palette.accent, lit);
+                let quiet = if active.is_some_and(|active| index < active) {
+                    sung
+                } else {
+                    upcoming
+                };
+                let color = blend(quiet, palette.text, lit);
                 let font = if lit > 0.5 {
                     theme::bold(LINE_SIZE)
                 } else {

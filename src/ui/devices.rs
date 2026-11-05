@@ -1,6 +1,6 @@
 //! The Spotify Connect device picker.
 
-use egui::{Align, CornerRadius, Layout, Rect, Sense, pos2, vec2};
+use egui::{CornerRadius, Rect, Sense, pos2, vec2};
 use fastframe_audio::DeviceInfo;
 
 use crate::api::models::Device;
@@ -261,7 +261,7 @@ fn output_picker(app: &mut App, ui: &mut egui::Ui) {
     let current_name = current
         .as_deref()
         .map(|saved| saved_output_name(saved, listed).to_string());
-    let (rect, response) = ui.allocate_exact_size(vec2(ui.available_width(), 44.0), Sense::click());
+    let (rect, response) = ui.allocate_exact_size(vec2(ui.available_width(), 36.0), Sense::click());
     response
         .widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, true, label.as_ref()));
     if response.hovered() {
@@ -553,11 +553,7 @@ pub fn side_panel(app: &mut App, ui: &mut egui::Ui) {
         .default_size(app.settings.queue_width)
         .size_range(fit.range.clone())
         .show_separator_line(false)
-        .frame(
-            egui::Frame::new()
-                .fill(palette.panel)
-                .inner_margin(egui::Margin::symmetric(12, 12)),
-        );
+        .frame(theme::pane_frame(&palette, true, true).inner_margin(egui::Margin::symmetric(12, 12)));
     let response = panel.show(ui, |ui| {
         let window_controls =
             super::window_controls_reservation(ui.ctx(), true, false, ui.available_width());
@@ -644,20 +640,28 @@ pub fn side_panel(app: &mut App, ui: &mut egui::Ui) {
                     output_picker(app, ui);
                 }
             });
-        ui.with_layout(Layout::bottom_up(Align::Min), |ui| {
-            help_link(
-                app,
-                ui,
-                &gettext(locale, "What can I connect to?"),
-                "https://connect.spotify.com/",
-            );
-            help_link(
-                app,
-                ui,
-                &gettext(locale, "Don't see your device?"),
-                "https://support.spotify.com/us/article/spotify-connect/",
-            );
-        });
+        // Spindle: the help links follow the list, under a hairline, rather
+        // than waiting at the foot of an empty panel.
+        ui.add_space(10.0);
+        let line = ui.available_rect_before_wrap();
+        ui.painter().hline(
+            (line.left() + 12.0)..=(line.right() - 12.0),
+            line.top(),
+            egui::Stroke::new(1.0, app.palette.outline),
+        );
+        ui.add_space(8.0);
+        help_link(
+            app,
+            ui,
+            &gettext(locale, "Don't see your device?"),
+            "https://support.spotify.com/us/article/spotify-connect/",
+        );
+        help_link(
+            app,
+            ui,
+            &gettext(locale, "What can I connect to?"),
+            "https://connect.spotify.com/",
+        );
     });
     let width = response.response.rect.width();
     if (width - app.settings.queue_width).abs() > 1.0
@@ -844,12 +848,13 @@ fn help_link(app: &mut App, ui: &mut egui::Ui, label: &str, url: &str) {
         pos2(rect.left() + 12.0, rect.center().y),
         egui::Align2::LEFT_CENTER,
         label,
-        theme::semibold(14.0),
-        palette.text,
+        // Spindle: quieter than the devices above it.
+        theme::regular(13.0),
+        palette.secondary,
     );
-    Icon::ExternalLink.image(palette.secondary, 16.0).paint_at(
+    Icon::ExternalLink.image(palette.dim, 14.0).paint_at(
         ui,
-        Rect::from_center_size(pos2(rect.right() - 16.0, rect.center().y), egui::Vec2::splat(16.0)),
+        Rect::from_center_size(pos2(rect.right() - 16.0, rect.center().y), egui::Vec2::splat(14.0)),
     );
     if response
         .on_hover_cursor(egui::CursorIcon::PointingHand)

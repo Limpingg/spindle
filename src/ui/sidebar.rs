@@ -569,9 +569,9 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
         .default_size(app.settings.sidebar_width)
         .size_range(fit.range.clone())
         .show_separator_line(false)
-        .frame(Frame::new().fill(palette.panel).inner_margin(Margin {
-            left: 12,
-            right: 8,
+        .frame(theme::pane_frame(&palette, true, false).inner_margin(Margin {
+            left: 6,
+            right: 6,
             top,
             bottom: if expanded_art { 0 } else { 8 },
         }));
@@ -1123,7 +1123,9 @@ fn contents(app: &mut App, ui: &mut egui::Ui, grid_art: Option<Rect>) {
     });
     ui.add_space(6.0);
 
-    ui.horizontal_wrapped(|ui| {
+    // Spindle: one row that scrolls sideways when the sidebar is narrow,
+    // instead of wrapping a lone chip onto a second line.
+    chip_row(ui, "library-filters", |ui| {
         ui.spacing_mut().item_spacing = vec2(6.0, 6.0);
         for (value, label) in [
             (Filter::Playlists, gettext(locale, "Playlists")),
@@ -1137,8 +1139,9 @@ fn contents(app: &mut App, ui: &mut egui::Ui, grid_art: Option<Rect>) {
         }
     });
     let sort = selected_sort(app, filter);
-    ui.add_space(4.0);
-    ui.horizontal_wrapped(|ui| {
+    ui.add_space(6.0);
+    chip_row(ui, "library-sort", |ui| {
+        ui.spacing_mut().item_spacing = vec2(6.0, 6.0);
         sort_menu(app, ui, filter, sort);
         if filter == Filter::Playlists {
             // Translators: Library filter for playlists created by the signed-in user.
@@ -3072,4 +3075,16 @@ mod ordering_tests {
         assert_eq!(full_playlist_order(&app).last().unwrap(), LIKED_SONGS_KEY);
         app.backend.shutdown();
     }
+}
+
+/// Spindle: a row of chips on one line, scrolling sideways with no bar when
+/// it is wider than the sidebar.
+fn chip_row(ui: &mut egui::Ui, id: &str, add: impl FnOnce(&mut egui::Ui)) {
+    egui::ScrollArea::horizontal()
+        .id_salt(id)
+        .scroll_bar_visibility(egui::scroll_area::ScrollBarVisibility::AlwaysHidden)
+        .auto_shrink([false, true])
+        .show(ui, |ui| {
+            ui.horizontal(add);
+        });
 }

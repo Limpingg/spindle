@@ -66,6 +66,9 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
             ),
         );
     }
+    // Spindle: the window is the gutter between rounded panes.
+    ui.painter()
+        .rect_filled(ui.max_rect(), 0.0, app.palette.gutter());
     // Spindle: drawn first so it sits under the player bar.
     player_bar::connect_strip(app, ui);
     player_bar::show(app, ui);
@@ -288,10 +291,19 @@ fn page_tint(app: &mut App) -> Option<Color32> {
 fn central(app: &mut App, ui: &mut egui::Ui) {
     let palette = app.palette;
     let tint = page_tint(app);
+    // Spindle: a rounded pane. It keeps the gap on its left always (to the
+    // window edge, or to the sidebar, which has none on its right so its
+    // own content keeps its width).
+    let left_gap = true;
+    let right_gap = !(app.show_queue_panel
+        || app.show_lyrics_panel
+        || app.show_friends_panel
+        || app.show_devices);
     egui::CentralPanel::default()
-        .frame(Frame::new().fill(palette.window))
+        .frame(theme::pane_frame(&palette, left_gap, right_gap))
         .show(ui, |ui| {
             let rect = ui.max_rect();
+            let pane_rect = rect;
             let page = app.page().clone();
             let overview = matches!(
                 page,
@@ -365,6 +377,7 @@ fn central(app: &mut App, ui: &mut egui::Ui) {
             ui.ctx()
                 .data_mut(|data| data.insert_temp(scrolled_id, scroll.state.offset.y));
             header_shadow(ui, scroll.inner_rect, scroll.state.offset.y, palette.dark);
+            theme::mask_pane_corners(ui.painter(), pane_rect, palette.gutter());
         });
 }
 
