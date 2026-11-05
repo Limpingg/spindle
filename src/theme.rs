@@ -49,7 +49,7 @@ impl Palette {
             surface_active: Color32::from_rgb(0x2f, 0x35, 0x3f),
             // Spindle: 3:1 against the page, so card edges and the off
             // toggle track read as controls (#2a3038 was 1.4:1).
-            outline: Color32::from_rgb(0x5a, 0x61, 0x6c),
+            outline: Color32::from_rgb(0x6b, 0x73, 0x7e),
             text: Color32::from_rgb(0xf2, 0xf4, 0xf6),
             secondary: Color32::from_rgb(0xa9, 0xb1, 0xbc),
             // Spindle: 4.5:1 on surfaces for small text (was #6e7784).
@@ -74,7 +74,7 @@ impl Palette {
             surface_hover: Color32::from_rgb(0xd8, 0xdd, 0xe4),
             surface_active: Color32::from_rgb(0xd7, 0xdb, 0xe1),
             // Spindle: field and pill edges that show on the pale panes.
-            outline: Color32::from_rgb(0xaa, 0xb1, 0xba),
+            outline: Color32::from_rgb(0x8a, 0x92, 0x9c),
             text: Color32::from_rgb(0x14, 0x17, 0x1a),
             secondary: Color32::from_rgb(0x53, 0x5b, 0x66),
             // Spindle: green that reads as text on white (5:1); #15a64a was 3:1.
@@ -942,7 +942,9 @@ fn soft_button_inner(
     } else {
         medium(13.0)
     };
-    let color = if active {
+    let color = if active && segment && palette.dark {
+        palette.text
+    } else if active {
         palette.window
     } else if segment {
         palette.secondary
@@ -987,9 +989,12 @@ fn soft_button_inner(
         let hovered = response.hovered() || over_dismiss;
         // Spindle: a selected pill is a soft white, not the brightest
         // block on the screen.
-        let fill = if active {
+        let fill = if active && segment && palette.dark {
+            // Spindle: a chosen segment is a raised grey, not a white block.
+            Color32::from_rgb(0x3e, 0x44, 0x4d)
+        } else if active {
             if palette.dark {
-                Color32::from_rgb(0xd9, 0xdd, 0xe2)
+                Color32::from_rgb(0xc9, 0xce, 0xd6)
             } else {
                 palette.text
             }

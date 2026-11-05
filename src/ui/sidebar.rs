@@ -3100,7 +3100,7 @@ fn active_row_fill(palette: &theme::Palette) -> egui::Color32 {
     if palette.dark {
         palette.surface
     } else {
-        palette.surface_hover
+        egui::Color32::from_rgb(0xcd, 0xd3, 0xda)
     }
 }
 

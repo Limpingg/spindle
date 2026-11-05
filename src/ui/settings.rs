@@ -345,8 +345,8 @@ fn section(
             bottom: 6,
         })
         .show(ui, |ui| {
-            // Spindle: the card fills the page's column, as the lists do.
-            ui.set_width(ui.available_width());
+            // Spindle: a readable column; labels and controls stay near.
+            ui.set_width(ui.available_width().min(880.0));
             add_contents(ui);
         });
     ui.add_space(8.0);
@@ -2688,7 +2688,7 @@ fn eq_curve(ui: &mut egui::Ui, palette: &Palette, settings: &crate::eq::EqSettin
 /// Spindle: an input's edge, 3:1 against its card so it reads as a field.
 fn field_edge(palette: &Palette) -> egui::Color32 {
     if palette.dark {
-        egui::Color32::from_rgb(0x5a, 0x61, 0x6c)
+        palette.outline
     } else {
         palette.outline
     }

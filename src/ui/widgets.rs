@@ -2660,7 +2660,10 @@ pub fn card(
     const TITLE_GAP: f32 = 10.0;
     const SUBTITLE_GAP: f32 = 2.0;
     const BOTTOM_PAD: f32 = 8.0;
-    let image_size = CARD_ART;
+    // Spindle: a shelf sets its own art size so whole cards fill the row.
+    let image_size = ui
+        .data(|data| data.get_temp::<f32>(egui::Id::new(SHELF_ART_ID)))
+        .unwrap_or(CARD_ART);
     let text_width = image_size;
     let title_font = theme::semibold(14.0);
     let subtitle_font = theme::regular(12.5);
@@ -2676,7 +2679,8 @@ pub fn card(
     });
     let height =
         PAD + image_size + TITLE_GAP + title_row + SUBTITLE_GAP + 2.0 * subtitle_row + BOTTOM_PAD;
-    let (rect, response) = ui.allocate_exact_size(vec2(CARD_WIDTH, height), Sense::click());
+    let (rect, response) =
+        ui.allocate_exact_size(vec2(image_size + 2.0 * PAD, height), Sense::click());
     response.widget_info(|| {
         egui::WidgetInfo::labeled(
             egui::WidgetType::Button,
@@ -2806,6 +2810,9 @@ pub fn linked_shelf(
     clicked
 }
 
+/// Spindle: where a shelf leaves the art size its cards take.
+const SHELF_ART_ID: &str = "shelf-card-art";
+
 /// Spindle: how far a shelf row reaches past its column, the cards' own
 /// inset, so card art sits on the heading's edge.
 const CARD_BLEED: f32 = 12.0;
@@ -2836,22 +2843,20 @@ fn shelf_cards(ui: &mut Ui, palette: &Palette, id: &str, add_contents: impl FnOn
     // Spindle: no edge fade: cards end on the column's edge, and a fade
     // painted the plain pane over a header's wash.
     child.spacing_mut().scroll.fade.strength = 0.0;
-    // Spindle: as many whole cards as fit, spread so the last one ends on
-    // the column's edge; more scroll in from past it. No row stops short
-    // and none shows a sliced card at rest.
-    let min_gap = CARD_GAP / 2.0;
-    let fit = ((room.width() + min_gap) / (CARD_WIDTH + min_gap)).floor().max(1.0);
-    let gap = if fit > 1.0 {
-        ((room.width() - fit * CARD_WIDTH) / (fit - 1.0)).max(min_gap)
-    } else {
-        min_gap
-    };
+    // Spindle: as many whole cards as fit, grown so the last one ends on
+    // the column's edge, art 24 px apart (the cards' own insets); more
+    // scroll in from past it.
+    let fit = (room.width() / CARD_WIDTH).floor().max(1.0);
+    let art = (room.width() / fit - 24.0).clamp(CARD_ART, CARD_ART * 1.35);
+    let gap = 0.0;
+    child.data_mut(|data| data.insert_temp(egui::Id::new(SHELF_ART_ID), art));
     let output = crate::autoscroll::show(&mut child, area, egui::Vec2b::new(true, false), |ui| {
         ui.horizontal(|ui| {
             ui.spacing_mut().item_spacing.x = gap;
             add_contents(ui);
         });
     });
+    child.data_mut(|data| data.remove_temp::<f32>(egui::Id::new(SHELF_ART_ID)));
     let used = child.min_rect();
     ui.allocate_rect(
         egui::Rect::from_x_y_ranges(column, used.y_range()),
@@ -2869,7 +2874,7 @@ fn shelf_cards(ui: &mut Ui, palette: &Palette, id: &str, add_contents: impl FnOn
             }
             let centre = egui::pos2(
                 if left { rect.left() + 20.0 } else { rect.right() - 20.0 },
-                rect.top() + CARD_ART_GUESS / 2.0,
+                rect.top() + 12.0 + art / 2.0,
             );
             let button = egui::Rect::from_center_size(centre, vec2(32.0, 32.0));
             let response = ui
@@ -2903,6 +2908,7 @@ fn shelf_cards(ui: &mut Ui, palette: &Palette, id: &str, add_contents: impl FnOn
 }
 
 /// Where a shelf's arrows sit: the middle of a card's cover.
+#[allow(dead_code)]
 const CARD_ART_GUESS: f32 = 160.0;
 
 /// A wrapping grid of cards.
@@ -3211,7 +3217,7 @@ pub fn thin_slider(
         let track_color = if palette.dark {
             Color32::from_rgb(0x5a, 0x61, 0x6b)
         } else {
-            Color32::from_rgb(0xa3, 0xa9, 0xb2)
+            Color32::from_rgb(0x8a, 0x92, 0x9c)
         };
         ui.painter().rect_filled(bar, 2.0, track_color);
         let filled = Rect::from_min_max(
