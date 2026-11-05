@@ -49,7 +49,7 @@ impl Palette {
             surface_active: Color32::from_rgb(0x2f, 0x35, 0x3f),
             // Spindle: 3:1 against the page, so card edges and the off
             // toggle track read as controls (#2a3038 was 1.4:1).
-            outline: Color32::from_rgb(0x46, 0x4d, 0x58),
+            outline: Color32::from_rgb(0x5a, 0x61, 0x6c),
             text: Color32::from_rgb(0xf2, 0xf4, 0xf6),
             secondary: Color32::from_rgb(0xa9, 0xb1, 0xbc),
             // Spindle: 4.5:1 on surfaces for small text (was #6e7784).
@@ -96,7 +96,7 @@ impl Palette {
         if self.dark {
             Color32::from_rgb(0x00, 0x00, 0x00)
         } else {
-            Color32::from_rgb(0xe2, 0xe5, 0xea)
+            Color32::from_rgb(0xd9, 0xdd, 0xe2)
         }
     }
 
@@ -114,13 +114,23 @@ impl Palette {
         }
     }
 
+    /// Spindle: a quiet hairline between parts of a list or panel, under
+    /// the 3:1 edge that controls take.
+    pub fn rule(&self) -> Color32 {
+        if self.dark {
+            Color32::from_rgb(0x2e, 0x34, 0x3d)
+        } else {
+            Color32::from_rgb(0xc9, 0xce, 0xd5)
+        }
+    }
+
     /// Spindle: the fill of the rounded panes.
     pub fn pane(&self) -> Color32 {
         // A touch under white on the light theme: pure white glared.
         if self.dark {
             self.window
         } else {
-            Color32::from_rgb(0xee, 0xf0, 0xf3)
+            Color32::from_rgb(0xe6, 0xe9, 0xed)
         }
     }
 

@@ -2538,7 +2538,7 @@ pub fn table_header(
     ui.painter().hline(
         rect.x_range(),
         rect.bottom() - 0.5,
-        Stroke::new(1.0, palette.outline),
+        Stroke::new(1.0, palette.rule()),
     );
     ui.add_space(6.0);
     clicked
@@ -2812,8 +2812,9 @@ fn shelf_cards(ui: &mut Ui, palette: &Palette, id: &str, add_contents: impl FnOn
     // shelf heading after it.
     let column = ui.available_rect_before_wrap().x_range();
     let mut child = ui.new_child(egui::UiBuilder::new().max_rect(room));
-    child.spacing_mut().scroll.fade.strength = 1.0;
-    child.spacing_mut().scroll.fade.size = 24.0;
+    // Spindle: no edge fade: cards end on the column's edge, and a fade
+    // painted the plain pane over a header's wash.
+    child.spacing_mut().scroll.fade.strength = 0.0;
     // Spindle: as many whole cards as fit, spread so the last one ends on
     // the column's edge; more scroll in from past it. No row stops short
     // and none shows a sliced card at rest.
@@ -3189,7 +3190,7 @@ pub fn thin_slider(
         let track_color = if palette.dark {
             Color32::from_rgb(0x5a, 0x61, 0x6b)
         } else {
-            Color32::from_rgb(0xc9, 0xcd, 0xd3)
+            Color32::from_rgb(0xa3, 0xa9, 0xb2)
         };
         ui.painter().rect_filled(bar, 2.0, track_color);
         let filled = Rect::from_min_max(

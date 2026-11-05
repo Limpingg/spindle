@@ -165,7 +165,7 @@ fn enable_playback_row(app: &mut App, ui: &mut egui::Ui) {
     ui.painter().hline(
         rect.x_range(),
         rect.bottom(),
-        egui::Stroke::new(1.0, palette.outline),
+        egui::Stroke::new(1.0, palette.rule()),
     );
     ui.add_space(4.0);
 }
@@ -648,7 +648,7 @@ pub fn side_panel(app: &mut App, ui: &mut egui::Ui) {
         ui.painter().hline(
             line.x_range(),
             line.top(),
-            egui::Stroke::new(1.0, app.palette.outline),
+            egui::Stroke::new(1.0, app.palette.rule()),
         );
         ui.add_space(8.0);
         help_link(

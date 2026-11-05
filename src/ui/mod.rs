@@ -541,8 +541,11 @@ fn header_wash(
     overview: bool,
     art: Option<Color32>,
 ) -> Option<(Color32, Color32)> {
+    // Spindle: overview pages (Home, Search) take no cover wash: it came
+    // and went with whether the playing cover's colour had loaded.
+    let art = art.filter(|_| !overview);
     if let Some(art) = art {
-        let strength = if overview { 0.45 } else { 0.85 };
+        let strength = 0.85;
         // Spindle: from and to the pane's own fill, so the wash ends on
         // the colour under it with no step.
         let base = palette.pane();
@@ -821,9 +824,8 @@ mod tests {
 
         let art = Color32::from_rgb(0x50, 0x38, 0xc8);
         let (page, _) = header_wash(&palette, false, Some(art)).unwrap();
-        let (overview, _) = header_wash(&palette, true, Some(art)).unwrap();
-        assert_eq!(page, blend(palette.window, art, 0.85));
-        assert_eq!(overview, blend(palette.window, art, 0.45));
+        assert_eq!(page, blend(palette.pane(), art, 0.85));
+        assert_eq!(header_wash(&palette, true, Some(art)), None, "overviews stay plain");
 
         palette.tint = Color32::from_black_alpha(24);
         assert_eq!(

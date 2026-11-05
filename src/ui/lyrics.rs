@@ -264,7 +264,7 @@ fn contents(app: &mut App, ui: &mut egui::Ui) {
         egui::Color32::from_rgb(0x8a, 0x92, 0x9c)
     };
     let upcoming = if palette.dark {
-        egui::Color32::from_rgb(0x8e, 0x96, 0xa1)
+        egui::Color32::from_rgb(0x7a, 0x82, 0x8d)
     } else {
         palette.dim
     };
