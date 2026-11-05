@@ -49,7 +49,7 @@ impl Palette {
             surface_active: Color32::from_rgb(0x2f, 0x35, 0x3f),
             // Spindle: 3:1 against the page, so card edges and the off
             // toggle track read as controls (#2a3038 was 1.4:1).
-            outline: Color32::from_rgb(0x3a, 0x41, 0x4b),
+            outline: Color32::from_rgb(0x46, 0x4d, 0x58),
             text: Color32::from_rgb(0xf2, 0xf4, 0xf6),
             secondary: Color32::from_rgb(0xa9, 0xb1, 0xbc),
             // Spindle: 4.5:1 on surfaces for small text (was #6e7784).
@@ -96,7 +96,7 @@ impl Palette {
         if self.dark {
             Color32::from_rgb(0x00, 0x00, 0x00)
         } else {
-            Color32::from_rgb(0xdf, 0xe3, 0xe8)
+            Color32::from_rgb(0xd2, 0xd7, 0xde)
         }
     }
 
@@ -814,7 +814,8 @@ pub fn pill_button(ui: &mut egui::Ui, palette: &Palette, label: &str, primary: b
         palette.text
     };
     let galley = ui.painter().layout_no_wrap(label.to_string(), font, color);
-    let padding = Vec2::new(18.0, 7.5);
+    // Spindle: 32 px tall, as every pill and field is.
+    let padding = Vec2::new(18.0, 8.0);
     let size = galley.size() + padding * 2.0;
     let (rect, response) = ui.allocate_exact_size(size, Sense::click());
     response.widget_info(|| {

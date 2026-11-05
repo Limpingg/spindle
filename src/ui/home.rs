@@ -195,7 +195,7 @@ fn quick_access(app: &mut App, ui: &mut egui::Ui) {
     let available = ui.available_width();
     // Spindle: as many columns as fit, then fewer if that leaves a hole in
     // the last row (8 tiles fill 4 columns, not 3).
-    let most = ((available / 180.0).floor() as usize).clamp(2, 4);
+    let most = ((available / 220.0).floor() as usize).clamp(2, 4);
     let columns = (2..=most)
         .rev()
         .find(|columns| tiles.len() % columns == 0)

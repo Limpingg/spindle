@@ -45,6 +45,13 @@ pub fn show(app: &mut App, ui: &mut egui::Ui, id: &str) {
                     app.request_play_counts(&artist.uri);
                     let show_plays = app.has_play_counts(&artist.uri);
                     let render_top = |ui: &mut egui::Ui, app: &mut App| {
+                        // Spindle: a short list stays compact, so the plays
+                        // sit near the title, not 650 px from it.
+                        let width = ui.available_width().min(860.0);
+                        ui.allocate_ui_with_layout(
+                            egui::vec2(width, 0.0),
+                            egui::Layout::top_down(egui::Align::Min),
+                            |ui| {
                         // Spindle: rows sit flush, one 56 px pitch, as on a playlist.
                         ui.spacing_mut().item_spacing.y = 0.0;
                         for (index, item) in items.iter().take(limit).enumerate() {
@@ -72,6 +79,8 @@ pub fn show(app: &mut App, ui: &mut egui::Ui, id: &str) {
                                 },
                             );
                         }
+                            },
+                        );
                     };
                     if !app.network_reachable {
                         ui.add_enabled_ui(false, |ui| {

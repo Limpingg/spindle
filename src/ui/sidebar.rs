@@ -1493,7 +1493,7 @@ fn contents(app: &mut App, ui: &mut egui::Ui, grid_art: Option<Rect>) {
                 if ui.is_rect_visible(rect) {
                     if active {
                         ui.painter()
-                            .rect_filled(rect, CornerRadius::same(6), palette.surface);
+                            .rect_filled(rect, CornerRadius::same(6), active_row_fill(&palette));
                     } else if response.hovered() {
                         ui.painter().rect_filled(
                             rect,
@@ -1845,7 +1845,7 @@ fn library_grid(
                     if ui.is_rect_visible(rect) {
                         if active {
                             ui.painter()
-                                .rect_filled(rect, CornerRadius::same(6), palette.surface);
+                                .rect_filled(rect, CornerRadius::same(6), active_row_fill(&palette));
                         } else if response.hovered() {
                             ui.painter().rect_filled(
                                 rect,
@@ -3094,6 +3094,16 @@ mod ordering_tests {
 
 /// Spindle: a row of chips on one line, scrolling sideways with no bar when
 /// it is wider than the sidebar.
+/// Spindle: the open page's row; on the light theme the plain surface
+/// matched the pane and showed nothing.
+fn active_row_fill(palette: &theme::Palette) -> egui::Color32 {
+    if palette.dark {
+        palette.surface
+    } else {
+        palette.surface_hover
+    }
+}
+
 fn chip_row(ui: &mut egui::Ui, id: &str, add: impl FnOnce(&mut egui::Ui)) {
     egui::ScrollArea::horizontal()
         .id_salt(id)

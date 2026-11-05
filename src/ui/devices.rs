@@ -822,7 +822,7 @@ fn jam_line(app: &mut App, ui: &mut egui::Ui) {
             Rect::from_center_size(pos2(rect.left() + 12.0, rect.center().y), egui::Vec2::splat(16.0)),
         );
     ui.painter().with_clip_rect(rect).text(
-        pos2(rect.left() + 32.0, rect.center().y),
+        pos2(rect.left() + 36.0, rect.center().y),
         egui::Align2::LEFT_CENTER,
         label,
         if live {

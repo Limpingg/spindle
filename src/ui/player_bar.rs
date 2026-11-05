@@ -178,7 +178,9 @@ pub fn connect_strip(app: &mut App, ui: &mut egui::Ui) {
 pub fn show(app: &mut App, ui: &mut egui::Ui) {
     let palette = app.palette;
     // Spindle: the bar sits on the gutter, under the rounded panes.
-    let fill = eased_fill(ui.ctx(), palette.gutter(), app.now_playing_tint());
+    // Spindle: one bar colour on every page; a cover's tint showed only on
+    // pages that had read that cover's colour.
+    let fill = eased_fill(ui.ctx(), palette.gutter(), None);
     egui::Panel::bottom("player-bar")
         .exact_size(theme::PLAYER_BAR_HEIGHT)
         .resizable(false)

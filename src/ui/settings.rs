@@ -79,7 +79,7 @@ fn eq_preset_controls(app: &mut App, ui: &mut egui::Ui, current: Option<&str>) {
             // Spindle: a pill with a hairline edge, like the search fields.
             .corner_radius(CornerRadius::same(16))
             .stroke(egui::Stroke::new(1.0, field_edge(&palette)))
-            .inner_margin(Margin::symmetric(14, 2))
+            .inner_margin(Margin::symmetric(14, 0))
             .show(ui, |ui| {
                 widgets::text_edit(
                     ui,
@@ -539,7 +539,7 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
                     // Spindle: a pill with a hairline edge, like the search fields.
                     .corner_radius(CornerRadius::same(16))
                     .stroke(egui::Stroke::new(1.0, field_edge(&palette)))
-                    .inner_margin(Margin::symmetric(14, 2))
+                    .inner_margin(Margin::symmetric(14, 0))
                     .show(ui, |ui| {
                         widgets::text_edit(
                             ui,
@@ -748,6 +748,14 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
         .when(!cfg!(target_os = "macos")),
         RowText::new(start_with_computer.clone(), start_detail).when(start_available),
     ];
+    let search_row = RowText::new(
+        gettext(locale, "Full search"),
+        gettext(
+            locale,
+            "Search all of Spotify through this computer. Opens your browser once to approve.",
+        ),
+    )
+    .when(app.local_ready && !crate::session_search::has_grant(&app.dirs.state));
     if section_matches(&needle, &playback, &playback_rows) {
         any_visible = true;
         section(ui, &palette, &playback, |ui| {
@@ -768,18 +776,18 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
                 {
                     app.actions.push(Action::RestartEngine);
                 }
-                // Spindle: Spotify answers the full catalogue search only
-                // after a browser approval; offer it until one is saved.
-                if app.local_ready
-                    && !crate::session_search::has_grant(&app.dirs.state)
-                    && theme::soft_button(
-                        ui,
-                        &palette,
-                        Some(Icon::Search),
-                        &gettext(locale, "Turn on full search"),
-                        false,
-                    )
-                    .clicked()
+            });
+            // Spindle: Spotify answers the full catalogue search only after
+            // a browser approval; its own row offers it until one is saved.
+            filtered_row(ui, &palette, &needle, &playback, &search_row, |ui| {
+                if theme::soft_button(
+                    ui,
+                    &palette,
+                    Some(Icon::Search),
+                    &gettext(locale, "Turn on"),
+                    false,
+                )
+                .clicked()
                 {
                     app.actions.push(Action::AuthorizeSearch);
                 }
@@ -790,7 +798,7 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
                     // Spindle: a pill with a hairline edge, like the search fields.
                     .corner_radius(CornerRadius::same(16))
                     .stroke(egui::Stroke::new(1.0, field_edge(&palette)))
-                    .inner_margin(Margin::symmetric(14, 2))
+                    .inner_margin(Margin::symmetric(14, 0))
                     .show(ui, |ui| {
                         widgets::text_edit(
                             ui,

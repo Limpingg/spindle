@@ -3428,8 +3428,17 @@ pub fn switch(ui: &mut Ui, palette: &Palette, label: &str, on: &mut bool) -> egu
         ui.painter()
             .rect_filled(rect, rect.height() / 2.0, Color32::from(fill));
         let knob_x = egui::lerp(rect.left() + 11.0..=rect.right() - 11.0, t);
+        // Spindle: on the bright green track a dark knob, 3:1 or more.
+        let knob = if palette.dark {
+            Color32::from(egui::lerp(
+                egui::Rgba::from(Color32::WHITE)..=egui::Rgba::from(palette.window),
+                t,
+            ))
+        } else {
+            Color32::WHITE
+        };
         ui.painter()
-            .circle_filled(pos2(knob_x, rect.center().y), 8.0, Color32::WHITE);
+            .circle_filled(pos2(knob_x, rect.center().y), 8.0, knob);
     }
     response.widget_info(|| {
         egui::WidgetInfo::selected(egui::WidgetType::Checkbox, ui.is_enabled(), *on, label)

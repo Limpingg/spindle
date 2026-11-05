@@ -266,11 +266,7 @@ fn contents(app: &mut App, ui: &mut egui::Ui) {
     } else {
         palette.secondary
     };
-    let sung_line = if palette.dark {
-        egui::Color32::WHITE
-    } else {
-        palette.text
-    };
+    let sung_line = palette.text;
     // Spindle: lines fade out under the header and above the panel's
     // foot instead of being cut through.
     ui.spacing_mut().scroll.fade.strength = 1.0;
@@ -400,7 +396,10 @@ fn contents(app: &mut App, ui: &mut egui::Ui) {
             mesh.add_triangle(base, base + 1, base + 2);
             mesh.add_triangle(base + 1, base + 2, base + 3);
         };
-        band(rect.top(), rect.top() + fade, fill, clear);
+        // Solid for the first 14 px, so no ghost of a line hangs under
+        // the song's row.
+        band(rect.top(), rect.top() + 14.0, fill, fill);
+        band(rect.top() + 14.0, rect.top() + 14.0 + fade, fill, clear);
         band(rect.bottom() - fade, rect.bottom(), clear, fill);
         painter.add(mesh);
     }
