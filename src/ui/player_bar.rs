@@ -49,6 +49,13 @@ pub(crate) fn end_tint_session(ctx: &egui::Context) {
 /// The strip's band and words: the accent mixed a fifth into the bar's own
 /// colour, and the accent (a deeper green on the light theme, where the
 /// bright one fails contrast on a pale band).
+/// Spindle: the dot under a player bar button whose panel is open, as
+/// Spotify has it, so the state does not rest on colour alone.
+fn active_dot(ui: &egui::Ui, button: Rect, color: egui::Color32) {
+    ui.painter()
+        .circle_filled(pos2(button.center().x, button.bottom() + 3.0), 2.0, color);
+}
+
 fn strip_colors(palette: &theme::Palette) -> (egui::Color32, egui::Color32) {
     let mix = |a: u8, b: u8, t: f32| (f32::from(a) + (f32::from(b) - f32::from(a)) * t).round() as u8;
     let (base, accent) = (palette.gutter(), palette.accent);
@@ -69,7 +76,7 @@ fn strip_colors(palette: &theme::Palette) -> (egui::Color32, egui::Color32) {
         // A clear green band with deep green words (6.6:1) on the light
         // theme, where a mix into the grey bar came out grey.
         (
-            egui::Color32::from_rgb(0xd8, 0xec, 0xdf),
+            egui::Color32::from_rgb(0xc4, 0xe5, 0xcf),
             egui::Color32::from_rgb(0x0b, 0x5c, 0x2a),
         )
     }
@@ -1265,6 +1272,9 @@ fn bar_button(app: &mut App, ui: &mut egui::Ui, now: Option<&NowPlaying>, name: 
             ui.ctx().data_mut(|data| {
                 data.insert_temp(egui::Id::new(super::devices::BUTTON_RECT_ID), devices.rect)
             });
+            if app.show_devices {
+                active_dot(ui, devices.rect, palette.accent);
+            }
             if devices.clicked() {
                 app.actions.push(Action::ToggleDevicesPopup);
             }
@@ -1283,6 +1293,9 @@ fn bar_button(app: &mut App, ui: &mut egui::Ui, now: Option<&NowPlaying>, name: 
                 palette.text,
                 &gettext(app.locale, "Queue"),
             );
+            if queue_open {
+                active_dot(ui, queue_button.rect, palette.accent);
+            }
             if queue_button.clicked() {
                 app.actions.push(Action::ToggleQueuePanel);
             }
@@ -1299,7 +1312,7 @@ fn bar_button(app: &mut App, ui: &mut egui::Ui, now: Option<&NowPlaying>, name: 
             }
         }
         "lyrics" => {
-            if theme::icon_button(
+            let lyrics_button = theme::icon_button(
                 ui,
                 // Spindle: the tilted vocal mic Spotify uses for lyrics.
                 Icon::MicVocal,
@@ -1311,9 +1324,11 @@ fn bar_button(app: &mut App, ui: &mut egui::Ui, now: Option<&NowPlaying>, name: 
                 },
                 palette.text,
                 &gettext(app.locale, "Lyrics"),
-            )
-            .clicked()
-            {
+            );
+            if app.show_lyrics_panel {
+                active_dot(ui, lyrics_button.rect, palette.accent);
+            }
+            if lyrics_button.clicked() {
                 app.actions.push(Action::ToggleLyricsPanel);
             }
         }
