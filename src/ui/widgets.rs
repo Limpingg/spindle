@@ -1403,6 +1403,16 @@ struct Columns {
 /// The play count column's width, in rows and in the header alike.
 const PLAYS_WIDTH: f32 = 120.0;
 
+/// Spindle: with no other middle columns, plays start at 55 % of the row,
+/// as in Spotify, rather than 700 px from the titles beside the duration.
+fn plays_column(width: f32, others: f32) -> f32 {
+    if others > 0.0 {
+        return PLAYS_WIDTH;
+    }
+    let right_fixed = 36.0 + 56.0 + 36.0 + 8.0;
+    (width * 0.45 - right_fixed).max(PLAYS_WIDTH)
+}
+
 /// Whether a list `width` wide has room for play counts.
 fn plays_fit(width: f32) -> bool {
     width > 560.0
@@ -1438,7 +1448,18 @@ fn columns(width: f32, row: &TrackRow<'_>) -> Columns {
             0.0
         },
         plays: if row.show_plays && !row.compact && plays_fit(width) {
-            PLAYS_WIDTH
+            let others = if row.show_album && medium {
+                (width * 0.28).clamp(140.0, 360.0)
+            } else {
+                0.0
+            } + if row.show_added_by && wide { 130.0 } else { 0.0 }
+                + if row.added_at.is_some() && (if row.show_added_by { extra_wide } else { wide })
+                {
+                    120.0
+                } else {
+                    0.0
+                };
+            plays_column(width, others)
         } else {
             0.0
         },
@@ -2437,7 +2458,7 @@ pub fn table_header(
     };
     let added_by_width = if show_added_by && wide { 130.0 } else { 0.0 };
     let plays_width = if show_plays && plays_fit(width) {
-        PLAYS_WIDTH
+        plays_column(width, album_width + added_width + added_by_width)
     } else {
         0.0
     };
