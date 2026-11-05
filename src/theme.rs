@@ -100,6 +100,20 @@ impl Palette {
         }
     }
 
+    /// Spindle: the big round play button: the brand green with a dark
+    /// glyph on both themes, as Spotify has it.
+    pub fn play_button(&self) -> (Color32, Color32, Color32) {
+        if self.dark {
+            (self.accent, self.accent_hover, self.on_accent)
+        } else {
+            (
+                Color32::from_rgb(0x1e, 0xd7, 0x60),
+                Color32::from_rgb(0x3c, 0xe8, 0x7a),
+                Color32::from_rgb(0x0a, 0x14, 0x0e),
+            )
+        }
+    }
+
     /// Spindle: the fill of the rounded panes.
     pub fn pane(&self) -> Color32 {
         // A touch under white on the light theme: pure white glared.

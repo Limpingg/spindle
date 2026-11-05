@@ -294,9 +294,9 @@ pub fn actions_row(
                         ui,
                         icon,
                         56.0,
-                        palette.accent,
-                        palette.accent_hover,
-                        palette.on_accent,
+                        palette.play_button().0,
+                        palette.play_button().1,
+                        palette.play_button().2,
                         &if now_playing_here {
                             gettext(locale, "Pause")
                         } else {

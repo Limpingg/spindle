@@ -108,7 +108,7 @@ pub fn connect_strip(app: &mut App, ui: &mut egui::Ui) {
         .frame(
             Frame::new()
                 .fill(fill)
-                .inner_margin(Margin::symmetric(20, 0)),
+                .inner_margin(Margin::symmetric(16, 0)),
         )
         .show(ui, |ui| {
             // Spindle: a status line read left to right from under the
@@ -546,7 +546,7 @@ fn eased_fill(ctx: &egui::Context, panel: Color32, tint: Option<Color32>) -> Col
 fn now_playing_block(app: &mut App, ui: &mut egui::Ui, region: Rect, now: Option<&NowPlaying>) {
     let palette = app.palette;
     let cy = region.center().y;
-    let cover_rect = Rect::from_min_size(pos2(region.left() + 4.0, cy - 28.0), Vec2::splat(56.0));
+    let cover_rect = Rect::from_min_size(pos2(region.left(), cy - 28.0), Vec2::splat(56.0));
 
     let Some(now) = now else {
         super::widgets::paint_cover(ui, &palette, None, cover_rect, 6.0, Icon::Music, None);

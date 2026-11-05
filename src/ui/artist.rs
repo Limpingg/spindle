@@ -412,9 +412,9 @@ fn artist_actions(app: &mut App, ui: &mut egui::Ui, artist: &Artist) {
             ui,
             Icon::PlayFilled,
             56.0,
-            palette.accent,
-            palette.accent_hover,
-            palette.on_accent,
+            palette.play_button().0,
+            palette.play_button().1,
+            palette.play_button().2,
             &gettext(locale, "Play"),
         )
         .clicked()

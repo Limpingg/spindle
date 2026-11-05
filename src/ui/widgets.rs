@@ -2813,10 +2813,20 @@ fn shelf_cards(ui: &mut Ui, palette: &Palette, id: &str, add_contents: impl FnOn
     let column = ui.available_rect_before_wrap().x_range();
     let mut child = ui.new_child(egui::UiBuilder::new().max_rect(room));
     child.spacing_mut().scroll.fade.strength = 1.0;
-    child.spacing_mut().scroll.fade.size = 48.0;
+    child.spacing_mut().scroll.fade.size = 24.0;
+    // Spindle: as many whole cards as fit, spread so the last one ends on
+    // the column's edge; more scroll in from past it. No row stops short
+    // and none shows a sliced card at rest.
+    let min_gap = CARD_GAP / 2.0;
+    let fit = ((room.width() + min_gap) / (CARD_WIDTH + min_gap)).floor().max(1.0);
+    let gap = if fit > 1.0 {
+        ((room.width() - fit * CARD_WIDTH) / (fit - 1.0)).max(min_gap)
+    } else {
+        min_gap
+    };
     let output = crate::autoscroll::show(&mut child, area, egui::Vec2b::new(true, false), |ui| {
         ui.horizontal(|ui| {
-            ui.spacing_mut().item_spacing.x = CARD_GAP / 2.0;
+            ui.spacing_mut().item_spacing.x = gap;
             add_contents(ui);
         });
     });
@@ -3177,9 +3187,9 @@ pub fn thin_slider(
         let bar = Rect::from_center_size(rect.center(), vec2(rect.width(), 4.0));
         // Spindle: 3:1 against the bar, so the track reads as a control.
         let track_color = if palette.dark {
-            Color32::from_rgb(0x4d, 0x53, 0x5c)
+            Color32::from_rgb(0x5a, 0x61, 0x6b)
         } else {
-            Color32::from_black_alpha(125)
+            Color32::from_rgb(0xc9, 0xcd, 0xd3)
         };
         ui.painter().rect_filled(bar, 2.0, track_color);
         let filled = Rect::from_min_max(

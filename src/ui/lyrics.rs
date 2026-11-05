@@ -154,7 +154,7 @@ pub fn side_panel(app: &mut App, ui: &mut egui::Ui) {
                 palette.secondary,
             );
         }
-        ui.add_space(16.0);
+        ui.add_space(4.0);
         contents(app, ui);
     });
     let current_width = response.response.rect.width();
@@ -289,7 +289,8 @@ fn contents(app: &mut App, ui: &mut egui::Ui) {
                     Some(Align::Min),
                 );
             }
-            ui.add_space(12.0);
+            // Spindle: clear of the solid band at the top.
+            ui.add_space(32.0);
             for (index, line) in lyrics.lines.iter().enumerate() {
                 let is_active = active == Some(index);
                 let lit = ui.ctx().animate_bool_with_time(
@@ -400,8 +401,8 @@ fn contents(app: &mut App, ui: &mut egui::Ui) {
         };
         // Solid for the first 14 px, so no ghost of a line hangs under
         // the song's row.
-        band(rect.top(), rect.top() + 14.0, fill, fill);
-        band(rect.top() + 14.0, rect.top() + 14.0 + fade, fill, clear);
+        band(rect.top(), rect.top() + 28.0, fill, fill);
+        band(rect.top() + 28.0, rect.top() + 28.0 + fade, fill, clear);
         band(rect.bottom() - fade, rect.bottom(), clear, fill);
         painter.add(mesh);
     }
