@@ -259,14 +259,14 @@ fn contents(app: &mut App, ui: &mut egui::Ui) {
     // Spindle: sung lines step back further than the ones to come, so
     // the place in the song shows at a glance.
     let sung = if palette.dark {
-        egui::Color32::from_rgb(0x6e, 0x76, 0x81)
+        egui::Color32::from_rgb(0x5f, 0x66, 0x70)
     } else {
-        palette.dim
+        egui::Color32::from_rgb(0x8a, 0x92, 0x9c)
     };
     let upcoming = if palette.dark {
-        egui::Color32::from_rgb(0xa9, 0xb1, 0xbc)
+        egui::Color32::from_rgb(0x8e, 0x96, 0xa1)
     } else {
-        palette.secondary
+        palette.dim
     };
     let sung_line = palette.text;
     // Spindle: lines fade out under the header and above the panel's

@@ -3430,7 +3430,7 @@ pub fn switch(ui: &mut Ui, palette: &Palette, label: &str, on: &mut bool) -> egu
             // Spindle: an off track at 3:1 on a settings card, not the
             // card's own grey.
             egui::Rgba::from(if palette.dark {
-                Color32::from_rgb(0x6b, 0x73, 0x80)
+                Color32::from_rgb(0x3a, 0x3f, 0x48)
             } else {
                 Color32::from_rgb(0xb4, 0xba, 0xc3)
             })..=egui::Rgba::from(palette.accent),
@@ -3442,7 +3442,8 @@ pub fn switch(ui: &mut Ui, palette: &Palette, label: &str, on: &mut bool) -> egu
         // Spindle: on the bright green track a dark knob, 3:1 or more.
         let knob = if palette.dark {
             Color32::from(egui::lerp(
-                egui::Rgba::from(Color32::WHITE)..=egui::Rgba::from(palette.window),
+                egui::Rgba::from(Color32::from_rgb(0xc9, 0xce, 0xd6))
+                    ..=egui::Rgba::from(palette.window),
                 t,
             ))
         } else {
