@@ -2756,7 +2756,7 @@ pub fn shelf(
 ) {
     ui.add_space(8.0);
     theme::section_title(ui, palette, title);
-    shelf_cards(ui, id, add_contents);
+    shelf_cards(ui, palette, id, add_contents);
 }
 
 /// A shelf whose title opens a page, as Your top songs does; true when the
@@ -2770,28 +2770,82 @@ pub fn linked_shelf(
 ) -> bool {
     ui.add_space(8.0);
     let clicked = theme::link(ui, title, theme::bold(17.0), palette.text).clicked();
-    shelf_cards(ui, id, add_contents);
+    shelf_cards(ui, palette, id, add_contents);
     clicked
 }
 
-fn shelf_cards(ui: &mut Ui, id: &str, add_contents: impl FnOnce(&mut Ui)) {
+fn shelf_cards(ui: &mut Ui, palette: &Palette, id: &str, add_contents: impl FnOnce(&mut Ui)) {
     ui.add_space(4.0);
-    crate::autoscroll::show(
-        ui,
-        egui::ScrollArea::horizontal().id_salt(id),
-        egui::Vec2b::new(true, false),
-        |ui| {
-            ui.horizontal(|ui| {
-                ui.spacing_mut().item_spacing.x = CARD_GAP / 2.0;
-                add_contents(ui);
-            });
-            // Spindle: room under the captions, so the floating scrollbar
-            // runs below the words instead of across them.
-            ui.add_space(12.0);
-        },
-    );
-    ui.add_space(4.0);
+    // Spindle: no scrollbar under a shelf. The row fades at the edge it
+    // continues past, and round arrows at its ends turn it a screen at a
+    // time while the pointer is over it, as in Spotify.
+    let jump_id = egui::Id::new(("shelf-jump", id));
+    let jump = ui.data_mut(|data| data.remove_temp::<f32>(jump_id));
+    let mut area = egui::ScrollArea::horizontal()
+        .id_salt(id)
+        .scroll_bar_visibility(egui::scroll_area::ScrollBarVisibility::AlwaysHidden);
+    if let Some(offset) = jump {
+        area = area.horizontal_scroll_offset(offset);
+    }
+    let output = ui
+        .scope(|ui| {
+            ui.spacing_mut().scroll.fade.strength = 1.0;
+            ui.spacing_mut().scroll.fade.size = 48.0;
+            crate::autoscroll::show(ui, area, egui::Vec2b::new(true, false), |ui| {
+                ui.horizontal(|ui| {
+                    ui.spacing_mut().item_spacing.x = CARD_GAP / 2.0;
+                    add_contents(ui);
+                });
+            })
+        })
+        .inner;
+    let rect = output.inner_rect;
+    let offset = output.state.offset.x;
+    let overflow = (output.content_size.x - rect.width()).max(0.0);
+    let hovered = ui.rect_contains_pointer(rect);
+    if hovered && overflow > 1.0 {
+        let step = (rect.width() * 0.8).max(160.0);
+        for (left, show) in [(true, offset > 1.0), (false, offset < overflow - 1.0)] {
+            if !show {
+                continue;
+            }
+            let centre = egui::pos2(
+                if left { rect.left() + 20.0 } else { rect.right() - 20.0 },
+                rect.top() + CARD_ART_GUESS / 2.0,
+            );
+            let button = egui::Rect::from_center_size(centre, vec2(32.0, 32.0));
+            let response = ui
+                .interact(button, jump_id.with(left), Sense::click())
+                .on_hover_cursor(egui::CursorIcon::PointingHand);
+            let fill = if response.hovered() {
+                palette.surface_active
+            } else {
+                palette.surface_hover
+            };
+            ui.painter().circle_filled(centre, 16.0, fill);
+            theme::paint_icon(
+                ui,
+                if left { Icon::ChevronLeft } else { Icon::ChevronRight },
+                button,
+                18.0,
+                palette.text,
+            );
+            if response.clicked() {
+                let target = if left {
+                    (offset - step).max(0.0)
+                } else {
+                    (offset + step).min(overflow)
+                };
+                ui.data_mut(|data| data.insert_temp(jump_id, target));
+                ui.ctx().request_repaint();
+            }
+        }
+    }
+    ui.add_space(12.0);
 }
+
+/// Where a shelf's arrows sit: the middle of a card's cover.
+const CARD_ART_GUESS: f32 = 160.0;
 
 /// A wrapping grid of cards.
 pub fn grid(ui: &mut Ui, add_contents: impl FnOnce(&mut Ui)) {
@@ -3099,7 +3153,7 @@ pub fn thin_slider(
         let track_color = if palette.dark {
             Color32::from_white_alpha(95)
         } else {
-            Color32::from_black_alpha(85)
+            Color32::from_black_alpha(125)
         };
         ui.painter().rect_filled(bar, 2.0, track_color);
         let filled = Rect::from_min_max(
@@ -3218,7 +3272,8 @@ pub fn search_field(
     hint: &str,
     width: f32,
 ) -> egui::Response {
-    let height = 34.0;
+    // Spindle: 36 px, the round Home button's size, so the two line up.
+    let height = 36.0;
     let (rect, _) = ui.allocate_exact_size(vec2(width, height), Sense::hover());
     let has_focus = ui.memory(|memory| memory.has_focus(id));
     let fill = if has_focus {
@@ -3330,7 +3385,13 @@ pub fn switch(ui: &mut Ui, palette: &Palette, label: &str, on: &mut bool) -> egu
     if ui.is_rect_visible(rect) {
         let t = ui.ctx().animate_bool(response.id, *on);
         let fill = egui::lerp(
-            egui::Rgba::from(palette.surface_active)..=egui::Rgba::from(palette.accent),
+            // Spindle: an off track at 3:1 on a settings card, not the
+            // card's own grey.
+            egui::Rgba::from(if palette.dark {
+                Color32::from_rgb(0x5a, 0x61, 0x6c)
+            } else {
+                Color32::from_rgb(0xb4, 0xba, 0xc3)
+            })..=egui::Rgba::from(palette.accent),
             t,
         );
         ui.painter()

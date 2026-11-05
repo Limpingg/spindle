@@ -964,36 +964,46 @@ fn contents(app: &mut App, ui: &mut egui::Ui, grid_art: Option<Rect>) {
     let palette = app.palette;
     let page = app.page().clone();
     let locale = app.locale;
-    ui.add_space(4.0);
-    if nav_row(
-        ui,
-        &palette,
-        Icon::House,
-        &gettext(locale, "Home"),
-        page == Page::Home,
-    )
-    .clicked()
-    {
-        app.actions.push(Action::Open(Page::Home));
+    // Spindle: the top bar's round Home button and search field lead the
+    // window, as in Spotify, so the sidebar starts with the Library. Its
+    // own Home and Search rows return when the bar is too tight for them.
+    let top_bar_has_home = ui
+        .data(|data| data.get_temp::<bool>(egui::Id::new(super::topbar::TOP_BAR_HOME_SHOWN)))
+        .unwrap_or(true);
+    if top_bar_has_home {
+        ui.add_space(6.0);
+    } else {
+        ui.add_space(4.0);
+        if nav_row(
+            ui,
+            &palette,
+            Icon::House,
+            &gettext(locale, "Home"),
+            page == Page::Home,
+        )
+        .clicked()
+        {
+            app.actions.push(Action::Open(Page::Home));
+        }
+        if nav_row(
+            ui,
+            &palette,
+            Icon::Search,
+            &gettext(locale, "Search"),
+            page == Page::Search,
+        )
+        .clicked()
+        {
+            app.actions.push(Action::FocusSearch);
+        }
+        ui.add_space(10.0);
+        ui.painter().hline(
+            ui.max_rect().x_range().shrink(4.0),
+            ui.cursor().top(),
+            egui::Stroke::new(1.0, palette.outline),
+        );
+        ui.add_space(10.0);
     }
-    if nav_row(
-        ui,
-        &palette,
-        Icon::Search,
-        &gettext(locale, "Search"),
-        page == Page::Search,
-    )
-    .clicked()
-    {
-        app.actions.push(Action::FocusSearch);
-    }
-    ui.add_space(10.0);
-    ui.painter().hline(
-        ui.max_rect().x_range().shrink(4.0),
-        ui.cursor().top(),
-        egui::Stroke::new(1.0, palette.outline),
-    );
-    ui.add_space(10.0);
 
     let filter_id = egui::Id::new("sidebar-filter");
     let mut filter = ui

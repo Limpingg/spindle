@@ -73,13 +73,14 @@ impl Palette {
             surface: Color32::from_rgb(0xee, 0xf0, 0xf3),
             surface_hover: Color32::from_rgb(0xe3, 0xe6, 0xeb),
             surface_active: Color32::from_rgb(0xd7, 0xdb, 0xe1),
-            outline: Color32::from_rgb(0xdd, 0xe1, 0xe6),
+            // Spindle: field and pill edges that show on the pale panes.
+            outline: Color32::from_rgb(0xc6, 0xcb, 0xd2),
             text: Color32::from_rgb(0x14, 0x17, 0x1a),
             secondary: Color32::from_rgb(0x53, 0x5b, 0x66),
             // Spindle: green that reads as text on white (5:1); #15a64a was 3:1.
             dim: Color32::from_rgb(0x6f, 0x77, 0x82),
-            accent: Color32::from_rgb(0x11, 0x7a, 0x3a),
-            accent_hover: Color32::from_rgb(0x0e, 0x6b, 0x33),
+            accent: Color32::from_rgb(0x0f, 0x6a, 0x33),
+            accent_hover: Color32::from_rgb(0x0b, 0x5c, 0x2a),
             on_accent: Color32::WHITE,
             danger: Color32::from_rgb(0xd6, 0x3b, 0x4c),
             warning: Color32::from_rgb(0xb8, 0x7a, 0x14),
@@ -95,7 +96,7 @@ impl Palette {
         if self.dark {
             Color32::from_rgb(0x00, 0x00, 0x00)
         } else {
-            Color32::from_rgb(0xe6, 0xe9, 0xed)
+            Color32::from_rgb(0xe2, 0xe5, 0xea)
         }
     }
 
@@ -105,7 +106,7 @@ impl Palette {
         if self.dark {
             self.window
         } else {
-            Color32::from_rgb(0xfa, 0xfb, 0xfc)
+            Color32::from_rgb(0xf5, 0xf6, 0xf8)
         }
     }
 
@@ -797,7 +798,7 @@ pub fn pill_button(ui: &mut egui::Ui, palette: &Palette, label: &str, primary: b
         palette.text
     };
     let galley = ui.painter().layout_no_wrap(label.to_string(), font, color);
-    let padding = Vec2::new(18.0, 8.0);
+    let padding = Vec2::new(18.0, 7.5);
     let size = galley.size() + padding * 2.0;
     let (rect, response) = ui.allocate_exact_size(size, Sense::click());
     response.widget_info(|| {
@@ -871,7 +872,8 @@ fn soft_button_inner(
     let galley = crate::bidi::layout_line(ui.painter(), label, font, color);
     let icon_size = 15.0;
     let icon_width = if icon.is_some() { icon_size + 6.0 } else { 0.0 };
-    let padding = Vec2::new(12.0, 7.0);
+    // Spindle: 32 px tall, the height every pill and input shares.
+    let padding = Vec2::new(12.0, 8.0);
     let size = Vec2::new(galley.size().x + icon_width, galley.size().y) + padding * 2.0;
     let (rect, response) = ui.allocate_exact_size(size, Sense::click());
     response.widget_info(|| {
@@ -911,6 +913,16 @@ fn soft_button_inner(
             palette.surface
         };
         ui.painter().rect_filled(rect, rect.height() / 2.0, fill);
+        // Spindle: an unselected pill keeps a hairline edge, so it still
+        // reads as a button on a card of nearly its own grey.
+        if !active {
+            ui.painter().rect_stroke(
+                rect,
+                rect.height() / 2.0,
+                egui::Stroke::new(1.0, palette.outline),
+                egui::StrokeKind::Inside,
+            );
+        }
         let mut x = rect.left() + padding.x;
         if let Some(icon) = icon {
             let icon = if dismiss.is_some() && hovered {

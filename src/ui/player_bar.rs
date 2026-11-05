@@ -58,12 +58,16 @@ fn strip_colors(palette: &theme::Palette) -> (egui::Color32, egui::Color32) {
         mix(base.g(), accent.g(), t),
         mix(base.b(), accent.b(), t),
     );
-    let ink = if palette.dark {
-        accent
+    if palette.dark {
+        (fill, accent)
     } else {
-        egui::Color32::from_rgb(0x0e, 0x6b, 0x31)
-    };
-    (fill, ink)
+        // A clear green band with deep green words (6.6:1) on the light
+        // theme, where a mix into the grey bar came out grey.
+        (
+            egui::Color32::from_rgb(0xd8, 0xec, 0xdf),
+            egui::Color32::from_rgb(0x0b, 0x5c, 0x2a),
+        )
+    }
 }
 
 pub fn connect_strip(app: &mut App, ui: &mut egui::Ui) {

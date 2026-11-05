@@ -9,7 +9,7 @@ use crate::theme::{self, Icon};
 
 use super::widgets;
 
-const LINE_SIZE: f32 = 20.0;
+const LINE_SIZE: f32 = 22.0;
 // Spindle: more room between lines than inside a wrapped one, so each
 // line reads as one unit.
 const LINE_GAP: f32 = 14.0;
@@ -207,8 +207,8 @@ fn contents(app: &mut App, ui: &mut egui::Ui) {
     // text. A line takes 220 ms to light up or fade, as in omarchy-lyrics.
     // Spindle: lines already sung step back further than the ones to come,
     // and the sung line is full white, so the eye finds it at once.
-    let sung = palette.text.gamma_multiply(0.52);
-    let upcoming = palette.text.gamma_multiply(0.72);
+    let sung = palette.text.gamma_multiply(0.42);
+    let upcoming = palette.text.gamma_multiply(0.6);
     let scroll = crate::autoscroll::show(
         ui,
         egui::ScrollArea::vertical()
@@ -267,10 +267,17 @@ fn contents(app: &mut App, ui: &mut egui::Ui) {
                     );
                     ui.add(egui::Label::new(galley).sense(sense))
                 } else {
-                    ui.add(
-                        egui::Label::new(egui::RichText::new(text).font(font).color(color))
-                            .sense(sense),
-                    )
+                    // Spindle: a line that needs two rows breaks near its
+                    // middle, so no word is left alone on the second.
+                    let width = balanced_width(ui, text, &font, ui.available_width());
+                    ui.scope(|ui| {
+                        ui.set_max_width(width);
+                        ui.add(
+                            egui::Label::new(egui::RichText::new(text).font(font).color(color))
+                                .sense(sense),
+                        )
+                    })
+                    .inner
                 };
                 crate::autoscroll::row(ui, &response);
                 let rect = response.rect;
@@ -901,4 +908,20 @@ mod tests {
         assert_eq!(fullscreen_content_width(47.0), 0.0);
         assert_eq!(fullscreen_content_width(2_000.0), 960.0);
     }
+}
+
+/// Spindle: the width to wrap a lyric line at so its rows come out about
+/// even: the whole width when it fits on one row, else its length over the
+/// rows it needs, with a little slack.
+fn balanced_width(ui: &egui::Ui, text: &str, font: &egui::FontId, available: f32) -> f32 {
+    let single = ui
+        .painter()
+        .layout_no_wrap(text.to_owned(), font.clone(), egui::Color32::WHITE)
+        .size()
+        .x;
+    if single <= available {
+        return available;
+    }
+    let rows = (single / available).ceil();
+    (single / rows * 1.08 + font.size).min(available)
 }

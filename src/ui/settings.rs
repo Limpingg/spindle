@@ -79,7 +79,7 @@ fn eq_preset_controls(app: &mut App, ui: &mut egui::Ui, current: Option<&str>) {
             // Spindle: a pill with a hairline edge, like the search fields.
             .corner_radius(CornerRadius::same(16))
             .stroke(egui::Stroke::new(1.0, palette.outline))
-            .inner_margin(Margin::symmetric(14, 6))
+            .inner_margin(Margin::symmetric(14, 4))
             .show(ui, |ui| {
                 widgets::text_edit(
                     ui,
@@ -530,7 +530,7 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
                     // Spindle: a pill with a hairline edge, like the search fields.
                     .corner_radius(CornerRadius::same(16))
                     .stroke(egui::Stroke::new(1.0, palette.outline))
-                    .inner_margin(Margin::symmetric(14, 6))
+                    .inner_margin(Margin::symmetric(14, 4))
                     .show(ui, |ui| {
                         widgets::text_edit(
                             ui,
@@ -781,7 +781,7 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
                     // Spindle: a pill with a hairline edge, like the search fields.
                     .corner_radius(CornerRadius::same(16))
                     .stroke(egui::Stroke::new(1.0, palette.outline))
-                    .inner_margin(Margin::symmetric(14, 6))
+                    .inner_margin(Margin::symmetric(14, 4))
                     .show(ui, |ui| {
                         widgets::text_edit(
                             ui,

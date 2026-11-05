@@ -2259,8 +2259,10 @@ mod tests {
             app.locale = locale;
             accessible_frame(&ctx, &mut app, vec![]);
             let tree = accessible_frame(&ctx, &mut app, vec![]);
+            // Spindle: Home is the top bar's round button, and the field
+            // beside it is next in the Tab order (the sidebar starts with
+            // the Library).
             let home = accessible_node(&tree, &gettext(locale, "Home"), Role::Button);
-            let search = accessible_node(&tree, &gettext(locale, "Search"), Role::Button);
             accessible_node(&tree, &gettext(locale, "Create"), Role::Button);
             accessible_node(&tree, &gettext(locale, "Albums"), Role::Button);
             accessible_node(&tree, &gettext(locale, "Artists"), Role::Button);
@@ -2275,7 +2277,18 @@ mod tests {
                 &mut app,
                 vec![keyboard(egui::Key::Tab, egui::Modifiers::NONE)],
             );
-            assert_eq!(tree.focus, search, "Tab order must survive translation");
+            let _ = tree;
+            assert!(
+                ctx.memory(|memory| memory.has_focus(egui::Id::new("global-search"))),
+                "{locale:?}: Tab from Home must reach the search field"
+            );
+            // Leave the field before moving on, as a person would.
+            accessible_frame(
+                &ctx,
+                &mut app,
+                vec![keyboard(egui::Key::Escape, egui::Modifiers::NONE)],
+            );
+            accessible_frame(&ctx, &mut app, vec![]);
             accessible_frame(
                 &ctx,
                 &mut app,

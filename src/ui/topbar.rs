@@ -47,8 +47,11 @@ const LEAD_GUESS: f32 = super::widgets::PAGE_PADDING + 2.0 * 32.0 + 3.0 * ITEM_S
 /// A badge collapsed to its icon: a square as tall as its 12.5 pt label.
 const BADGE_CHIP: f32 = 15.0 + BADGE_PADDING_Y;
 
-/// Spindle: the round Home button before the search field, close to the
-/// field's 34 px so the two read as one control.
+/// Spindle: whether the top bar drew its Home button this frame.
+pub(crate) const TOP_BAR_HOME_SHOWN: &str = "top-bar-home-shown";
+
+/// Spindle: the round Home button before the search field, the field's
+/// height so the two read as one control.
 const HOME_SIZE: f32 = 36.0;
 
 fn home_button(ui: &mut egui::Ui, palette: &Palette, active: bool, hint: &str) -> egui::Response {
@@ -68,6 +71,11 @@ fn home_button(ui: &mut egui::Ui, palette: &Palette, active: bool, hint: &str) -
         };
         theme::paint_icon(ui, Icon::House, rect, 20.0, color);
     }
+    // Spindle: named for screen readers, now that the sidebar leaves Home
+    // to this button.
+    response.widget_info(|| {
+        egui::WidgetInfo::selected(egui::WidgetType::Button, ui.is_enabled(), active, hint)
+    });
     response
         .on_hover_cursor(egui::CursorIcon::PointingHand)
         .on_hover_text(hint)
@@ -369,6 +377,9 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
             let full_room = (ui.available_width() - window_controls.topbar_width).max(0.0);
             let show_home =
                 full_room - HOME_SIZE - ITEM_SPACING - controls - badges(false) >= SEARCH_FLOOR;
+            // Spindle: the sidebar shows its own Home and Search rows only
+            // when the bar has no room for the button (read next frame).
+            ui.data_mut(|data| data.insert_temp(egui::Id::new(TOP_BAR_HOME_SHOWN), show_home));
             let home_width = if show_home {
                 HOME_SIZE + ITEM_SPACING
             } else {

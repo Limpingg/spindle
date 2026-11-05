@@ -154,35 +154,17 @@ pub(super) fn hero(app: &mut App, ui: &mut egui::Ui, hero: Hero<'_>) {
                 Some(app.backend.art()),
             );
         }
-        ui.vertical(|ui| {
+        // Spindle: the words sit on the cover's bottom edge, as in Spotify,
+        // rather than hanging from its top with a gap below: laid out from
+        // the bottom up, so the info line comes first and the type last.
+        ui.allocate_ui_with_layout(
+            Vec2::new(ui.available_width(), cover_size),
+            egui::Layout::bottom_up(egui::Align::Min),
+            |ui| {
             let width = ui.available_width();
             ui.set_width(width);
             ui.spacing_mut().item_spacing.y = 6.0;
-            ui.add_space(cover_size * 0.08);
-            theme::text(ui, hero.kind.as_ref(), theme::medium(12.5), palette.text);
-            let mut size = if cover_size > 200.0 { 56.0 } else { 40.0 };
-            loop {
-                let galley = ui.painter().layout_no_wrap(
-                    hero.title.to_string(),
-                    theme::bold(size),
-                    palette.text,
-                );
-                if galley.size().x <= width || size <= 22.0 {
-                    break;
-                }
-                size -= 6.0;
-            }
-            theme::text(ui, hero.title, theme::bold(size), palette.text);
-            if let Some(description) = &hero.description
-                && !description.is_empty()
-            {
-                theme::text(
-                    ui,
-                    description.as_str(),
-                    theme::regular(13.5),
-                    palette.secondary,
-                );
-            }
+            ui.add_space(2.0);
             ui.horizontal_wrapped(|ui| {
                 ui.spacing_mut().item_spacing.x = 4.0;
                 if let Some(avatar) = &hero.avatar {
@@ -219,7 +201,32 @@ pub(super) fn hero(app: &mut App, ui: &mut egui::Ui, hero: Hero<'_>) {
                     }
                 }
             });
-        });
+            if let Some(description) = &hero.description
+                && !description.is_empty()
+            {
+                theme::text(
+                    ui,
+                    description.as_str(),
+                    theme::regular(13.5),
+                    palette.secondary,
+                );
+            }
+            let mut size = if cover_size > 200.0 { 56.0 } else { 40.0 };
+            loop {
+                let galley = ui.painter().layout_no_wrap(
+                    hero.title.to_string(),
+                    theme::bold(size),
+                    palette.text,
+                );
+                if galley.size().x <= width || size <= 22.0 {
+                    break;
+                }
+                size -= 6.0;
+            }
+            theme::text(ui, hero.title, theme::bold(size), palette.text);
+            theme::text(ui, hero.kind.as_ref(), theme::medium(12.5), palette.text);
+            },
+        );
     });
     ui.add_space(20.0);
 }
