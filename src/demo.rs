@@ -7727,9 +7727,12 @@ mod tests {
             placed
         };
         let assert_same_row = |placed: &[(String, egui::Rect)], left: &str, right: &str| {
+            // The last drawn: the Queue panel's title also reads "Queue",
+            // above the tab of that name.
             let at = |label: &str| {
                 placed
                     .iter()
+                    .rev()
                     .find(|(text, _)| text == label)
                     .unwrap_or_else(|| panic!("{label} was never drawn: {placed:?}"))
                     .1

@@ -562,8 +562,7 @@ pub fn side_panel(app: &mut App, ui: &mut egui::Ui) {
         egui::Sides::new().shrink_left().show(
             ui,
             |ui| {
-                ui.add_space(4.0);
-                theme::text(ui, gettext(locale, "Connect"), theme::bold(16.0), palette.text);
+                theme::text(ui, gettext(locale, "Connect"), theme::bold(18.0), palette.text);
             },
             |ui| {
                 close = theme::icon_button(
@@ -793,6 +792,47 @@ fn current_card(
             if open && is_local && app.local_ready {
                 ui.add_space(4.0);
                 output_choices(app, ui);
+            }
+            // Spindle: the playing device's volume, right in its card.
+            if let Some(now) = app
+                .now_playing()
+                .filter(|now| !now.local && now.can_set_volume && !is_local)
+            {
+                ui.add_space(4.0);
+                let shown = app
+                    .volume_preview
+                    .map_or(now.volume_percent, |value| (value * 100.0).round() as u8);
+                ui.horizontal(|ui| {
+                    ui.add_space(3.0);
+                    let icon = match shown {
+                        0 => Icon::VolumeX,
+                        1..=33 => Icon::Volume,
+                        34..=66 => Icon::Volume1,
+                        _ => Icon::Volume2,
+                    };
+                    theme::icon(ui, icon, 16.0, palette.secondary);
+                    ui.add_space(10.0);
+                    let width = (ui.available_width() - 4.0).max(60.0);
+                    match super::widgets::thin_slider(
+                        ui,
+                        &palette,
+                        egui::Id::new("connect-volume-slider"),
+                        &gettext(locale, "Volume (%)"),
+                        shown as f32 / 100.0,
+                        width,
+                        Some(0.05),
+                    ) {
+                        super::widgets::SliderEvent::Dragging(value) => {
+                            app.volume_preview = Some(value);
+                        }
+                        super::widgets::SliderEvent::Committed(value) => {
+                            app.volume_preview = None;
+                            app.actions
+                                .push(Action::SetVolume((value * 100.0).round() as u8));
+                        }
+                        super::widgets::SliderEvent::None => {}
+                    }
+                });
             }
             ui.add_space(6.0);
             jam_line(app, ui);

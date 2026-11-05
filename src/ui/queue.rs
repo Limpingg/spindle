@@ -61,21 +61,18 @@ pub fn side_panel(app: &mut App, ui: &mut egui::Ui) {
         // Without `shrink_left`, wrapped chips can overlap the close button.
         let tab = app.queue_tab;
         let offer_save = tab == QueueTab::Queue && !app.queue_playlist_uris().is_empty();
-        let mut picked = None;
         let mut close = false;
         let mut save = false;
         egui::Sides::new().shrink_left().show(
             ui,
             |ui| {
-                ui.add_space(4.0);
-                picked = widgets::chips(
+                // Spindle: a bold title, as the Lyrics and Connect panels
+                // have; the tabs sit on their own row under it.
+                theme::text(
                     ui,
-                    &palette,
-                    &[
-                        (QueueTab::Queue, &gettext(app.locale, "Queue")),
-                        (QueueTab::Recents, &gettext(app.locale, "Recent")),
-                    ],
-                    tab,
+                    gettext(app.locale, "Queue"),
+                    theme::bold(18.0),
+                    palette.text,
                 );
             },
             |ui| {
@@ -90,6 +87,16 @@ pub fn side_panel(app: &mut App, ui: &mut egui::Ui) {
                 .clicked();
                 save = save_button(ui, &palette, offer_save, app.locale);
             },
+        );
+        ui.add_space(10.0);
+        let picked = widgets::chips(
+            ui,
+            &palette,
+            &[
+                (QueueTab::Queue, &gettext(app.locale, "Queue")),
+                (QueueTab::Recents, &gettext(app.locale, "Recent")),
+            ],
+            tab,
         );
         if let Some(tab) = picked {
             app.actions.push(Action::SetQueueTab(tab));
@@ -118,7 +125,7 @@ pub fn side_panel(app: &mut App, ui: &mut egui::Ui) {
                 // Keep rows and headings clear of the scroll bar.
                 .content_margin(egui::Margin {
                     left: 0,
-                    right: 12,
+                    right: 4,
                     top: 0,
                     bottom: 0,
                 }),
