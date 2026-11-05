@@ -1452,6 +1452,11 @@ fn columns(width: f32, row: &TrackRow<'_>) -> Columns {
 ///
 /// Returns the selection behavior for a row-body click. The caller supplies
 /// the display index because sorting and filtering change row positions.
+/// Spindle: a narrow song list drops Date added rather than squeezing it
+/// into the artist line, where it truncated ("2 weeks a..."). Episodes keep
+/// it: a podcast's date says whether the episode is new.
+const FOLD_SONG_ADDED: bool = false;
+
 pub fn track_row(ui: &mut Ui, app: &mut App, row: TrackRow<'_>) -> Option<RowPick> {
     track_row_response(ui, app, row).1
 }
@@ -1583,6 +1588,15 @@ fn track_row_contents(
                 .secondary
                 .gamma_multiply(if hovered { 0.30 } else { 0.20 }),
         );
+    } else if is_current {
+        // Spindle: the playing song's row is lifted on every list, so the
+        // green title is not the only sign of it.
+        let fill = if palette.dark {
+            palette.surface_hover
+        } else {
+            Color32::from_rgb(0xe6, 0xe9, 0xee)
+        };
+        ui.painter().rect_filled(rect, CornerRadius::same(6), fill);
     } else if hovered {
         ui.painter().rect_filled(
             rect,
@@ -1742,6 +1756,7 @@ fn track_row_contents(
                 );
                 if let Some(added) = row.added_at.filter(|a| !a.starts_with("1970-01-01"))
                     && cols.added == 0.0
+                    && FOLD_SONG_ADDED
                 {
                     let now = jiff::Timestamp::now();
                     let label = util::format_relative_date(app.locale, added, now);
@@ -1830,6 +1845,7 @@ fn track_row_contents(
                     );
                     if let Some(added) = row.added_at.filter(|a| !a.starts_with("1970-01-01"))
                         && cols.added == 0.0
+                        && FOLD_SONG_ADDED
                     {
                         theme::text(
                             ui,
@@ -2318,8 +2334,10 @@ pub fn table_header(
             )
         });
         theme::focus_ring(ui, &response);
-        let color = if active.is_some() {
-            palette.accent
+        // Spindle: a chosen sort shows in full text colour, not green, so
+        // green stays for what plays.
+        let color = if active.is_some() || response.hovered() {
+            palette.text
         } else if response.hovered() {
             palette.text
         } else {
@@ -2366,8 +2384,10 @@ pub fn table_header(
             )
         });
         theme::focus_ring(ui, &response);
-        let number_color = if natural || active.is_some() {
-            palette.accent
+        let number_color = if active.is_some() || response.hovered() {
+            palette.text
+        } else if natural {
+            color
         } else if response.hovered() {
             palette.text
         } else {
@@ -2380,10 +2400,9 @@ pub fn table_header(
             font.clone(),
             number_color,
         );
-        if let Some(ascending) = active
-            .map(|sort| sort.ascending)
-            .or(natural.then_some(true))
-        {
+        // Spindle: the plain playlist order needs no arrow.
+        let _ = natural;
+        if let Some(ascending) = active.map(|sort| sort.ascending) {
             let center = pos2(number.center().x + 12.0, rect.center().y);
             let (wing, tip) = if ascending { (2.8, -3.2) } else { (-2.8, 3.2) };
             ui.painter().add(egui::Shape::convex_polygon(
@@ -2524,8 +2543,9 @@ pub fn table_header(
     {
         clicked = Some(SortColumn::Duration);
     }
+    // Spindle: the same width as the row highlights below it.
     ui.painter().hline(
-        rect.x_range().shrink(8.0),
+        rect.x_range(),
         rect.bottom() - 0.5,
         Stroke::new(1.0, palette.outline),
     );
@@ -3151,7 +3171,7 @@ pub fn thin_slider(
         let bar = Rect::from_center_size(rect.center(), vec2(rect.width(), 4.0));
         // Spindle: 3:1 against the bar, so the track reads as a control.
         let track_color = if palette.dark {
-            Color32::from_white_alpha(95)
+            Color32::from_rgb(0x6a, 0x6f, 0x76)
         } else {
             Color32::from_black_alpha(125)
         };
@@ -3160,7 +3180,13 @@ pub fn thin_slider(
             bar.min,
             pos2(bar.left() + bar.width() * shown.clamp(0.0, 1.0), bar.max.y),
         );
-        let fill = if active { palette.accent } else { palette.text };
+        // Spindle: a softer white at rest, so the bar does not glow.
+        let rest = if palette.dark {
+            Color32::from_rgb(0xd0, 0xd4, 0xd9)
+        } else {
+            palette.text
+        };
+        let fill = if active { palette.accent } else { rest };
         ui.painter().rect_filled(filled, 2.0, fill);
         if active {
             ui.painter()
@@ -3388,7 +3414,7 @@ pub fn switch(ui: &mut Ui, palette: &Palette, label: &str, on: &mut bool) -> egu
             // Spindle: an off track at 3:1 on a settings card, not the
             // card's own grey.
             egui::Rgba::from(if palette.dark {
-                Color32::from_rgb(0x5a, 0x61, 0x6c)
+                Color32::from_rgb(0x6b, 0x73, 0x80)
             } else {
                 Color32::from_rgb(0xb4, 0xba, 0xc3)
             })..=egui::Rgba::from(palette.accent),

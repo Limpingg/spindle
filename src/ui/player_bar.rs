@@ -59,7 +59,12 @@ fn strip_colors(palette: &theme::Palette) -> (egui::Color32, egui::Color32) {
         mix(base.b(), accent.b(), t),
     );
     if palette.dark {
-        (fill, accent)
+        // Spindle: a calm band for long sessions, light green words.
+        let _ = fill;
+        (
+            egui::Color32::from_rgb(0x0d, 0x1f, 0x14),
+            egui::Color32::from_rgb(0x7f, 0xdc, 0xa0),
+        )
     } else {
         // A clear green band with deep green words (6.6:1) on the light
         // theme, where a mix into the grey bar came out grey.
@@ -86,6 +91,7 @@ pub fn connect_strip(app: &mut App, ui: &mut egui::Ui) {
     // it sits at the bottom of every page for as long as another device
     // plays, so it must not outshout the page.
     let (fill, ink) = strip_colors(&palette);
+    let mark = if palette.dark { palette.accent } else { ink };
     let (device, kind) = match &remote {
         Some(now) => (
             now.device_name
@@ -124,9 +130,9 @@ pub fn connect_strip(app: &mut App, ui: &mut egui::Ui) {
                                 ui,
                                 crate::ui::devices::device_icon(&kind),
                                 14.0,
-                                ink,
+                                mark,
                             );
-                            theme::text(ui, &label, theme::semibold(12.5), ink);
+                            theme::text(ui, &label, theme::medium(12.5), ink);
                         })
                         .response
                         .interact(egui::Sense::click())
@@ -154,8 +160,8 @@ pub fn connect_strip(app: &mut App, ui: &mut egui::Ui) {
                         let jam_response = ui
                             .scope(|ui| {
                                 ui.spacing_mut().item_spacing.x = 6.0;
-                                theme::icon(ui, Icon::Users, 14.0, ink);
-                                theme::text(ui, &label, theme::semibold(12.5), ink);
+                                theme::icon(ui, Icon::Users, 14.0, mark);
+                                theme::text(ui, &label, theme::medium(12.5), ink);
                             })
                             .response
                             .interact(egui::Sense::click())

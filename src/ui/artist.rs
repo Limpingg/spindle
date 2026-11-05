@@ -45,6 +45,8 @@ pub fn show(app: &mut App, ui: &mut egui::Ui, id: &str) {
                     app.request_play_counts(&artist.uri);
                     let show_plays = app.has_play_counts(&artist.uri);
                     let render_top = |ui: &mut egui::Ui, app: &mut App| {
+                        // Spindle: rows sit flush, one 56 px pitch, as on a playlist.
+                        ui.spacing_mut().item_spacing.y = 0.0;
                         for (index, item) in items.iter().take(limit).enumerate() {
                             widgets::track_row(
                                 ui,
@@ -80,18 +82,23 @@ pub fn show(app: &mut App, ui: &mut egui::Ui, id: &str) {
                         render_top(ui, app);
                     }
                     if items.len() > 5 {
-                        ui.add_space(6.0);
-                        if theme::soft_button(
-                            ui,
-                            &palette,
-                            None,
-                            &if page.show_all_top {
-                                gettext(locale, "Show less")
-                            } else {
-                                gettext(locale, "See more")
-                            },
-                            false,
-                        )
+                        ui.add_space(10.0);
+                        // Spindle: a quiet text link, as Spotify has it.
+                        if ui
+                            .horizontal(|ui| {
+                            ui.add_space(8.0);
+                            theme::link(
+                                ui,
+                                if page.show_all_top {
+                                    gettext(locale, "Show less").into_owned()
+                                } else {
+                                    gettext(locale, "See more").into_owned()
+                                },
+                                theme::semibold(13.0),
+                                palette.secondary,
+                            )
+                        })
+                        .inner
                         .clicked()
                         {
                             app.actions.push(Action::ToggleShowAllTop(id.to_string()));

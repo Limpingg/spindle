@@ -49,7 +49,7 @@ impl Palette {
             surface_active: Color32::from_rgb(0x2f, 0x35, 0x3f),
             // Spindle: 3:1 against the page, so card edges and the off
             // toggle track read as controls (#2a3038 was 1.4:1).
-            outline: Color32::from_rgb(0x38, 0x3f, 0x4a),
+            outline: Color32::from_rgb(0x46, 0x4e, 0x59),
             text: Color32::from_rgb(0xf2, 0xf4, 0xf6),
             secondary: Color32::from_rgb(0xa9, 0xb1, 0xbc),
             // Spindle: 4.5:1 on surfaces for small text (was #6e7784).
@@ -96,7 +96,7 @@ impl Palette {
         if self.dark {
             Color32::from_rgb(0x00, 0x00, 0x00)
         } else {
-            Color32::from_rgb(0xe2, 0xe5, 0xea)
+            Color32::from_rgb(0xdf, 0xe3, 0xe8)
         }
     }
 

@@ -43,7 +43,7 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
     let greeting = crate::util::greeting(app.locale);
     theme::text(ui, greeting.as_ref(), theme::bold(30.0), palette.text);
     ui.add_space(12.0);
-    quick_access(app, ui);
+    ui.scope(|ui| quick_access(app, ui));
     ui.add_space(16.0);
 
     if app.settings.home.made_for_you.visible {
@@ -195,12 +195,14 @@ fn quick_access(app: &mut App, ui: &mut egui::Ui) {
     let available = ui.available_width();
     // Spindle: as many columns as fit, then fewer if that leaves a hole in
     // the last row (8 tiles fill 4 columns, not 3).
-    let most = ((available / 240.0).floor() as usize).clamp(2, 4);
+    let most = ((available / 180.0).floor() as usize).clamp(2, 4);
     let columns = (2..=most)
         .rev()
         .find(|columns| tiles.len() % columns == 0)
         .unwrap_or(most);
-    let gap = 10.0;
+    // Spindle: one 8 px gap both ways.
+    let gap = 8.0;
+    ui.spacing_mut().item_spacing.y = gap;
     let tile_width = (available - gap * (columns as f32 - 1.0)) / columns as f32;
     let rows = tiles.len().div_ceil(columns);
     for row in 0..rows {

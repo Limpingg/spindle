@@ -224,7 +224,7 @@ pub(super) fn hero(app: &mut App, ui: &mut egui::Ui, hero: Hero<'_>) {
                 size -= 6.0;
             }
             theme::text(ui, hero.title, theme::bold(size), palette.text);
-            theme::text(ui, hero.kind.as_ref(), theme::medium(12.5), palette.text);
+            theme::text(ui, hero.kind.as_ref(), theme::semibold(14.0), palette.text);
             },
         );
     });

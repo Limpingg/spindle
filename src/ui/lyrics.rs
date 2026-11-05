@@ -37,6 +37,11 @@ fn blend(from: egui::Color32, to: egui::Color32, t: f32) -> egui::Color32 {
 
 pub fn side_panel(app: &mut App, ui: &mut egui::Ui) {
     let palette = app.palette;
+    // The cover's colour, as the page headers take it.
+    let art = app
+        .now_playing()
+        .and_then(|now| now.art_small.or(now.art_url));
+    let tint = app.tint_for(art.as_deref());
     let fit = super::yielding_panel(
         ui.ctx(),
         "lyrics-panel",
@@ -49,7 +54,11 @@ pub fn side_panel(app: &mut App, ui: &mut egui::Ui) {
         .default_size(app.settings.lyrics_width)
         .size_range(fit.range.clone())
         .show_separator_line(false)
-        .frame(theme::pane_frame(&palette, true, true).inner_margin(Margin::symmetric(12, 12)));
+        .frame(
+            theme::pane_frame(&palette, true, true)
+                .fill(lyrics_fill(&palette, tint))
+                .inner_margin(Margin::symmetric(16, 12)),
+        );
     let response = panel.show(ui, |ui| {
         let window_controls = super::window_controls_reservation(
             ui.ctx(),
@@ -207,8 +216,21 @@ fn contents(app: &mut App, ui: &mut egui::Ui) {
     // text. A line takes 220 ms to light up or fade, as in omarchy-lyrics.
     // Spindle: lines already sung step back further than the ones to come,
     // and the sung line is full white, so the eye finds it at once.
-    let sung = palette.text.gamma_multiply(0.42);
-    let upcoming = palette.text.gamma_multiply(0.6);
+    let sung = if palette.dark {
+        egui::Color32::from_rgb(0x8a, 0x90, 0x99)
+    } else {
+        palette.dim
+    };
+    let upcoming = palette.secondary;
+    let sung_line = if palette.dark {
+        egui::Color32::WHITE
+    } else {
+        palette.text
+    };
+    // Spindle: lines fade out under the header and above the panel's
+    // foot instead of being cut through.
+    ui.spacing_mut().scroll.fade.strength = 1.0;
+    ui.spacing_mut().scroll.fade.size = 48.0;
     let scroll = crate::autoscroll::show(
         ui,
         egui::ScrollArea::vertical()
@@ -238,7 +260,7 @@ fn contents(app: &mut App, ui: &mut egui::Ui) {
                 } else {
                     upcoming
                 };
-                let color = blend(quiet, palette.text, lit);
+                let color = blend(quiet, sung_line, lit);
                 let font = if lit > 0.5 {
                     theme::bold(LINE_SIZE)
                 } else {
@@ -313,6 +335,32 @@ fn contents(app: &mut App, ui: &mut egui::Ui) {
         },
     );
     crate::autoscroll::lyrics(ui, scroll.id);
+    // Spindle: lines melt into the panel at the top and the foot rather
+    // than being cut through mid glyph.
+    {
+        let art = app
+            .now_playing()
+            .and_then(|now| now.art_small.or(now.art_url));
+        let tint = app.tint_for(art.as_deref());
+        let fill = lyrics_fill(&palette, tint);
+        let rect = scroll.inner_rect;
+        let painter = ui.painter_at(rect);
+        let fade = 40.0_f32.min(rect.height() / 4.0);
+        let mut mesh = egui::Mesh::default();
+        let clear = egui::Color32::from_rgba_unmultiplied(fill.r(), fill.g(), fill.b(), 0);
+        let mut band = |top: f32, bottom: f32, upper: egui::Color32, lower: egui::Color32| {
+            let base = mesh.vertices.len() as u32;
+            mesh.colored_vertex(egui::pos2(rect.left(), top), upper);
+            mesh.colored_vertex(egui::pos2(rect.right(), top), upper);
+            mesh.colored_vertex(egui::pos2(rect.left(), bottom), lower);
+            mesh.colored_vertex(egui::pos2(rect.right(), bottom), lower);
+            mesh.add_triangle(base, base + 1, base + 2);
+            mesh.add_triangle(base + 1, base + 2, base + 3);
+        };
+        band(rect.top(), rect.top() + fade, fill, clear);
+        band(rect.bottom() - fade, rect.bottom(), clear, fill);
+        painter.add(mesh);
+    }
     // Scrolling by hand means the reader wants to look elsewhere; the
     // Follow button in the header picks the song back up.
     if ui.rect_contains_pointer(scroll.inner_rect)
@@ -924,4 +972,21 @@ fn balanced_width(ui: &egui::Ui, text: &str, font: &egui::FontId, available: f32
     }
     let rows = (single / available).ceil();
     (single / rows * 1.08 + font.size).min(available)
+}
+
+/// Spindle: the lyrics panel takes a wash of the playing cover's colour,
+/// as a page header does, so it reads as the song's own view.
+fn lyrics_fill(palette: &theme::Palette, tint: Option<egui::Color32>) -> egui::Color32 {
+    let base = palette.pane();
+    let Some(tint) = tint else {
+        return base;
+    };
+    let tint = palette.tint_from_art([tint.r(), tint.g(), tint.b()]);
+    let t = if palette.dark { 0.7 } else { 0.45 };
+    let mix = |a: u8, b: u8| (f32::from(a) + (f32::from(b) - f32::from(a)) * t).round() as u8;
+    egui::Color32::from_rgb(
+        mix(base.r(), tint.r()),
+        mix(base.g(), tint.g()),
+        mix(base.b(), tint.b()),
+    )
 }

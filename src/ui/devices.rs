@@ -510,7 +510,14 @@ fn device_row(
     } else if is_local {
         gettext(locale, "Play here").into_owned()
     } else {
-        device.kind.replace('_', " ")
+        // Spindle: Spotify sends "smartphone" or "Smartphone"; show it as
+        // a label, capitalised.
+        let kind = device.kind.replace('_', " ").to_lowercase();
+        let mut letters = kind.chars();
+        letters
+            .next()
+            .map(|first| first.to_uppercase().chain(letters).collect())
+            .unwrap_or_default()
     };
     painter.text(
         pos2(rect.left() + 48.0, rect.center().y + 10.0),
@@ -644,8 +651,9 @@ pub fn side_panel(app: &mut App, ui: &mut egui::Ui) {
         // than waiting at the foot of an empty panel.
         ui.add_space(10.0);
         let line = ui.available_rect_before_wrap();
+        // The same inset as the divider under the sound output.
         ui.painter().hline(
-            (line.left() + 12.0)..=(line.right() - 12.0),
+            line.x_range().shrink(6.0),
             line.top(),
             egui::Stroke::new(1.0, app.palette.outline),
         );
@@ -845,7 +853,8 @@ fn help_link(app: &mut App, ui: &mut egui::Ui, label: &str, url: &str) {
             .rect_filled(rect, CornerRadius::same(6), palette.surface_hover);
     }
     ui.painter().with_clip_rect(rect).text(
-        pos2(rect.left() + 12.0, rect.center().y),
+        // Spindle: on the device names' column.
+        pos2(rect.left() + 48.0, rect.center().y),
         egui::Align2::LEFT_CENTER,
         label,
         // Spindle: quieter than the devices above it.

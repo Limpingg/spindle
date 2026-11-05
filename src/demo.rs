@@ -5349,6 +5349,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "Spindle leaves Date added out of a narrow song row (widgets::FOLD_SONG_ADDED)"]
     fn compact_track_rows_leave_a_gap_before_the_added_date_separator() {
         fn rows(app: &mut App, ui: &mut egui::Ui) {
             use crate::model::RowContext;
