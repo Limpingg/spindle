@@ -48,7 +48,7 @@ pub fn side_panel(app: &mut App, ui: &mut egui::Ui) {
         .default_size(app.settings.queue_width)
         .size_range(fit.range.clone())
         .show_separator_line(false)
-        .frame(theme::pane_frame(&palette, true, true).inner_margin(Margin::symmetric(12, 12)));
+        .frame(theme::pane_frame(&palette, true, true).inner_margin(Margin::symmetric(16, 12)));
     let response = panel.show(ui, |ui| {
         let window_controls = super::window_controls_reservation(
             ui.ctx(),
@@ -380,6 +380,8 @@ fn contents(app: &mut App, ui: &mut egui::Ui, compact: bool) {
     // page, so its name is plain text.
     if let Some(from) = app.playing_from().filter(|_| current.is_some()) {
         ui.horizontal(|ui| {
+            // Spindle: one word space between the label and the name.
+            ui.spacing_mut().item_spacing.x = 4.0;
             theme::text(
                 ui,
                 gettext(app.locale, "Playing from"),

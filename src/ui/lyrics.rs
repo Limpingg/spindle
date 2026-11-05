@@ -68,7 +68,6 @@ pub fn side_panel(app: &mut App, ui: &mut egui::Ui) {
         );
         ui.add_space(window_controls.lyrics_top);
         ui.horizontal(|ui| {
-            ui.add_space(4.0);
             theme::text(
                 ui,
                 gettext(app.locale, "Lyrics"),
@@ -116,6 +115,42 @@ pub fn side_panel(app: &mut App, ui: &mut egui::Ui) {
                 }
             });
         });
+        // Spindle: which song these words belong to, under the heading.
+        if let Some(now) = app.now_playing() {
+            ui.add_space(10.0);
+            let width = ui.available_width();
+            let (rect, _) = ui.allocate_exact_size(egui::vec2(width, 40.0), egui::Sense::hover());
+            let cover = Rect::from_min_size(rect.min, egui::Vec2::splat(40.0));
+            super::widgets::paint_cover(
+                ui,
+                &palette,
+                now.art_small.as_deref().or(now.art_url.as_deref()),
+                cover,
+                4.0,
+                Icon::Music,
+                Some(app.backend.art()),
+            );
+            let painter = ui.painter_at(rect);
+            let left = cover.right() + 12.0;
+            crate::bidi::paint_line(
+                &painter,
+                left,
+                rect.right(),
+                rect.top() + 11.0,
+                &now.title,
+                theme::semibold(14.0),
+                palette.text,
+            );
+            crate::bidi::paint_line(
+                &painter,
+                left,
+                rect.right(),
+                rect.top() + 29.0,
+                &now.subtitle,
+                theme::regular(12.0),
+                palette.secondary,
+            );
+        }
         ui.add_space(8.0);
         contents(app, ui);
     });
@@ -216,12 +251,18 @@ fn contents(app: &mut App, ui: &mut egui::Ui) {
     // text. A line takes 220 ms to light up or fade, as in omarchy-lyrics.
     // Spindle: lines already sung step back further than the ones to come,
     // and the sung line is full white, so the eye finds it at once.
+    // Spindle: every line stays readable (4.5:1 or more); the sung line
+    // stands out by white, weight and size.
     let sung = if palette.dark {
-        egui::Color32::from_rgb(0x8a, 0x90, 0x99)
+        palette.secondary
     } else {
         palette.dim
     };
-    let upcoming = palette.secondary;
+    let upcoming = if palette.dark {
+        egui::Color32::from_rgb(0xb8, 0xbe, 0xc6)
+    } else {
+        palette.secondary
+    };
     let sung_line = if palette.dark {
         egui::Color32::WHITE
     } else {
@@ -262,7 +303,7 @@ fn contents(app: &mut App, ui: &mut egui::Ui) {
                 };
                 let color = blend(quiet, sung_line, lit);
                 let font = if lit > 0.5 {
-                    theme::bold(LINE_SIZE)
+                    theme::bold(LINE_SIZE + 2.0)
                 } else {
                     theme::regular(LINE_SIZE)
                 };
@@ -982,7 +1023,7 @@ fn lyrics_fill(palette: &theme::Palette, tint: Option<egui::Color32>) -> egui::C
         return base;
     };
     let tint = palette.tint_from_art([tint.r(), tint.g(), tint.b()]);
-    let t = if palette.dark { 0.7 } else { 0.45 };
+    let t = if palette.dark { 0.16 } else { 0.2 };
     let mix = |a: u8, b: u8| (f32::from(a) + (f32::from(b) - f32::from(a)) * t).round() as u8;
     egui::Color32::from_rgb(
         mix(base.r(), tint.r()),

@@ -326,7 +326,15 @@ fn section(
                 .surface
                 .gamma_multiply(if palette.dark { 0.7 } else { 1.0 }),
         )
-        .stroke(Stroke::new(1.0, palette.outline))
+        // Spindle: a quiet edge; the fill already sets the card apart.
+        .stroke(Stroke::new(
+            1.0,
+            if palette.dark {
+                palette.surface_hover
+            } else {
+                palette.outline
+            },
+        ))
         .corner_radius(CornerRadius::same(theme::RADIUS + 2))
         // Every row leaves 10 points below itself for the next one, so the
         // bottom margin is that much less than the top one (#1037).
@@ -337,7 +345,8 @@ fn section(
             bottom: 6,
         })
         .show(ui, |ui| {
-            ui.set_width(ui.available_width().min(760.0));
+            // Spindle: the card fills the page's column, as the lists do.
+            ui.set_width(ui.available_width());
             add_contents(ui);
         });
     ui.add_space(8.0);
@@ -820,10 +829,9 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
                 choices_width,
                 |ui| {
                     let mut choose = |ui: &mut egui::Ui, kbps: u16, label: &str| {
-                        if theme::soft_button(
+                        if theme::segment_button(
                             ui,
                             &palette,
-                            None,
                             label,
                             app.settings.bitrate == kbps,
                         )
@@ -837,8 +845,8 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
                     };
                     if ui.available_width() >= choices_width {
                         // Laid right to left, so the last choice goes first.
-                        ui.horizontal(|ui| {
-                            ui.spacing_mut().item_spacing.x = choice_gap;
+                        // Spindle: one segmented control, not three loose pills.
+                        theme::segmented(ui, &palette, |ui| {
                             for (kbps, label) in choices.iter().rev() {
                                 choose(ui, *kbps, label);
                             }

@@ -49,7 +49,7 @@ impl Palette {
             surface_active: Color32::from_rgb(0x2f, 0x35, 0x3f),
             // Spindle: 3:1 against the page, so card edges and the off
             // toggle track read as controls (#2a3038 was 1.4:1).
-            outline: Color32::from_rgb(0x46, 0x4e, 0x59),
+            outline: Color32::from_rgb(0x3a, 0x41, 0x4b),
             text: Color32::from_rgb(0xf2, 0xf4, 0xf6),
             secondary: Color32::from_rgb(0xa9, 0xb1, 0xbc),
             // Spindle: 4.5:1 on surfaces for small text (was #6e7784).
@@ -79,8 +79,8 @@ impl Palette {
             secondary: Color32::from_rgb(0x53, 0x5b, 0x66),
             // Spindle: green that reads as text on white (5:1); #15a64a was 3:1.
             dim: Color32::from_rgb(0x6f, 0x77, 0x82),
-            accent: Color32::from_rgb(0x0f, 0x6a, 0x33),
-            accent_hover: Color32::from_rgb(0x0b, 0x5c, 0x2a),
+            accent: Color32::from_rgb(0x15, 0x80, 0x3d),
+            accent_hover: Color32::from_rgb(0x11, 0x6c, 0x33),
             on_accent: Color32::WHITE,
             danger: Color32::from_rgb(0xd6, 0x3b, 0x4c),
             warning: Color32::from_rgb(0xb8, 0x7a, 0x14),
@@ -106,7 +106,7 @@ impl Palette {
         if self.dark {
             self.window
         } else {
-            Color32::from_rgb(0xf5, 0xf6, 0xf8)
+            Color32::from_rgb(0xee, 0xf0, 0xf3)
         }
     }
 
@@ -248,6 +248,22 @@ pub const PANE_RADIUS: u8 = 10;
 /// Spindle: the frame of one rounded pane. `left` and `right` say which
 /// sides keep a gap to the window edge (the gap between two panes is the
 /// right one of the first pane).
+/// Spindle: a band at the foot of `rect` that fades from clear to `color`,
+/// so content scrolled under the edge melts away.
+pub fn fade_edge(painter: &egui::Painter, rect: egui::Rect, color: Color32, size: f32) {
+    let size = size.min(rect.height() / 3.0);
+    let clear = Color32::from_rgba_unmultiplied(color.r(), color.g(), color.b(), 0);
+    let top = rect.bottom() - size;
+    let mut mesh = egui::Mesh::default();
+    mesh.colored_vertex(egui::pos2(rect.left(), top), clear);
+    mesh.colored_vertex(egui::pos2(rect.right(), top), clear);
+    mesh.colored_vertex(egui::pos2(rect.left(), rect.bottom()), color);
+    mesh.colored_vertex(egui::pos2(rect.right(), rect.bottom()), color);
+    mesh.add_triangle(0, 1, 2);
+    mesh.add_triangle(1, 2, 3);
+    painter.add(mesh);
+}
+
 pub fn pane_frame(palette: &Palette, left: bool, right: bool) -> egui::Frame {
     egui::Frame::new()
         .fill(palette.pane())
@@ -838,7 +854,7 @@ pub fn soft_button(
     label: &str,
     active: bool,
 ) -> Response {
-    soft_button_inner(ui, palette, icon, label, active, false).0
+    soft_button_inner(ui, palette, icon, label, active, false, false).0
 }
 
 /// A [`soft_button`] whose icon turns into a cross on hover, allowing the
@@ -849,7 +865,7 @@ pub fn soft_button_dismiss(
     icon: Icon,
     label: &str,
 ) -> (Response, bool) {
-    soft_button_inner(ui, palette, Some(icon), label, false, true)
+    soft_button_inner(ui, palette, Some(icon), label, false, true, false)
 }
 
 /// The width `soft_button` gives a button without an icon, for laying out
@@ -859,6 +875,30 @@ pub fn soft_button_width(ui: &egui::Ui, label: &str) -> f32 {
     galley.size().x + 24.0
 }
 
+/// Spindle: one option of a segmented control: no edge and no fill until
+/// chosen or hovered, for a row set in [`segmented`].
+pub fn segment_button(ui: &mut egui::Ui, palette: &Palette, label: &str, active: bool) -> Response {
+    soft_button_inner(ui, palette, None, label, active, false, true).0
+}
+
+/// Spindle: a rounded track that holds [`segment_button`]s side by side.
+pub fn segmented<R>(
+    ui: &mut egui::Ui,
+    palette: &Palette,
+    add_contents: impl FnOnce(&mut egui::Ui) -> R,
+) -> R {
+    egui::Frame::new()
+        .fill(palette.surface)
+        .stroke(egui::Stroke::new(1.0, palette.outline))
+        .corner_radius(18)
+        .inner_margin(egui::Margin::same(2))
+        .show(ui, |ui| {
+            ui.spacing_mut().item_spacing.x = 2.0;
+            ui.horizontal(add_contents).inner
+        })
+        .inner
+}
+
 fn soft_button_inner(
     ui: &mut egui::Ui,
     palette: &Palette,
@@ -866,6 +906,7 @@ fn soft_button_inner(
     label: &str,
     active: bool,
     dismissible: bool,
+    segment: bool,
 ) -> (Response, bool) {
     let font = medium(13.0);
     let color = if active { palette.window } else { palette.text };
@@ -905,17 +946,25 @@ fn soft_button_inner(
         .is_some_and(|dismiss| dismiss.hovered() || dismiss.has_focus());
     if ui.is_rect_visible(rect) {
         let hovered = response.hovered() || over_dismiss;
+        // Spindle: a selected pill is a soft white, not the brightest
+        // block on the screen.
         let fill = if active {
-            palette.text
+            if palette.dark {
+                Color32::from_rgb(0xd9, 0xdd, 0xe2)
+            } else {
+                palette.text
+            }
         } else if hovered {
             palette.surface_hover
+        } else if segment {
+            Color32::TRANSPARENT
         } else {
             palette.surface
         };
         ui.painter().rect_filled(rect, rect.height() / 2.0, fill);
         // Spindle: an unselected pill keeps a hairline edge, so it still
         // reads as a button on a card of nearly its own grey.
-        if !active {
+        if !active && !segment {
             ui.painter().rect_stroke(
                 rect,
                 rect.height() / 2.0,

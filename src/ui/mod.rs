@@ -377,6 +377,13 @@ fn central(app: &mut App, ui: &mut egui::Ui) {
             ui.ctx()
                 .data_mut(|data| data.insert_temp(scrolled_id, scroll.state.offset.y));
             header_shadow(ui, scroll.inner_rect, scroll.state.offset.y, palette.dark);
+            // Spindle: what runs on below the fold melts into the pane
+            // instead of being cut through a line of text.
+            let more_below =
+                scroll.content_size.y - scroll.state.offset.y > scroll.inner_rect.height() + 1.0;
+            if more_below {
+                theme::fade_edge(ui.painter(), scroll.inner_rect, palette.pane(), 28.0);
+            }
             theme::mask_pane_corners(ui.painter(), pane_rect, palette.gutter());
         });
 }

@@ -14410,7 +14410,7 @@ mod tests {
                     .rect
                     .center()
             } else {
-                egui::pos2(1120.0, 100.0)
+                egui::pos2(1120.0, 200.0)
             };
             let press = |button, pressed| egui::Event::PointerButton {
                 pos: anchor,

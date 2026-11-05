@@ -163,7 +163,7 @@ fn enable_playback_row(app: &mut App, ui: &mut egui::Ui) {
         app.actions.push(Action::EnablePlayback);
     }
     ui.painter().hline(
-        rect.x_range().shrink(6.0),
+        rect.x_range(),
         rect.bottom(),
         egui::Stroke::new(1.0, palette.outline),
     );
@@ -510,14 +510,7 @@ fn device_row(
     } else if is_local {
         gettext(locale, "Play here").into_owned()
     } else {
-        // Spindle: Spotify sends "smartphone" or "Smartphone"; show it as
-        // a label, capitalised.
-        let kind = device.kind.replace('_', " ").to_lowercase();
-        let mut letters = kind.chars();
-        letters
-            .next()
-            .map(|first| first.to_uppercase().chain(letters).collect())
-            .unwrap_or_default()
+        kind_label(&device.kind)
     };
     painter.text(
         pos2(rect.left() + 48.0, rect.center().y + 10.0),
@@ -560,7 +553,7 @@ pub fn side_panel(app: &mut App, ui: &mut egui::Ui) {
         .default_size(app.settings.queue_width)
         .size_range(fit.range.clone())
         .show_separator_line(false)
-        .frame(theme::pane_frame(&palette, true, true).inner_margin(egui::Margin::symmetric(12, 12)));
+        .frame(theme::pane_frame(&palette, true, true).inner_margin(egui::Margin::symmetric(16, 12)));
     let response = panel.show(ui, |ui| {
         let window_controls =
             super::window_controls_reservation(ui.ctx(), true, false, ui.available_width());
@@ -651,9 +644,9 @@ pub fn side_panel(app: &mut App, ui: &mut egui::Ui) {
         // than waiting at the foot of an empty panel.
         ui.add_space(10.0);
         let line = ui.available_rect_before_wrap();
-        // The same inset as the divider under the sound output.
+        // Spindle: dividers run the full content width, as the card does.
         ui.painter().hline(
-            line.x_range().shrink(6.0),
+            line.x_range(),
             line.top(),
             egui::Stroke::new(1.0, app.palette.outline),
         );
@@ -722,6 +715,9 @@ fn current_card(
                     |saved| saved_output_name(saved, listed).to_string(),
                 )
             });
+            // Spindle: another device shows its kind under its name, as the
+            // rows below do.
+            let output = output.or_else(|| (!is_local).then(|| kind_label(&kind)));
             if app.settings.audio_device.is_some()
                 && matches!(app.output_devices, crate::model::Loadable::NotLoaded)
             {
@@ -861,9 +857,10 @@ fn help_link(app: &mut App, ui: &mut egui::Ui, label: &str, url: &str) {
         theme::regular(13.0),
         palette.secondary,
     );
-    Icon::ExternalLink.image(palette.dim, 14.0).paint_at(
+    Icon::ExternalLink.image(palette.secondary, 16.0).paint_at(
         ui,
-        Rect::from_center_size(pos2(rect.right() - 16.0, rect.center().y), egui::Vec2::splat(14.0)),
+        // Spindle: in the icon column, as the devices above have it.
+        Rect::from_center_size(pos2(rect.left() + 24.0, rect.center().y), egui::Vec2::splat(16.0)),
     );
     if response
         .on_hover_cursor(egui::CursorIcon::PointingHand)
@@ -980,4 +977,15 @@ mod tests {
             "two identities may have the same name"
         );
     }
+}
+
+/// Spindle: Spotify sends a device's kind as "smartphone" or "Smartphone";
+/// shown as a label, capitalised.
+fn kind_label(kind: &str) -> String {
+    let kind = kind.replace('_', " ").to_lowercase();
+    let mut letters = kind.chars();
+    letters
+        .next()
+        .map(|first| first.to_uppercase().chain(letters).collect())
+        .unwrap_or_default()
 }

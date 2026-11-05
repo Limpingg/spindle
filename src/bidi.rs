@@ -230,7 +230,23 @@ pub fn paint_line(
     color: Color32,
 ) -> Rect {
     if !has_rtl(text) {
-        return painter.text(pos2(left, y), Align2::LEFT_CENTER, text, font, color);
+        // Spindle: a line too long for its room ends in an ellipsis rather
+        // than being sliced through a letter by the clip.
+        let room = right - left;
+        let galley = painter.layout_no_wrap(text.to_owned(), font.clone(), color);
+        if room > 0.0 && galley.size().x > room {
+            let mut job = egui::text::LayoutJob::simple(text.to_owned(), font, color, room);
+            job.wrap.max_rows = 1;
+            job.wrap.break_anywhere = true;
+            job.wrap.overflow_character = Some('\u{2026}');
+            let galley = painter.layout_job(job);
+            let rect = Align2::LEFT_CENTER.anchor_size(pos2(left, y), galley.size());
+            painter.galley(rect.min, galley, color);
+            return rect;
+        }
+        let rect = Align2::LEFT_CENTER.anchor_size(pos2(left, y), galley.size());
+        painter.galley(rect.min, galley, color);
+        return rect;
     }
     let galley = layout_line(painter, text, font, color);
     let rect = if is_rtl(text) {

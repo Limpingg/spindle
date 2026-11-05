@@ -371,13 +371,17 @@ fn sort_menu(app: &mut App, ui: &mut egui::Ui, shelf: Filter, selected: LibraryS
         .find(|(sort, _)| *sort == selected)
         .expect("sort label")
         .1;
+    // Spindle: a plain text control, so a sort never looks like one of
+    // the filter chips beside it.
     let response = ui.add(
         egui::Button::image_and_text(
-            Icon::ChevronDown.image(app.palette.text, 15.0),
-            egui::RichText::new(label.as_ref()).font(theme::medium(13.0)),
+            Icon::ChevronDown.image(app.palette.secondary, 14.0),
+            egui::RichText::new(label.as_ref())
+                .font(theme::regular(13.0))
+                .color(app.palette.secondary),
         )
         .wrap()
-        .fill(app.palette.surface)
+        .frame_when_inactive(false)
         .corner_radius(12)
         .min_size(vec2(0.0, 28.0)),
     );
@@ -1147,12 +1151,7 @@ fn contents(app: &mut App, ui: &mut egui::Ui, grid_art: Option<Rect>) {
                 filter = value;
             }
         }
-    });
-    let sort = selected_sort(app, filter);
-    ui.add_space(6.0);
-    chip_row(ui, "library-sort", |ui| {
-        ui.spacing_mut().item_spacing = vec2(6.0, 6.0);
-        sort_menu(app, ui, filter, sort);
+        // Spindle: By You is a filter, so it sits with the filters.
         if filter == Filter::Playlists {
             // Translators: Library filter for playlists created by the signed-in user.
             let label = gettext(locale, "By You");
@@ -1170,6 +1169,12 @@ fn contents(app: &mut App, ui: &mut egui::Ui, grid_art: Option<Rect>) {
                 app.actions.push(Action::SetLibraryByYou(!by_you));
             }
         }
+    });
+    let sort = selected_sort(app, filter);
+    ui.add_space(6.0);
+    chip_row(ui, "library-sort", |ui| {
+        ui.spacing_mut().item_spacing = vec2(6.0, 6.0);
+        sort_menu(app, ui, filter, sort);
     });
     ui.data_mut(|data| {
         data.insert_temp(filter_id, filter);

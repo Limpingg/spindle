@@ -220,11 +220,7 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
                     app.actions.push(Action::CyclePlayerBarVis);
                 }
             }
-            ui.painter().hline(
-                rect.x_range(),
-                rect.top() + 0.5,
-                egui::Stroke::new(1.0, palette.outline),
-            );
+            // Spindle: no rule on top; the gutter under the panes divides.
             let width = rect.width();
             let side = (width * 0.3).clamp(200.0, 420.0);
             let cy = rect.center().y;
@@ -639,7 +635,7 @@ fn now_playing_block(app: &mut App, ui: &mut egui::Ui, region: Rect, now: Option
     let displayed_text_width: f32 = {
         let title =
             ui.painter()
-                .layout_no_wrap(now.title.clone(), theme::medium(14.0), palette.text);
+                .layout_no_wrap(now.title.clone(), theme::semibold(14.0), palette.text);
         let subtitle = ui.painter().layout_no_wrap(
             now.subtitle.clone(),
             theme::regular(12.0),
@@ -656,7 +652,7 @@ fn now_playing_block(app: &mut App, ui: &mut egui::Ui, region: Rect, now: Option
     );
     text_ui.set_clip_rect(info_rect.intersect(ui.clip_rect()));
     text_ui.spacing_mut().item_spacing.y = 2.0;
-    let title_response = theme::link(&mut text_ui, &now.title, theme::medium(14.0), palette.text)
+    let title_response = theme::link(&mut text_ui, &now.title, theme::semibold(14.0), palette.text)
         .interact(drag_sense);
     if title_response.clicked() {
         if let Some(id) = &now.album_id {

@@ -1588,15 +1588,6 @@ fn track_row_contents(
                 .secondary
                 .gamma_multiply(if hovered { 0.30 } else { 0.20 }),
         );
-    } else if is_current {
-        // Spindle: the playing song's row is lifted on every list, so the
-        // green title is not the only sign of it.
-        let fill = if palette.dark {
-            palette.surface_hover
-        } else {
-            Color32::from_rgb(0xe6, 0xe9, 0xee)
-        };
-        ui.painter().rect_filled(rect, CornerRadius::same(6), fill);
     } else if hovered {
         ui.painter().rect_filled(
             rect,
@@ -1635,7 +1626,7 @@ fn track_row_contents(
             let color = if is_current {
                 palette.accent
             } else {
-                palette.secondary
+                palette.dim
             };
             let label = row.number.unwrap_or(row.index + 1).to_string();
             painter.text(
@@ -2030,7 +2021,7 @@ fn track_row_contents(
         egui::Align2::RIGHT_CENTER,
         util::format_duration_ms(row.item.duration_ms()),
         theme::regular(13.0),
-        palette.secondary,
+        palette.dim,
     );
     x += cols.duration;
 
@@ -2308,7 +2299,8 @@ pub fn table_header(
     let width = ui.available_width();
     let (rect, _) = ui.allocate_exact_size(vec2(width, 34.0), Sense::hover());
     let font = theme::regular(12.0);
-    let color = palette.secondary;
+    // Spindle: headings in the third grey, under the songs' own text.
+    let color = palette.dim;
     let mut clicked = None;
     let mut heading = |ui: &mut Ui, x: f32, text: &str, column: SortColumn| {
         let active = sort.filter(|sort| sort.column == column);
@@ -2794,6 +2786,10 @@ pub fn linked_shelf(
     clicked
 }
 
+/// Spindle: how far a shelf row reaches past its column, the cards' own
+/// inset, so card art sits on the heading's edge.
+const CARD_BLEED: f32 = 12.0;
+
 fn shelf_cards(ui: &mut Ui, palette: &Palette, id: &str, add_contents: impl FnOnce(&mut Ui)) {
     ui.add_space(4.0);
     // Spindle: no scrollbar under a shelf. The row fades at the edge it
@@ -2807,18 +2803,29 @@ fn shelf_cards(ui: &mut Ui, palette: &Palette, id: &str, add_contents: impl FnOn
     if let Some(offset) = jump {
         area = area.horizontal_scroll_offset(offset);
     }
-    let output = ui
-        .scope(|ui| {
-            ui.spacing_mut().scroll.fade.strength = 1.0;
-            ui.spacing_mut().scroll.fade.size = 48.0;
-            crate::autoscroll::show(ui, area, egui::Vec2b::new(true, false), |ui| {
-                ui.horizontal(|ui| {
-                    ui.spacing_mut().item_spacing.x = CARD_GAP / 2.0;
-                    add_contents(ui);
-                });
-            })
-        })
-        .inner;
+    // Spindle: the cards keep a 12 px inset for their hover fill, so the
+    // row reaches 12 px past the column on each side and the art lines up
+    // with the shelf's heading.
+    let mut room = ui.available_rect_before_wrap();
+    room.min.x -= CARD_BLEED;
+    room.max.x += CARD_BLEED;
+    // A child, not a scope: a scope would widen this column for every
+    // shelf heading after it.
+    let column = ui.available_rect_before_wrap().x_range();
+    let mut child = ui.new_child(egui::UiBuilder::new().max_rect(room));
+    child.spacing_mut().scroll.fade.strength = 1.0;
+    child.spacing_mut().scroll.fade.size = 48.0;
+    let output = crate::autoscroll::show(&mut child, area, egui::Vec2b::new(true, false), |ui| {
+        ui.horizontal(|ui| {
+            ui.spacing_mut().item_spacing.x = CARD_GAP / 2.0;
+            add_contents(ui);
+        });
+    });
+    let used = child.min_rect();
+    ui.allocate_rect(
+        egui::Rect::from_x_y_ranges(column, used.y_range()),
+        Sense::hover(),
+    );
     let rect = output.inner_rect;
     let offset = output.state.offset.x;
     let overflow = (output.content_size.x - rect.width()).max(0.0);
@@ -3182,7 +3189,7 @@ pub fn thin_slider(
         );
         // Spindle: a softer white at rest, so the bar does not glow.
         let rest = if palette.dark {
-            Color32::from_rgb(0xd0, 0xd4, 0xd9)
+            Color32::from_rgb(0xb3, 0xb9, 0xc1)
         } else {
             palette.text
         };
