@@ -9,7 +9,7 @@ use crate::theme::{self, Icon};
 
 use super::widgets;
 
-const LINE_SIZE: f32 = 22.0;
+const LINE_SIZE: f32 = 20.0;
 // Spindle: more room between lines than inside a wrapped one, so each
 // line reads as one unit.
 const LINE_GAP: f32 = 14.0;
@@ -256,13 +256,15 @@ fn contents(app: &mut App, ui: &mut egui::Ui) {
     // and the sung line is full white, so the eye finds it at once.
     // Spindle: every line stays readable (4.5:1 or more); the sung line
     // stands out by white, weight and size.
+    // Spindle: sung lines step back further than the ones to come, so
+    // the place in the song shows at a glance.
     let sung = if palette.dark {
-        egui::Color32::from_rgb(0x7d, 0x85, 0x90)
+        egui::Color32::from_rgb(0x6e, 0x76, 0x81)
     } else {
         palette.dim
     };
     let upcoming = if palette.dark {
-        egui::Color32::from_rgb(0x96, 0x9e, 0xa9)
+        egui::Color32::from_rgb(0xa9, 0xb1, 0xbc)
     } else {
         palette.secondary
     };
@@ -330,7 +332,7 @@ fn contents(app: &mut App, ui: &mut egui::Ui) {
                 } else {
                     // Spindle: a line that needs two rows breaks near its
                     // middle, so no word is left alone on the second.
-                    let width = ui.available_width();
+                    let width = balanced_width(ui, text, &font, ui.available_width());
                     ui.scope(|ui| {
                         ui.set_max_width(width);
                         ui.add(
@@ -1003,7 +1005,6 @@ mod tests {
 /// Spindle: the width to wrap a lyric line at so its rows come out about
 /// even: the whole width when it fits on one row, else its length over the
 /// rows it needs, with a little slack.
-#[allow(dead_code)]
 fn balanced_width(ui: &egui::Ui, text: &str, font: &egui::FontId, available: f32) -> f32 {
     let single = ui
         .painter()

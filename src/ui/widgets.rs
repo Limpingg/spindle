@@ -2485,7 +2485,8 @@ pub fn table_header(
         clicked = Some(SortColumn::Index);
     }
     let clock = Rect::from_center_size(
-        pos2(rect.right() - 36.0 - 56.0 / 2.0 - 6.0, rect.center().y),
+        // Spindle: right aligned on the durations' right edge.
+        pos2(rect.right() - 36.0 - 56.0 / 2.0 + 5.0, rect.center().y),
         Vec2::splat(15.0),
     );
     let duration_active = sort.is_some_and(|sort| sort.column == SortColumn::Duration);

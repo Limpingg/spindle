@@ -191,15 +191,15 @@ fn quick_access_tiles(app: &App) -> Vec<Tile> {
 
 fn quick_access(app: &mut App, ui: &mut egui::Ui) {
     let palette = app.palette;
-    let tiles = quick_access_tiles(app);
+    let mut tiles = quick_access_tiles(app);
     let available = ui.available_width();
-    // Spindle: as many columns as fit, then fewer if that leaves a hole in
-    // the last row (8 tiles fill 4 columns, not 3).
-    let most = ((available / 220.0).floor() as usize).clamp(2, 4);
-    let columns = (2..=most)
-        .rev()
-        .find(|columns| tiles.len() % columns == 0)
-        .unwrap_or(most);
+    // Spindle: as many columns as fit at 200 px or more, and only whole
+    // rows: beside a side panel 6 tiles in 3 columns, not 8 in 2 tall
+    // ones or 4 cut short.
+    let columns = ((available / 200.0).floor() as usize).clamp(2, 4);
+    if tiles.len() > columns {
+        tiles.truncate(tiles.len() / columns * columns);
+    }
     // Spindle: one 8 px gap both ways.
     let gap = 8.0;
     ui.spacing_mut().item_spacing.y = gap;

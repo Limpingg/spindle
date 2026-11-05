@@ -701,8 +701,15 @@ fn current_card(
     };
     let open_id = ui.make_persistent_id("connect-outputs-open");
     let mut open = ui.data(|data| data.get_temp::<bool>(open_id).unwrap_or(false));
+    // Spindle: the playing device's card takes a faint wash of green, the
+    // same family as the strip under the player bar.
+    let card_fill = if palette.dark {
+        egui::Color32::from_rgb(0x13, 0x26, 0x1b)
+    } else {
+        egui::Color32::from_rgb(0xdd, 0xee, 0xe2)
+    };
     egui::Frame::new()
-        .fill(palette.surface)
+        .fill(card_fill)
         .corner_radius(CornerRadius::same(8))
         .inner_margin(egui::Margin::symmetric(12, 10))
         .show(ui, |ui| {

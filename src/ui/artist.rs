@@ -47,7 +47,7 @@ pub fn show(app: &mut App, ui: &mut egui::Ui, id: &str) {
                     let render_top = |ui: &mut egui::Ui, app: &mut App| {
                         // Spindle: a short list stays compact, so the plays
                         // sit near the title, not 650 px from it.
-                        let width = ui.available_width().min(860.0);
+                        let width = ui.available_width();
                         ui.allocate_ui_with_layout(
                             egui::vec2(width, 0.0),
                             egui::Layout::top_down(egui::Align::Min),
@@ -102,7 +102,7 @@ pub fn show(app: &mut App, ui: &mut egui::Ui, id: &str) {
                                 } else {
                                     gettext(locale, "See more").into_owned()
                                 },
-                                theme::semibold(13.0),
+                                theme::semibold(14.0),
                                 palette.secondary,
                             )
                         })

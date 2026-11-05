@@ -96,7 +96,7 @@ impl Palette {
         if self.dark {
             Color32::from_rgb(0x00, 0x00, 0x00)
         } else {
-            Color32::from_rgb(0xd2, 0xd7, 0xde)
+            Color32::from_rgb(0xe2, 0xe5, 0xea)
         }
     }
 
@@ -909,8 +909,22 @@ fn soft_button_inner(
     dismissible: bool,
     segment: bool,
 ) -> (Response, bool) {
-    let font = medium(13.0);
-    let color = if active { palette.window } else { palette.text };
+    // Spindle: in a segmented control the options at rest are quiet and
+    // the chosen one is bold, so the choice reads at once.
+    let font = if segment && active {
+        semibold(13.0)
+    } else if segment {
+        regular(13.0)
+    } else {
+        medium(13.0)
+    };
+    let color = if active {
+        palette.window
+    } else if segment {
+        palette.secondary
+    } else {
+        palette.text
+    };
     let galley = crate::bidi::layout_line(ui.painter(), label, font, color);
     let icon_size = 15.0;
     let icon_width = if icon.is_some() { icon_size + 6.0 } else { 0.0 };
