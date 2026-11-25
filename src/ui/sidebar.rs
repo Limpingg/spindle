@@ -1224,7 +1224,7 @@ fn contents(app: &mut App, ui: &mut egui::Ui, grid_art: Option<Rect>) {
             (Filter::Artists, gettext(locale, "Artists")),
             (Filter::Podcasts, gettext(locale, "Podcasts")),
         ] {
-            if theme::soft_button(ui, &palette, None, &label, filter == value).clicked() {
+            if theme::chip_button(ui, &palette, &label, filter == value).clicked() {
                 filter = value;
             }
         }
@@ -1233,7 +1233,7 @@ fn contents(app: &mut App, ui: &mut egui::Ui, grid_art: Option<Rect>) {
             // Translators: Library filter for playlists created by the signed-in user.
             let label = gettext(locale, "By You");
             let by_you = app.settings.library_by_you;
-            let response = theme::soft_button(ui, &palette, None, &label, by_you);
+            let response = theme::chip_button(ui, &palette, &label, by_you);
             response.widget_info(|| {
                 egui::WidgetInfo::selected(
                     egui::WidgetType::Button,
@@ -3243,7 +3243,7 @@ fn chip_row(ui: &mut egui::Ui, id: &str, inset: f32, add: impl FnOnce(&mut egui:
     // Spindle: chips past the edge fade out instead of being cut flat.
     ui.spacing_mut().scroll.fade.strength = 1.0;
     ui.spacing_mut().scroll.fade.size = 24.0;
-    egui::ScrollArea::horizontal()
+    let output = egui::ScrollArea::horizontal()
         .id_salt(id)
         .scroll_bar_visibility(egui::scroll_area::ScrollBarVisibility::AlwaysHidden)
         .auto_shrink([false, true])
@@ -3254,4 +3254,17 @@ fn chip_row(ui: &mut egui::Ui, id: &str, inset: f32, add: impl FnOnce(&mut egui:
                 add(ui);
             });
         });
+    // Spindle: chips running past the edge fade out instead of being cut
+    // flat (egui fades only vertical scroll areas).
+    let rect = output.inner_rect;
+    let more = output.content_size.x - rect.width() - output.state.offset.x;
+    if more > 1.0 {
+        let bg = ui.stack().bg_color();
+        let fade = egui::Rect::from_min_max(egui::pos2(rect.right() - 28.0, rect.top()), rect.right_bottom());
+        ui.painter().add(egui::Shape::gradient_rect(
+            fade,
+            egui::epaint::Direction::RightToLeft,
+            [bg, egui::Color32::TRANSPARENT],
+        ));
+    }
 }

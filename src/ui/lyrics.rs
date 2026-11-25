@@ -262,12 +262,12 @@ fn contents(app: &mut App, ui: &mut egui::Ui) {
     // Spindle: sung lines step back further than the ones to come, so
     // the place in the song shows at a glance.
     let sung = if palette.dark {
-        egui::Color32::from_rgb(0x55, 0x5c, 0x66)
+        egui::Color32::from_rgb(0x6e, 0x73, 0x7b)
     } else {
         egui::Color32::from_rgb(0x8a, 0x92, 0x9c)
     };
     let upcoming = if palette.dark {
-        egui::Color32::from_rgb(0x6b, 0x72, 0x7c)
+        egui::Color32::from_rgb(0xa0, 0xa5, 0xad)
     } else {
         palette.dim
     };
@@ -292,8 +292,8 @@ fn contents(app: &mut App, ui: &mut egui::Ui) {
                     Some(Align::Min),
                 );
             }
-            // Spindle: just clear of the solid band at the top.
-            ui.add_space(14.0);
+            // Spindle: the first line close under the song's header.
+            ui.add_space(2.0);
             for (index, line) in lyrics.lines.iter().enumerate() {
                 let is_active = active == Some(index);
                 let lit = ui.ctx().animate_bool_with_time(
@@ -336,7 +336,7 @@ fn contents(app: &mut App, ui: &mut egui::Ui) {
                 } else {
                     // Spindle: a line that needs two rows breaks near its
                     // middle, so no word is left alone on the second.
-                    let width = ui.available_width();
+                    let width = balanced_width(ui, text, &font, ui.available_width());
                     ui.scope(|ui| {
                         ui.set_max_width(width);
                         ui.add(

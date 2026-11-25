@@ -128,7 +128,7 @@ pub fn side_panel(app: &mut App, ui: &mut egui::Ui) {
         let ui = &mut ui;
         // Spindle: rows fade at the panel's foot, like the library list.
         ui.spacing_mut().scroll.fade.strength = 1.0;
-        ui.spacing_mut().scroll.fade.size = 32.0;
+        ui.spacing_mut().scroll.fade.size = 48.0;
         crate::autoscroll::show(
             ui,
             egui::ScrollArea::vertical()

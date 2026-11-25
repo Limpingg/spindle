@@ -95,10 +95,12 @@ pub fn show(app: &mut App, ui: &mut egui::Ui, id: &str) {
                         render_top(ui, app);
                     }
                     if items.len() > 5 {
-                        ui.add_space(10.0);
+                        ui.add_space(16.0);
                         // Spindle: a quiet text link, as Spotify has it.
                         if ui
                             .horizontal(|ui| {
+                            // Spindle: on the rows' number column.
+                            ui.add_space(26.0);
                             theme::link(
                                 ui,
                                 if page.show_all_top {

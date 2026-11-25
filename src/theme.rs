@@ -918,7 +918,13 @@ pub fn soft_button(
     label: &str,
     active: bool,
 ) -> Response {
-    soft_button_inner(ui, palette, icon, label, active, false, false).0
+    soft_button_inner(ui, palette, icon, label, active, false, false, 12.0).0
+}
+
+/// Spindle: a [`soft_button`] with 10 px sides, for a row of filter chips
+/// that has to fit a narrow sidebar.
+pub fn chip_button(ui: &mut egui::Ui, palette: &Palette, label: &str, active: bool) -> Response {
+    soft_button_inner(ui, palette, None, label, active, false, false, 10.0).0
 }
 
 /// A [`soft_button`] whose icon turns into a cross on hover, allowing the
@@ -929,7 +935,7 @@ pub fn soft_button_dismiss(
     icon: Icon,
     label: &str,
 ) -> (Response, bool) {
-    soft_button_inner(ui, palette, Some(icon), label, false, true, false)
+    soft_button_inner(ui, palette, Some(icon), label, false, true, false, 12.0)
 }
 
 /// The width `soft_button` gives a button without an icon, for laying out
@@ -942,7 +948,7 @@ pub fn soft_button_width(ui: &egui::Ui, label: &str) -> f32 {
 /// Spindle: one option of a segmented control: no edge and no fill until
 /// chosen or hovered, for a row set in [`segmented`].
 pub fn segment_button(ui: &mut egui::Ui, palette: &Palette, label: &str, active: bool) -> Response {
-    soft_button_inner(ui, palette, None, label, active, false, true).0
+    soft_button_inner(ui, palette, None, label, active, false, true, 12.0).0
 }
 
 /// Spindle: a rounded track that holds [`segment_button`]s side by side.
@@ -971,6 +977,7 @@ fn soft_button_inner(
     active: bool,
     dismissible: bool,
     segment: bool,
+    side: f32,
 ) -> (Response, bool) {
     // Spindle: in a segmented control the options at rest are quiet and
     // the chosen one is bold, so the choice reads at once.
@@ -997,7 +1004,7 @@ fn soft_button_inner(
     let icon_width = if icon.is_some() { icon_size + 6.0 } else { 0.0 };
     // Spindle: 32 px tall, the height every pill and input shares; a
     // segment is 2 px shorter so its track, with edge and inset, is 32 too.
-    let padding = Vec2::new(12.0, if segment { 7.0 } else { 8.0 });
+    let padding = Vec2::new(side, if segment { 7.0 } else { 8.0 });
     let size = Vec2::new(galley.size().x + icon_width, galley.size().y) + padding * 2.0;
     let (rect, response) = ui.allocate_exact_size(size, Sense::click());
     response.widget_info(|| {

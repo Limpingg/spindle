@@ -78,8 +78,8 @@ fn strip_colors(palette: &theme::Palette) -> (egui::Color32, egui::Color32) {
         // A clear green band with deep green words (6.6:1) on the light
         // theme, where a mix into the grey bar came out grey.
         (
-            egui::Color32::from_rgb(0xe2, 0xee, 0xe6),
-            palette.accent,
+            egui::Color32::from_rgb(0xe4, 0xf2, 0xe8),
+            egui::Color32::from_rgb(0x13, 0x69, 0x2f),
         )
     }
 }
@@ -199,7 +199,8 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
         .frame(
             Frame::new()
                 .fill(fill)
-                .inner_margin(Margin::symmetric(16, 0)),
+                // Spindle: on the sidebar's content edge, 22 px in.
+                .inner_margin(Margin::symmetric(22, 0)),
         )
         .show(ui, |ui| {
             let rect = ui.max_rect();
