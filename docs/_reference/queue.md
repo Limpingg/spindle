@@ -45,7 +45,9 @@ playlist position, provided the rows load from the beginning and no missing
 or local entry comes before it; otherwise it starts by name, which plays the
 first copy. A song started from a row marks only that row as playing and
 loading; other copies in the same list look like ordinary rows until another
-song plays. A filtered playlist or Liked Songs view
+song plays. Another playlist that also holds the playing song shows it as an
+ordinary row, since the song is not playing from there. A filtered playlist or
+Liked Songs view
 plays its matching songs in displayed order, including duplicates. An empty or entirely
 unplayable view disables Play instead of starting the unfiltered context.
 
@@ -72,6 +74,13 @@ not consume a queue row or restore an older queue saved on this computer.
 
 1. **The list shows the play order.** The top row plays next, followed by the
    rows below it.
+
+   Spotify pads a short queue by going round it again, back to the playing
+   song, even with Repeat off. With Repeat off, Spotifast leaves out the
+   rows from where the list comes back round, so a song started on its own,
+   as a Recent row starts it, is not listed again under itself. Near the end
+   of an album, Spotify may go round to the album's first song without
+   showing where the album ends, so a few rows that will not play can stay.
 
 2. **Add to queue adds a song to your part of the queue.** It goes after
    the songs you queued earlier and before the playlist's songs. Queue
@@ -116,7 +125,12 @@ not consume a queue row or restore an older queue saved on this computer.
 
 5. **Playing a row from the queue skips to it.** The rows above it are
    skipped and removed, as if you had pressed Next down to it. The rows
-   below it stay, and the playlist keeps going afterwards.
+   below it stay, and the playlist keeps going afterwards. On this
+   computer the rows above leave the queue without playing, so only the
+   chosen song loads and no song in between is heard or named. Previous
+   then returns to the song that was playing, not to a skipped row. Another
+   device, Soloist included, cannot have a song taken out of its queue, so
+   it steps down to the row with one skip per row.
 
 6. **Starting a playlist or album keeps your songs.** The rows underneath
    change to the new collection; your songs stay under **Playing next**
@@ -136,7 +150,13 @@ not consume a queue row or restore an older queue saved on this computer.
    promptly without waiting for the song to finish.
 
 9. **Closing the app keeps the queue.** Spotifast saves it locally. When you
-   resume the last song, it restores your queued songs and playlist position.
+   resume the last song, it restores your queued songs and playlist position,
+   and the playlist carries on after that song, even when it was paused or
+   playing from a sorted view when you closed the app.
+
+   A song the playlist no longer holds, such as a recommendation that followed
+   its end, plays on its own at its saved position, followed by your queued
+   songs and, with Autoplay on, Spotify's recommendations for that song.
 
 10. **Old answers from Spotify are ignored.** Queue responses can be a few
     seconds late. Spotifast ignores stale responses and asks again. Your

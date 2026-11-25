@@ -23,6 +23,8 @@ ROOT = Path(sys.argv[1] if len(sys.argv) > 1 else ".").resolve()
 RENAMES = [
     ("src/spotifast.rs", "src/spindle.rs"),
     ("assets/skins/spotifast.wsz", "assets/skins/spindle.wsz"),
+    ("assets/skins/spotifast-ribbon.wmz", "assets/skins/spindle-ribbon.wmz"),
+    ("assets/skins/spotifast-wide.wmz", "assets/skins/spindle-wide.wmz"),
     ("contrib/omarchy/spotifast-theme", "contrib/omarchy/spindle-theme"),
     ("contrib/omarchy/spotifast.json.tpl", "contrib/omarchy/spindle.json.tpl"),
     ("packaging/windows/spotifast.iss", "packaging/windows/spindle.iss"),

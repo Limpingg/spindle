@@ -753,10 +753,10 @@ fn now_playing_block(app: &mut App, ui: &mut egui::Ui, region: Rect, now: Option
             &tooltip,
         );
         let popup_id = egui::Id::new(ADD_POPUP_ID);
+        let query_id = popup_id.with("query");
         match song.as_ref() {
             None => egui::Popup::close_id(ui.ctx(), popup_id),
             Some(item) => {
-                let query_id = popup_id.with("query");
                 let shown = egui::Popup::menu(&response)
                     .id(popup_id)
                     .close_behavior(egui::PopupCloseBehavior::CloseOnClickOutside)
@@ -771,6 +771,7 @@ fn now_playing_block(app: &mut App, ui: &mut egui::Ui, region: Rect, now: Option
                             app,
                             std::slice::from_ref(item),
                             &mut query,
+                            None,
                         );
                         if fresh {
                             field.request_focus();
@@ -1544,5 +1545,12 @@ mod player_bar_tint_tests {
 
         let accent = Color32::from_rgb(30, 215, 96);
         assert_eq!(vis_colours(None, accent, true).len(), 2);
+    }
+
+    /// A window too narrow for it loses the button, not the volume.
+    #[test]
+    fn the_full_screen_button_goes_when_the_bar_is_tight() {
+        assert!(full_screen_button_fits(320.0));
+        assert!(!full_screen_button_fits(200.0));
     }
 }
