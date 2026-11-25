@@ -172,7 +172,18 @@ impl Palette {
         let keep = if hi - lo > cap { cap / (hi - lo) } else { 1.0 };
         let pull = |c: f32| grey + (c - grey) * keep;
         let (r, g, b) = (pull(r), pull(g), pull(b));
-        Color32::from_rgb((r * 255.0) as u8, (g * 255.0) as u8, (b * 255.0) as u8)
+        // Spindle: khaki and olive never survive as a hue: such a cover
+        // gives the app's own cool slate at the same lightness.
+        let (r, g, b) = if olive && self.dark {
+            (grey * 0.9, grey * 0.96, grey * 1.06)
+        } else {
+            (r, g, b)
+        };
+        Color32::from_rgb(
+            (r.min(1.0) * 255.0) as u8,
+            (g.min(1.0) * 255.0) as u8,
+            (b.min(1.0) * 255.0) as u8,
+        )
     }
 }
 

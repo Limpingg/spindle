@@ -404,8 +404,8 @@ fn contents(app: &mut App, ui: &mut egui::Ui) {
         };
         // Solid for the first 14 px, so no ghost of a line hangs under
         // the song's row.
-        band(rect.top(), rect.top() + 24.0, fill, fill);
-        band(rect.top() + 24.0, rect.top() + 24.0 + fade, fill, clear);
+        band(rect.top(), rect.top() + 6.0, fill, fill);
+        band(rect.top() + 6.0, rect.top() + 6.0 + fade, fill, clear);
         band(rect.bottom() - fade, rect.bottom(), clear, fill);
         painter.add(mesh);
     }

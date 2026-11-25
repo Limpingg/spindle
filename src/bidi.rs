@@ -81,11 +81,12 @@ pub fn layout(
     overflow: Option<char>,
 ) -> Arc<Galley> {
     if !has_rtl(text) {
-        let mut job = LayoutJob::simple(text.to_owned(), font, color, wrap_width);
+        let mut job = LayoutJob::simple(text.to_owned(), font.clone(), color, wrap_width);
         job.wrap.max_rows = max_rows;
         job.wrap.break_anywhere = false;
         job.wrap.overflow_character = overflow;
-        return painter.layout_job(job);
+        let galley = painter.layout_job(job);
+        return tidy_cut(painter, text, galley, font, color, wrap_width, max_rows, overflow);
     }
     // The rows are found here, whole words at a time, and each becomes a
     // paragraph of its own, so a paragraph's first row still holds its first
@@ -105,6 +106,68 @@ pub fn layout(
     let mut galley = painter.layout_job(job);
     reorder(&mut galley);
     galley
+}
+
+/// Spindle: epaint puts its ellipsis wherever the last glyph that fits
+/// ends, so a cut after a space reads "new …". This lays the text out again
+/// cut at the end of the last whole word, with the mark straight after it.
+#[allow(clippy::too_many_arguments)]
+fn tidy_cut(
+    painter: &Painter,
+    text: &str,
+    galley: Arc<Galley>,
+    font: FontId,
+    color: Color32,
+    wrap_width: f32,
+    max_rows: usize,
+    overflow: Option<char>,
+) -> Arc<Galley> {
+    let Some(mark) = overflow else {
+        return galley;
+    };
+    // Only wrapped text (card descriptions): a one-row name keeps its
+    // whole text, which is what finds and copies it.
+    if !galley.elided || max_rows < 2 {
+        return galley;
+    }
+    let Some(last) = galley.rows.last() else {
+        return galley;
+    };
+    let shown: String = last.row.glyphs.iter().map(|glyph| glyph.chr).collect();
+    let Some(before) = shown.strip_suffix(mark) else {
+        return galley;
+    };
+    if !before.ends_with(char::is_whitespace) {
+        return galley;
+    }
+    let kept = before.trim_end();
+    if kept.is_empty() {
+        return galley;
+    }
+    // Where the last row's words end in the whole text, past the rows
+    // before it.
+    let earlier: usize = galley.rows[..galley.rows.len() - 1]
+        .iter()
+        .map(|row| row.row.glyphs.len())
+        .sum();
+    let start = text
+        .char_indices()
+        .nth(earlier.saturating_sub(1))
+        .map_or(0, |(at, _)| at);
+    let Some(found) = text[start..].find(kept) else {
+        return galley;
+    };
+    let end = start + found + kept.len();
+    let cut = format!("{}{mark}", &text[..end]);
+    let mut job = LayoutJob::simple(cut, font, color, wrap_width);
+    job.wrap.max_rows = max_rows;
+    job.wrap.break_anywhere = false;
+    let tidy = painter.layout_job(job);
+    if tidy.rows.len() <= galley.rows.len() && !tidy.elided {
+        tidy
+    } else {
+        galley
+    }
 }
 
 /// Fills rows with whole words up to `wrap_width`, at most `max_rows` of

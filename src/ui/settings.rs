@@ -366,7 +366,7 @@ fn section(
 ) {
     ui.add_space(10.0);
     theme::text(ui, title, theme::bold(18.0), palette.text);
-    ui.add_space(8.0);
+    ui.add_space(12.0);
     Frame::new()
         .fill(if palette.dark {
             egui::Color32::from_rgb(0x17, 0x1a, 0x1f)
@@ -482,7 +482,8 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
         theme::bold(28.0),
         palette.text,
     );
-    ui.add_space(4.0);
+    // Spindle: the title, the search and the first section on one rhythm.
+    ui.add_space(14.0);
     #[cfg(feature = "demo")]
     if let Some(filter) = app.winamp.demo_settings_filter.take() {
         ui.data_mut(|data| data.insert_temp(egui::Id::new(SETTINGS_FILTER_ID), filter));
@@ -501,7 +502,7 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
     );
     let needle = filter.trim().to_lowercase();
     ui.data_mut(|data| data.insert_temp(egui::Id::new(SETTINGS_FILTER_ID), filter));
-    ui.add_space(4.0);
+    ui.add_space(14.0);
     let dirty_id = egui::Id::new(PLAYBACK_DIRTY_ID);
     let mut playback_dirty = ui
         .data(|data| data.get_temp::<bool>(dirty_id))
