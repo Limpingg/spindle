@@ -78,12 +78,7 @@ fn eq_preset_controls(app: &mut App, ui: &mut egui::Ui, current: Option<&str>) {
     let mut name = ui.data(|data| data.get_temp::<String>(name_id).unwrap_or_default());
     ui.horizontal_wrapped(|ui| {
         ui.spacing_mut().item_spacing = Vec2::splat(8.0);
-        let field = Frame::new()
-            .fill(palette.surface)
-            // Spindle: a pill with a hairline edge, like the search fields.
-            .corner_radius(CornerRadius::same(16))
-            .stroke(egui::Stroke::new(1.0, field_edge(&palette)))
-            .inner_margin(Margin::symmetric(14, 0))
+        let field = field_frame(&palette)
             .show(ui, |ui| {
                 // Spindle: the field is as tall as the buttons beside it (32 px
                 // with its edge); a row taller than that stretched it.
@@ -647,12 +642,7 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
                 .data(|data| data.get_temp::<String>(draft_id))
                 .unwrap_or_else(|| app.settings.web_client_id.clone().unwrap_or_default());
             filtered_row(ui, &palette, &needle, &account, &account_rows[0], |ui| {
-                let response = Frame::new()
-                    .fill(palette.surface)
-                    // Spindle: a pill with a hairline edge, like the search fields.
-                    .corner_radius(CornerRadius::same(16))
-                    .stroke(egui::Stroke::new(1.0, field_edge(&palette)))
-                    .inner_margin(Margin::symmetric(14, 0))
+                let response = field_frame(&palette)
                     .show(ui, |ui| {
                         // Spindle: the field is as tall as the buttons beside it (32 px
                         // with its edge); a row taller than that stretched it.
@@ -906,12 +896,7 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
                 }
             });
             filtered_row(ui, &palette, &needle, &playback, &playback_rows[1], |ui| {
-                let response = Frame::new()
-                    .fill(palette.surface)
-                    // Spindle: a pill with a hairline edge, like the search fields.
-                    .corner_radius(CornerRadius::same(16))
-                    .stroke(egui::Stroke::new(1.0, field_edge(&palette)))
-                    .inner_margin(Margin::symmetric(14, 0))
+                let response = field_frame(&palette)
                     .show(ui, |ui| {
                         // Spindle: the field is as tall as the buttons beside it (32 px
                         // with its edge); a row taller than that stretched it.
@@ -2973,12 +2958,24 @@ fn eq_curve(ui: &mut egui::Ui, palette: &Palette, settings: &crate::eq::EqSettin
 }
 
 /// Spindle: an input's edge, 3:1 against its card so it reads as a field.
-fn field_edge(palette: &Palette) -> egui::Color32 {
-    if palette.dark {
-        palette.outline
+/// Spindle: text fields are filled rectangles with the settings search's
+/// corners, so they never read as the pill buttons beside them.
+fn field_frame(palette: &Palette) -> Frame {
+    let fill = if palette.dark {
+        egui::Color32::from_rgb(0x24, 0x28, 0x2e)
+    } else {
+        egui::Color32::WHITE
+    };
+    let edge = if palette.dark {
+        egui::Color32::from_rgb(0x34, 0x39, 0x41)
     } else {
         palette.outline
-    }
+    };
+    Frame::new()
+        .fill(fill)
+        .corner_radius(CornerRadius::same(8))
+        .stroke(egui::Stroke::new(1.0, edge))
+        .inner_margin(Margin::symmetric(12, 0))
 }
 
 #[cfg(test)]

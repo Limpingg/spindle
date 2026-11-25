@@ -63,7 +63,8 @@ pub fn side_panel(app: &mut App, ui: &mut egui::Ui) {
         .frame(
             theme::pane_frame(&palette, true, true)
                 .fill(lyrics_fill(&palette, tint))
-                .inner_margin(Margin::symmetric(16, 12)),
+                // Spindle: 24 px sides, so lines never run to the edge.
+                .inner_margin(Margin::symmetric(24, 12)),
         );
     let response = panel.show(ui, |ui| {
         let window_controls = super::window_controls_reservation(
@@ -292,8 +293,8 @@ fn contents(app: &mut App, ui: &mut egui::Ui) {
                     Some(Align::Min),
                 );
             }
-            // Spindle: clear of the solid band at the top.
-            ui.add_space(26.0);
+            // Spindle: just clear of the solid band at the top.
+            ui.add_space(14.0);
             for (index, line) in lyrics.lines.iter().enumerate() {
                 let is_active = active == Some(index);
                 let lit = ui.ctx().animate_bool_with_time(

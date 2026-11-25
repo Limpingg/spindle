@@ -206,17 +206,17 @@ fn nav_button(
     response.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, enabled, tooltip));
     if ui.is_rect_visible(rect) {
         // Spindle: raised like the Home button, not sunk into the pane.
+        // Spindle: one circle on every page, so Home and the pages with a
+        // tinted header show the same pair; with nowhere to go only the
+        // arrow fades.
         let fill = if response.hovered() && enabled {
             palette.surface_hover
-        } else if enabled {
-            palette.surface
         } else {
-            // Spindle: with nowhere to go the circle steps back too.
-            palette.surface.gamma_multiply(0.3)
+            palette.surface
         };
         ui.painter().circle_filled(rect.center(), 16.0, fill);
         let color = if !enabled {
-            palette.dim
+            palette.secondary.gamma_multiply(0.4)
         } else if response.hovered() || response.has_focus() {
             palette.text
         } else {

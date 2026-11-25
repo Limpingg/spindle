@@ -12,6 +12,8 @@ use crate::theme::{self, Icon};
 
 use super::widgets::{self, TrackRow};
 
+/// Spindle: headings start where the rows' covers do.
+const ROW_INSET: f32 = 10.0;
 pub fn page(app: &mut App, ui: &mut egui::Ui) {
     let palette = app.palette;
     ui.add_space(8.0);
@@ -387,6 +389,7 @@ fn contents(app: &mut App, ui: &mut egui::Ui, compact: bool) {
     // page, so its name is plain text.
     if let Some(from) = app.playing_from().filter(|_| current.is_some()) {
         ui.horizontal(|ui| {
+            ui.add_space(ROW_INSET);
             // Spindle: one word space between the label and the name.
             ui.spacing_mut().item_spacing.x = 4.0;
             theme::text(
@@ -409,12 +412,15 @@ fn contents(app: &mut App, ui: &mut egui::Ui, compact: bool) {
         ui.add_space(10.0);
     }
     if let Some(current) = current.as_ref() {
-        theme::text(
-            ui,
-            gettext(app.locale, "Now playing"),
-            theme::semibold(14.0),
-            palette.text,
-        );
+        ui.horizontal(|ui| {
+            ui.add_space(ROW_INSET);
+            theme::text(
+                ui,
+                gettext(app.locale, "Now playing"),
+                theme::semibold(14.0),
+                palette.text,
+            );
+        });
         ui.add_space(4.0);
         let context = RowContext::Uris(Arc::from([current.uri().to_string()]));
         widgets::track_row(
@@ -474,6 +480,7 @@ fn contents(app: &mut App, ui: &mut egui::Ui, compact: bool) {
         // The trash sits with the songs it removes: only this section is
         // the user's to clear, the context below plays itself.
         ui.horizontal(|ui| {
+            ui.add_space(ROW_INSET);
             theme::text(
                 ui,
                 gettext(
@@ -591,16 +598,19 @@ fn contents(app: &mut App, ui: &mut egui::Ui, compact: bool) {
     // row on it belongs to Next up, which plays from the context and is never
     // rewritten. The player bar's Queue button still takes the drop.
     if queue_len > queued_len {
-        theme::text(
-            ui,
-            gettext(
-                app.locale,
-                // Translators: Upcoming songs from the current playlist or album, after manually queued songs.
-                "Next up",
-            ),
-            theme::semibold(14.0),
-            palette.text,
-        );
+        ui.horizontal(|ui| {
+            ui.add_space(ROW_INSET);
+            theme::text(
+                ui,
+                gettext(
+                    app.locale,
+                    // Translators: Upcoming songs from the current playlist or album, after manually queued songs.
+                    "Next up",
+                ),
+                theme::semibold(14.0),
+                palette.text,
+            );
+        });
         ui.add_space(4.0);
         // Spindle: a Next up row can be dragged within Next up too; see
         // `Action::ArrangeNextUp`. Other drops do not land here.

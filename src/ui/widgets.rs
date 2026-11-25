@@ -1667,6 +1667,8 @@ struct Columns {
 
 /// The play count column's width, in rows and in the header alike.
 const PLAYS_WIDTH: f32 = 120.0;
+/// Spindle: the gap between the right aligned play counts and the heart.
+const PLAYS_INSET: f32 = 16.0;
 
 /// Spindle: with no other middle columns, plays start at 55 % of the row,
 /// as in Spotify, rather than 700 px from the titles beside the duration.
@@ -1674,8 +1676,10 @@ fn plays_column(width: f32, others: f32) -> f32 {
     if others > 0.0 {
         return PLAYS_WIDTH;
     }
-    let right_fixed = 36.0 + 56.0 + 36.0 + 8.0;
-    (width * 0.55 - right_fixed).max(PLAYS_WIDTH)
+    // Spindle: a narrow right aligned column beside the heart, so the
+    // counts read with their song instead of floating mid row.
+    let _ = width;
+    PLAYS_WIDTH
 }
 
 /// Whether a list `width` wide has room for play counts.
@@ -2257,8 +2261,8 @@ fn track_row_contents(
         if let Some(plays) = app.play_counts.get(row.item.uri()) {
             let cell = Rect::from_min_size(pos2(x, rect.top()), vec2(cols.plays, row_height));
             painter.text(
-                pos2(cell.left(), cell.center().y),
-                egui::Align2::LEFT_CENTER,
+                pos2(cell.right() - PLAYS_INSET, cell.center().y),
+                egui::Align2::RIGHT_CENTER,
                 util::format_count(*plays),
                 theme::regular(13.0),
                 palette.secondary,
@@ -2762,10 +2766,16 @@ pub fn table_header(
         cx += added_width;
     }
     if plays_width > 0.0 {
+        let label = pgettext(locale, "column heading", "PLAYS");
+        let label_width = ui
+            .painter()
+            .layout_no_wrap(label.to_string(), font.clone(), egui::Color32::PLACEHOLDER)
+            .size()
+            .x;
         heading(
             ui,
-            cx,
-            &pgettext(locale, "column heading", "PLAYS"),
+            cx + plays_width - PLAYS_INSET - label_width,
+            &label,
             SortColumn::Plays,
         );
     }

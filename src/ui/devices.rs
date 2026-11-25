@@ -737,15 +737,17 @@ fn current_card(
     };
     let open_id = ui.make_persistent_id("connect-outputs-open");
     let mut open = ui.data(|data| data.get_temp::<bool>(open_id).unwrap_or(false));
-    // Spindle: the playing device's card takes a faint wash of green, the
-    // same family as the strip under the player bar.
+    // Spindle: the playing device's card is a neutral raised card with a
+    // faint green edge; the green name and icon mark it, so the slider
+    // inside keeps its usual contrast.
     let card_fill = if palette.dark {
-        egui::Color32::from_rgb(0x13, 0x26, 0x1b)
+        egui::Color32::from_rgb(0x1f, 0x22, 0x27)
     } else {
-        egui::Color32::from_rgb(0xdd, 0xee, 0xe2)
+        egui::Color32::WHITE
     };
     egui::Frame::new()
         .fill(card_fill)
+        .stroke(egui::Stroke::new(1.0, palette.accent.gamma_multiply(0.35)))
         .corner_radius(CornerRadius::same(8))
         .inner_margin(egui::Margin::symmetric(12, 10))
         .show(ui, |ui| {

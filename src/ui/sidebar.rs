@@ -3246,6 +3246,8 @@ fn chip_row(ui: &mut egui::Ui, id: &str, add: impl FnOnce(&mut egui::Ui)) {
         .auto_shrink([false, true])
         .show(ui, |ui| {
             ui.horizontal(|ui| {
+                // Spindle: chips start on the heading's and covers' edge.
+                ui.add_space(8.0);
                 add(ui);
             });
         });
