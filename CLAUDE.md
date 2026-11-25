@@ -269,8 +269,10 @@ Nick asked for Spotify's own layout:
 
 Merged one release at a time on sync-spotifast-0.17. Soloist (Spotify's
 own player, Premium plus a personal Soloist key) joins Spindle's Connect
-panel as This computer; unlike the built-in librespot player it reports
-plays to Spotify, which Nick needs for On Repeat and Wrapped. Spindle
+panel as This computer. Plays from the built-in librespot player do not
+show in Nick's Recently played (checked 2026-11-24); Soloist is
+Spotify's own code and is expected to report them, which he needs for On
+Repeat and Wrapped. Confirm with Recently played after setup. Spindle
 keeps its player bar plus (no Liked Songs checklist), its top bar (no
 mini player or MilkDrop buttons) and hides the mini player and MilkDrop
 settings. Spotifast moved crmne/egui to 96c9740; its eframe crate is
