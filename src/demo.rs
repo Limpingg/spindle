@@ -4468,6 +4468,7 @@ mod tests {
     /// A Windows Media Player skin is listed under its own title, even from
     /// a `.zip`, and choosing one says what it lacks before it has loaded.
     #[test]
+    #[ignore = "Spindle hides the mini player section in Settings"]
     fn the_mini_player_settings_give_each_kind_of_skin_its_own_source() {
         let (ctx, mut app) = accessible_app("settings-media-player-skin");
         let folder = app.dirs.skins_dir();
@@ -6010,6 +6011,7 @@ mod tests {
     /// The player bar's heart applies its checks on Done, asking about each
     /// playlist it adds to, and a click outside drops them unapplied.
     #[test]
+    #[ignore = "Spindle's player bar plus adds to a playlist; it has no Liked Songs checklist"]
     fn the_hearts_done_applies_its_checks_and_a_click_outside_drops_them() {
         use crate::backend::ApiRequest;
         use egui::accesskit::{Action as AccessibleAction, Role};
@@ -9436,7 +9438,7 @@ mod tests {
                 "Local files",
                 "Audio cache",
                 "Equalizer",
-                "MilkDrop",
+                // Spindle: no MilkDrop section in Settings.
                 "Player bar visualizer",
             ] {
                 let text = settings_text(&ctx, &mut app, title);
@@ -9494,7 +9496,8 @@ mod tests {
         let (ctx, mut app) = accessible_app("soloist-processing");
         app.settings.soloist_enabled = true;
         app.soloist_audio = true;
-        for title in ["Equalizer", "MilkDrop", "Player bar visualizer"] {
+        // Spindle: no MilkDrop section in Settings.
+        for title in ["Equalizer", "Player bar visualizer"] {
             let text = settings_text(&ctx, &mut app, title);
             // Windows can observe the owned process but cannot apply EQ to
             // its audible output. Keep the visualizers without promising EQ.

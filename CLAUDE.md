@@ -265,6 +265,19 @@ Nick asked for Spotify's own layout:
   "Add to playlist") that opens the playlist picker on every song and
   never likes or unlikes. Song rows and menus keep their own like toggles.
 
+## Spotifast 0.15 to 0.17.2 (Spindle 0.17.201, 2026-11-25)
+
+Merged one release at a time on sync-spotifast-0.17. Soloist (Spotify's
+own player, Premium plus a personal Soloist key) joins Spindle's Connect
+panel as This computer; unlike the built-in librespot player it reports
+plays to Spotify, which Nick needs for On Repeat and Wrapped. Spindle
+keeps its player bar plus (no Liked Songs checklist), its top bar (no
+mini player or MilkDrop buttons) and hides the mini player and MilkDrop
+settings. Spotifast moved crmne/egui to 96c9740; its eframe crate is
+unchanged from 6ce633b, so vendor/eframe carried over. The rename now
+also covers the two shipped .wmz skins (files and their text members)
+and assets/skins *.wms.
+
 ## Spotifast 0.14.2 (Spindle 0.14.201, 2026-10-27)
 
 ncspot's Web API app, which Spotifast used as the shared app, takes no new

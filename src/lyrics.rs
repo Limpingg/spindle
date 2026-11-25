@@ -306,9 +306,6 @@ async fn get_from<T: DeserializeOwned>(
     if status == reqwest::StatusCode::NOT_FOUND || status == reqwest::StatusCode::BAD_REQUEST {
         return Ok(None);
     }
-    if status.is_server_error() {
-        anyhow::bail!("the lyrics service is down right now, try again in a few minutes");
-    }
     if !status.is_success() {
         return Err(RequestFailure {
             status,
@@ -968,19 +965,6 @@ mod tests {
         let http = reqwest::Client::builder().no_proxy().build().unwrap();
         let answer = get_from::<Vec<Record>>(&http, &api, "/search", &[]).await;
         assert!(matches!(answer, Ok(Some(records)) if records.is_empty()));
-        server.await.unwrap();
-    }
-
-    /// A LRCLIB that stays down says so in words, not a status code.
-    #[tokio::test]
-    async fn a_lrclib_that_stays_down_says_so_plainly() {
-        let (api, server) = lrclib(vec![DOWN, DOWN]).await;
-        let http = reqwest::Client::builder().no_proxy().build().unwrap();
-        let error = get_from::<Vec<Record>>(&http, &api, "/search", &[])
-            .await
-            .expect_err("still down");
-        assert!(error.to_string().contains("lyrics service is down"), "{error}");
-        assert!(!error.to_string().contains("503"), "{error}");
         server.await.unwrap();
     }
 
