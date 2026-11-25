@@ -995,8 +995,9 @@ fn soft_button_inner(
     let galley = crate::bidi::layout_line(ui.painter(), label, font, color);
     let icon_size = 15.0;
     let icon_width = if icon.is_some() { icon_size + 6.0 } else { 0.0 };
-    // Spindle: 32 px tall, the height every pill and input shares.
-    let padding = Vec2::new(12.0, 8.0);
+    // Spindle: 32 px tall, the height every pill and input shares; a
+    // segment is 2 px shorter so its track, with edge and inset, is 32 too.
+    let padding = Vec2::new(12.0, if segment { 7.0 } else { 8.0 });
     let size = Vec2::new(galley.size().x + icon_width, galley.size().y) + padding * 2.0;
     let (rect, response) = ui.allocate_exact_size(size, Sense::click());
     response.widget_info(|| {

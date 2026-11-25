@@ -1216,7 +1216,7 @@ fn contents(app: &mut App, ui: &mut egui::Ui, grid_art: Option<Rect>) {
 
     // Spindle: one row that scrolls sideways when the sidebar is narrow,
     // instead of wrapping a lone chip onto a second line.
-    chip_row(ui, "library-filters", |ui| {
+    chip_row(ui, "library-filters", 8.0, |ui| {
         ui.spacing_mut().item_spacing = vec2(6.0, 6.0);
         for (value, label) in [
             (Filter::Playlists, gettext(locale, "Playlists")),
@@ -1249,7 +1249,7 @@ fn contents(app: &mut App, ui: &mut egui::Ui, grid_art: Option<Rect>) {
     });
     let sort = selected_sort(app, filter);
     ui.add_space(6.0);
-    chip_row(ui, "library-sort", |ui| {
+    chip_row(ui, "library-sort", 0.0, |ui| {
         ui.spacing_mut().item_spacing = vec2(6.0, 6.0);
         sort_menu(app, ui, filter, sort);
     });
@@ -3239,7 +3239,10 @@ fn active_row_fill(palette: &theme::Palette) -> egui::Color32 {
     }
 }
 
-fn chip_row(ui: &mut egui::Ui, id: &str, add: impl FnOnce(&mut egui::Ui)) {
+fn chip_row(ui: &mut egui::Ui, id: &str, inset: f32, add: impl FnOnce(&mut egui::Ui)) {
+    // Spindle: chips past the edge fade out instead of being cut flat.
+    ui.spacing_mut().scroll.fade.strength = 1.0;
+    ui.spacing_mut().scroll.fade.size = 24.0;
     egui::ScrollArea::horizontal()
         .id_salt(id)
         .scroll_bar_visibility(egui::scroll_area::ScrollBarVisibility::AlwaysHidden)
@@ -3247,7 +3250,7 @@ fn chip_row(ui: &mut egui::Ui, id: &str, add: impl FnOnce(&mut egui::Ui)) {
         .show(ui, |ui| {
             ui.horizontal(|ui| {
                 // Spindle: chips start on the heading's and covers' edge.
-                ui.add_space(8.0);
+                ui.add_space(inset);
                 add(ui);
             });
         });

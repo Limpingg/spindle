@@ -3833,7 +3833,7 @@ pub fn switch(ui: &mut Ui, palette: &Palette, label: &str, on: &mut bool) -> egu
             // Spindle: an off track at 3:1 on a settings card, not the
             // card's own grey.
             egui::Rgba::from(if palette.dark {
-                Color32::from_rgb(0x3a, 0x3f, 0x48)
+                Color32::from_rgb(0x55, 0x5b, 0x65)
             } else {
                 Color32::from_rgb(0xb4, 0xba, 0xc3)
             })..=egui::Rgba::from(palette.accent),
@@ -3845,7 +3845,7 @@ pub fn switch(ui: &mut Ui, palette: &Palette, label: &str, on: &mut bool) -> egu
         // Spindle: on the bright green track a dark knob, 3:1 or more.
         let knob = if palette.dark {
             Color32::from(egui::lerp(
-                egui::Rgba::from(Color32::from_rgb(0xc9, 0xce, 0xd6))
+                egui::Rgba::from(Color32::from_rgb(0xe6, 0xe8, 0xeb))
                     ..=egui::Rgba::from(palette.window),
                 t,
             ))
@@ -3894,6 +3894,19 @@ const SETTING_CONTROL_WIDTH: f32 = 260.0;
 /// the control moves below it.
 const SETTING_TEXT_MIN_WIDTH: f32 = 140.0;
 
+/// Spindle: a hairline between settings rows, so a card reads as a list
+/// rather than a wall of text. The first row in a card draws none.
+fn setting_divider(ui: &mut Ui, palette: &Palette) {
+    let top = ui.cursor().min.y;
+    if top <= ui.min_rect().min.y + 2.0 {
+        return;
+    }
+    let y = top - 3.0;
+    let x = ui.max_rect().x_range();
+    ui.painter().hline(x, y, egui::Stroke::new(1.0, palette.rule()));
+    ui.add_space(4.0);
+}
+
 /// A labelled row in a settings section.
 pub fn setting_row(
     ui: &mut Ui,
@@ -3908,6 +3921,7 @@ pub fn setting_row(
 /// A settings row that only says something: with nothing to lay out beside
 /// or under the text, a narrow window leaves no gap where a control would go.
 pub fn setting_note(ui: &mut Ui, palette: &Palette, label: &str, description: &str) {
+    setting_divider(ui, palette);
     theme::text(ui, label, theme::medium(14.0), palette.text);
     ui.add(
         egui::Label::new(
@@ -3933,6 +3947,7 @@ pub fn setting_row_sized(
     control_width: f32,
     control: impl FnOnce(&mut Ui),
 ) {
+    setting_divider(ui, palette);
     let reserved = (control_width + 16.0).max(SETTING_CONTROL_WIDTH);
     let text = |ui: &mut Ui| {
         theme::text(ui, label, theme::medium(14.0), palette.text);

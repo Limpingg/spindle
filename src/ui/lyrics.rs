@@ -63,8 +63,7 @@ pub fn side_panel(app: &mut App, ui: &mut egui::Ui) {
         .frame(
             theme::pane_frame(&palette, true, true)
                 .fill(lyrics_fill(&palette, tint))
-                // Spindle: 24 px sides, so lines never run to the edge.
-                .inner_margin(Margin::symmetric(24, 12)),
+                .inner_margin(Margin::symmetric(16, 12)),
         );
     let response = panel.show(ui, |ui| {
         let window_controls = super::window_controls_reservation(
@@ -263,12 +262,12 @@ fn contents(app: &mut App, ui: &mut egui::Ui) {
     // Spindle: sung lines step back further than the ones to come, so
     // the place in the song shows at a glance.
     let sung = if palette.dark {
-        egui::Color32::from_rgb(0x6a, 0x72, 0x7d)
+        egui::Color32::from_rgb(0x55, 0x5c, 0x66)
     } else {
         egui::Color32::from_rgb(0x8a, 0x92, 0x9c)
     };
     let upcoming = if palette.dark {
-        egui::Color32::from_rgb(0x7a, 0x82, 0x8d)
+        egui::Color32::from_rgb(0x6b, 0x72, 0x7c)
     } else {
         palette.dim
     };

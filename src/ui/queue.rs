@@ -119,6 +119,16 @@ pub fn side_panel(app: &mut App, ui: &mut egui::Ui) {
         {
             app.actions.push(Action::LoadMoreRecents);
         }
+        // Spindle: the list reaches ROW_INSET into the panel's margin, so
+        // the covers and headings sit on the title's and chips' edge and
+        // only the hover fill steps out past it.
+        let mut list = ui.available_rect_before_wrap();
+        list.min.x -= ROW_INSET;
+        let mut ui = ui.new_child(egui::UiBuilder::new().max_rect(list));
+        let ui = &mut ui;
+        // Spindle: rows fade at the panel's foot, like the library list.
+        ui.spacing_mut().scroll.fade.strength = 1.0;
+        ui.spacing_mut().scroll.fade.size = 32.0;
         crate::autoscroll::show(
             ui,
             egui::ScrollArea::vertical()
