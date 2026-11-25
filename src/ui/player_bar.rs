@@ -1547,10 +1547,6 @@ mod player_bar_tint_tests {
         assert_eq!(vis_colours(None, accent, true).len(), 2);
     }
 
-    /// A window too narrow for it loses the button, not the volume.
-    #[test]
-    fn the_full_screen_button_goes_when_the_bar_is_tight() {
-        assert!(full_screen_button_fits(320.0));
-        assert!(!full_screen_button_fits(200.0));
-    }
+    // Spindle: the player bar has no full screen button (Spotifast 0.17's
+    // sits in the extras Spindle lays out itself), so no test for its room.
 }
