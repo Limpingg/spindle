@@ -167,7 +167,10 @@ impl Palette {
         } else {
             60.0 * ((r - g) / (hi - lo) + 4.0)
         };
-        let olive = (35.0..=75.0).contains(&hue);
+        // Spindle: dull greens (moss, sage) read as olive too; a vivid
+        // green keeps its hue.
+        let olive = (35.0..=75.0).contains(&hue)
+            || ((75.0..=140.0).contains(&hue) && hi - lo < 0.25);
         let cap = if olive { 0.06 } else { 0.18 };
         let keep = if hi - lo > cap { cap / (hi - lo) } else { 1.0 };
         let pull = |c: f32| grey + (c - grey) * keep;

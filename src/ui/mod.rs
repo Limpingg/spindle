@@ -374,6 +374,10 @@ fn central(app: &mut App, ui: &mut egui::Ui) {
             if let Some((_, offset)) = app.restore_scroll.take().filter(|(at, _)| *at == page_key) {
                 area = area.vertical_scroll_offset(offset);
             }
+            // Spindle: what runs past the pane's foot fades out, as the
+            // library list does, instead of being cut through.
+            ui.spacing_mut().scroll.fade.strength = 1.0;
+            ui.spacing_mut().scroll.fade.size = 32.0;
             let scroll = crate::autoscroll::show(ui, area, egui::Vec2b::new(false, true), |ui| {
                 Frame::new()
                     .inner_margin(Margin {

@@ -157,7 +157,7 @@ pub fn side_panel(app: &mut App, ui: &mut egui::Ui) {
                 palette.secondary,
             );
         }
-        ui.add_space(4.0);
+        ui.add_space(12.0);
         contents(app, ui);
     });
     let current_width = response.response.rect.width();
@@ -390,7 +390,7 @@ fn contents(app: &mut App, ui: &mut egui::Ui) {
         let fill = lyrics_fill(&palette, None);
         let rect = scroll.inner_rect;
         let painter = ui.painter_at(rect);
-        let fade = 16.0_f32.min(rect.height() / 4.0);
+        let fade = 28.0_f32.min(rect.height() / 4.0);
         let mut mesh = egui::Mesh::default();
         let clear = egui::Color32::from_rgba_unmultiplied(fill.r(), fill.g(), fill.b(), 0);
         let mut band = |top: f32, bottom: f32, upper: egui::Color32, lower: egui::Color32| {
@@ -404,8 +404,8 @@ fn contents(app: &mut App, ui: &mut egui::Ui) {
         };
         // Solid for the first 14 px, so no ghost of a line hangs under
         // the song's row.
-        band(rect.top(), rect.top() + 6.0, fill, fill);
-        band(rect.top() + 6.0, rect.top() + 6.0 + fade, fill, clear);
+        band(rect.top(), rect.top() + 4.0, fill, fill);
+        band(rect.top() + 4.0, rect.top() + 4.0 + fade, fill, clear);
         band(rect.bottom() - fade, rect.bottom(), clear, fill);
         painter.add(mesh);
     }

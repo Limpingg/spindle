@@ -2974,9 +2974,11 @@ fn field_frame(palette: &Palette) -> Frame {
     };
     Frame::new()
         .fill(fill)
-        .corner_radius(CornerRadius::same(8))
+        // Spindle: a pill like every search field, told apart from the
+        // outlined pill buttons by its fill.
+        .corner_radius(CornerRadius::same(16))
         .stroke(egui::Stroke::new(1.0, edge))
-        .inner_margin(Margin::symmetric(12, 0))
+        .inner_margin(Margin::symmetric(14, 0))
 }
 
 #[cfg(test)]
