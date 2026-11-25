@@ -359,6 +359,11 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
                     + badge_width(update_galley.as_ref(), UPDATE_BADGE_PADDING, labels)
             };
             let controls = RIGHT_CONTROLS_WIDTH
+                - if !app.visualizers_available() {
+                    ICON_BUTTON_SIZE + ITEM_SPACING
+                } else {
+                    0.0
+                }
                 + if !app.network_reachable {
                     ICON_BUTTON_SIZE + 4.0
                 } else {

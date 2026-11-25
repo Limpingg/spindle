@@ -635,7 +635,6 @@ pub(crate) fn run() -> eframe::Result<()> {
         let creator_shot = shot.clone();
         let mini = lease.peek(MiniWindow::wanted);
         let geometry = lease.peek(main_geometry);
-        #[cfg(windows)]
         let locale = lease.peek(|app| app.locale);
         #[cfg(feature = "demo")]
         let options = {
@@ -658,111 +657,110 @@ pub(crate) fn run() -> eframe::Result<()> {
         let thumbbar_enabled = desktop_surfaces && options.viewport.taskbar != Some(false);
         #[cfg(target_os = "linux")]
         let hide_from_taskbar = options.viewport.taskbar == Some(false);
-        eframe::run_native(
-            "Spindle",
-            options,
-            Box::new(move |cc| {
-                if let Some(gl) = &cc.gl {
-                    use eframe::glow::HasContext;
-                    // eframe has made this window's GL context current
-                    // before calling the app creator. These identify the
-                    // renderer actually selected, which may differ from
-                    // the listed GPU.
-                    unsafe {
-                        log::info!(
-                            "OpenGL renderer: {}; vendor: {}; version: {}",
-                            gl.get_parameter_string(eframe::glow::RENDERER),
-                            gl.get_parameter_string(eframe::glow::VENDOR),
-                            gl.get_parameter_string(eframe::glow::VERSION)
-                        );
-                    }
+        // Without the wgpu feature OpenGL is the only renderer, so there is
+        // one try and each of these is asked for once. When it cannot draw,
+        // fastframe-graphics says why in a native dialog rather than letting
+        // the app quit without a word.
+        let mut options = Some(options);
+        let mut creator: Option<eframe::AppCreator<'_>> = Some(Box::new(move |cc| {
+            if let Some(gl) = &cc.gl {
+                use eframe::glow::HasContext;
+                // eframe has made this window's GL context current
+                // before calling the app creator. These identify the
+                // renderer actually selected, which may differ from
+                // the listed GPU.
+                unsafe {
+                    log::info!(
+                        "OpenGL renderer: {}; vendor: {}; version: {}",
+                        gl.get_parameter_string(eframe::glow::RENDERER),
+                        gl.get_parameter_string(eframe::glow::VENDOR),
+                        gl.get_parameter_string(eframe::glow::VERSION)
+                    );
                 }
-                let mut app = lease.take(&cc.egui_ctx);
-                // Built once per window, before the first frame; the
-                // handler wakes the loop so a menu pick is not held until
-                // the next repaint.
-                #[cfg(target_os = "macos")]
-                {
-                    spindle::mac_touchbar_crash_guard::install();
-                    spindle::mac_menu::init();
-                    let ctx = cc.egui_ctx.clone();
-                    spindle::mac_menu::set_waker(move || ctx.request_repaint());
-
-                    spindle::notch::init();
-                    let ctx_notch = cc.egui_ctx.clone();
-                    spindle::notch::set_waker(move || ctx_notch.request_repaint());
-                }
-                {
-                    use raw_window_handle::HasDisplayHandle;
-                    if let Ok(display) = cc.display_handle() {
-                        app.window_level_supported =
-                            spindle::window::supports_window_level(display.as_raw());
-                        app.taskbar_hiding_supported =
-                            spindle::window::supports_hiding_from_taskbar(display.as_raw());
-                    }
-                }
-                // winit hides a taskbar button on Windows only; X11 is
-                // asked here, while the window is still unmapped.
-                #[cfg(target_os = "linux")]
-                if hide_from_taskbar {
-                    use raw_window_handle::HasWindowHandle;
-                    if let Ok(handle) = cc.window_handle() {
-                        spindle::window::skip_x11_taskbar(handle.as_raw());
-                    }
-                }
-                app.attach(&cc.egui_ctx);
-                #[cfg(windows)]
-                {
-                    use raw_window_handle::{HasWindowHandle, RawWindowHandle};
-                    if let Ok(handle) = cc.window_handle()
-                        && let RawWindowHandle::Win32(window) = handle.as_raw()
-                    {
-                        // SAFETY: the window was just created on this thread.
-                        unsafe { spindle::window::use_exe_icons(window.hwnd.get()) };
-                    }
-                }
-                #[cfg(windows)]
-                let thumbbar = {
-                    use raw_window_handle::{HasWindowHandle, RawWindowHandle};
-                    let mut toolbar = spindle::thumbbar::ThumbBar::new();
-                    if thumbbar_enabled
-                        && let Ok(handle) = cc.window_handle()
-                        && let RawWindowHandle::Win32(window) = handle.as_raw()
-                    {
-                        let wake = creator_waker.clone();
-                        // The shell and toolbar share this window's thread
-                        // and lifetime; the toolbar is detached on shell
-                        // drop.
-                        unsafe { toolbar.attach(window.hwnd.get(), move || wake.wake()) };
-                    }
-                    toolbar
-                };
-                Ok(Box::new(Shell {
-                    app,
-                    recovery_checked: false,
-                    #[cfg(windows)]
-                    thumbbar,
-                    #[cfg(feature = "demo")]
-                    shot: creator_shot.clone(),
-                    #[cfg(feature = "demo")]
-                    drag: demo_drag,
-                    stalls: fastframe_shell::StallWatch::default(),
-                    screen_asked: None,
-                }))
-            }),
-        )
-        .inspect_err(|error| {
-            log::error!("Native window failed: {error}");
-            #[cfg(windows)]
-            if matches!(
-                error,
-                eframe::Error::Glutin(_)
-                    | eframe::Error::NoGlutinConfigs(..)
-                    | eframe::Error::OpenGL(_)
-            ) {
-                spindle::window::report_missing_opengl(locale);
             }
-        })
+            let mut app = lease.take(&cc.egui_ctx);
+            // Built once per window, before the first frame; the
+            // handler wakes the loop so a menu pick is not held until
+            // the next repaint.
+            #[cfg(target_os = "macos")]
+            {
+                spindle::mac_touchbar_crash_guard::install();
+                spindle::mac_menu::init();
+                let ctx = cc.egui_ctx.clone();
+                spindle::mac_menu::set_waker(move || ctx.request_repaint());
+
+                spindle::notch::init();
+                let ctx_notch = cc.egui_ctx.clone();
+                spindle::notch::set_waker(move || ctx_notch.request_repaint());
+            }
+            {
+                use raw_window_handle::HasDisplayHandle;
+                if let Ok(display) = cc.display_handle() {
+                    app.window_level_supported =
+                        spindle::window::supports_window_level(display.as_raw());
+                    app.taskbar_hiding_supported =
+                        spindle::window::supports_hiding_from_taskbar(display.as_raw());
+                }
+            }
+            // winit hides a taskbar button on Windows only; X11 is
+            // asked here, while the window is still unmapped.
+            #[cfg(target_os = "linux")]
+            if hide_from_taskbar {
+                use raw_window_handle::HasWindowHandle;
+                if let Ok(handle) = cc.window_handle() {
+                    spindle::window::skip_x11_taskbar(handle.as_raw());
+                }
+            }
+            app.attach(&cc.egui_ctx);
+            // Spindle: the window's small and large icons from the exe at
+            // the display's sizes; winit hands Windows only one picture.
+            #[cfg(windows)]
+            {
+                use raw_window_handle::{HasWindowHandle, RawWindowHandle};
+                if let Ok(handle) = cc.window_handle()
+                    && let RawWindowHandle::Win32(window) = handle.as_raw()
+                {
+                    // SAFETY: the window was just created on this thread.
+                    unsafe { spindle::window::use_exe_icons(window.hwnd.get()) };
+                }
+            }
+            #[cfg(windows)]
+            let thumbbar = {
+                use raw_window_handle::{HasWindowHandle, RawWindowHandle};
+                let mut toolbar = spindle::thumbbar::ThumbBar::new();
+                if thumbbar_enabled
+                    && let Ok(handle) = cc.window_handle()
+                    && let RawWindowHandle::Win32(window) = handle.as_raw()
+                {
+                    let wake = creator_waker.clone();
+                    // The shell and toolbar share this window's thread
+                    // and lifetime; the toolbar is detached on shell
+                    // drop.
+                    unsafe { toolbar.attach(window.hwnd.get(), move || wake.wake()) };
+                }
+                toolbar
+            };
+            Ok(Box::new(Shell {
+                app,
+                recovery_checked: false,
+                #[cfg(windows)]
+                thumbbar,
+                #[cfg(feature = "demo")]
+                shot: creator_shot.clone(),
+                #[cfg(feature = "demo")]
+                drag: demo_drag,
+                stalls: fastframe_shell::StallWatch::default(),
+                screen_asked: None,
+            }))
+        }));
+        fastframe_graphics::Graphics::new("Spindle")
+            .help(spindle::window::DOWNLOAD_PAGE)
+            .dialog(move |trouble| spindle::window::no_window_dialog(locale, trouble))
+            .run_native(
+                || options.take().expect("one try opens the window"),
+                || creator.take().expect("one try opens the window"),
+            )
+            .inspect_err(|error| log::error!("Native window failed: {error}"))
     })
 }
 
