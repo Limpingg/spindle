@@ -14,10 +14,11 @@ remain available for playback and library requests.
 
 Spotifast uses separate credentials for Web API access and local playback:
 
-1. **Your own Spotify app**, the personal app, carries the Web API: account,
+1. **Your registration**, the Client ID you get by registering Spotifast with
+   Spotify (the personal app below), carries the Web API: account,
    library, catalogue, search, playlists and playback control. Since 0.14.2
-   it is the only way to sign in. The sign-in screen walks through creating
-   one, and its Client ID is kept in settings
+   it is the only way to sign in. The sign-in screen walks through
+   registering, and the Client ID is kept in settings
    ([Getting Started](/getting-started/#make-a-spotify-app)). Before
    opening the browser, Spotifast asks Spotify's token endpoint whether it
    knows the Client ID, with a code that cannot be valid: an unknown client
@@ -85,7 +86,7 @@ Spotifast uses separate credentials for Web API access and local playback:
    to disk or logged. If the feed fails, the session's older
    `presence-view/v1/buddylist` stands in.
 
-When Soloist plays, **Settings → Account → Spotify access** keeps this separate
+When Soloist plays, **Settings → Spotify Soloist → Spotify access** keeps this separate
 connection available. **Authorize** opens the existing browser approval without
 switching playback to the built-in player. Once connected, missing Made for you,
 listening activity and lyrics can be read again through the session.
@@ -530,16 +531,23 @@ as Spotify's own apps do: a transfer, then player commands (play, pause,
 resume, skip, seek, shuffle, repeat, queue) and volume, all sent from this
 computer's Connect device to that one. This needs local playback enabled,
 because the session belongs to it. Playback state is still read from the Web
-API, which reports a restricted device while it plays.
+API, which reports a restricted device while it plays. It may report a Sonos
+without its device id. Commands for it, starting a song or playlist included,
+then name no device and go to the device the session's Connect cluster names
+as playing, which the session knows from the moment it connects.
 
 Spotify does not always report a restricted device as such, for example a
 Sonos that another app is already steering when Spotifast starts. When the Web
-API refuses a command for a named device as restricted, Spotifast remembers
-that device as restricted and sends the same command over the Connect route
-once, so later commands go there directly.
+API refuses a command as restricted, Spotifast remembers the device it named,
+or for a command naming none the device the Connect cluster names as playing,
+as restricted and sends the same command over the Connect route once, so later
+commands go there directly.
 
 Shuffle Play enables shuffle before starting the context, as it does for
-Web API devices. If enabling shuffle fails, playback does not start.
+Web API devices. If enabling shuffle fails, playback does not start. On a Web
+API device, one refusal is the exception: "Restriction violated" means what
+plays now forbids shuffle, as autoplay does, so the start goes first and
+shuffle follows. If shuffle is refused again, the start keeps playing in order.
 
 Individual and album queue additions use the same Connect route, one song at
 a time. A later addition waits for the whole album, repeated songs keep their
