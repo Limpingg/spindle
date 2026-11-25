@@ -76,7 +76,7 @@ fn strip_colors(palette: &theme::Palette) -> (egui::Color32, egui::Color32) {
         // A clear green band with deep green words (6.6:1) on the light
         // theme, where a mix into the grey bar came out grey.
         (
-            egui::Color32::from_rgb(0xc4, 0xe5, 0xcf),
+            egui::Color32::from_rgb(0xe2, 0xee, 0xe6),
             egui::Color32::from_rgb(0x0b, 0x5c, 0x2a),
         )
     }

@@ -85,6 +85,9 @@ fn eq_preset_controls(app: &mut App, ui: &mut egui::Ui, current: Option<&str>) {
             .stroke(egui::Stroke::new(1.0, field_edge(&palette)))
             .inner_margin(Margin::symmetric(14, 0))
             .show(ui, |ui| {
+                // Spindle: the field is as tall as the buttons beside it (32 px
+                // with its edge); a row taller than that stretched it.
+                ui.set_max_height(30.0);
                 widgets::text_edit(
                     ui,
                     locale,
@@ -662,6 +665,9 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
                     .stroke(egui::Stroke::new(1.0, field_edge(&palette)))
                     .inner_margin(Margin::symmetric(14, 0))
                     .show(ui, |ui| {
+                        // Spindle: the field is as tall as the buttons beside it (32 px
+                        // with its edge); a row taller than that stretched it.
+                        ui.set_max_height(30.0);
                         widgets::text_edit(
                             ui,
                             app.locale,
@@ -886,7 +892,7 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
                     && theme::soft_button(
                         ui,
                         &palette,
-                        Some(Icon::Refresh),
+                        None,
                         &gettext(locale, "Reconnect"),
                         false,
                     )
@@ -901,7 +907,7 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
                 if theme::soft_button(
                     ui,
                     &palette,
-                    Some(Icon::Search),
+                    None,
                     &gettext(locale, "Turn on"),
                     false,
                 )
@@ -918,6 +924,9 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
                     .stroke(egui::Stroke::new(1.0, field_edge(&palette)))
                     .inner_margin(Margin::symmetric(14, 0))
                     .show(ui, |ui| {
+                        // Spindle: the field is as tall as the buttons beside it (32 px
+                        // with its edge); a row taller than that stretched it.
+                        ui.set_max_height(30.0);
                         widgets::text_edit(
                             ui,
                             locale,

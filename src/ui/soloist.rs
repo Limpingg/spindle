@@ -940,7 +940,8 @@ pub(super) fn settings(
     let locale = app.locale;
     filtered_row(ui, &palette, needle, section, &rows[OFFER], |ui| {
         if crate::soloist::install::supported()
-            && theme::pill_button(ui, &palette, &gettext(locale, "Set up Soloist"), true).clicked()
+            // Spindle: an outlined pill like the other row actions.
+            && theme::pill_button(ui, &palette, &gettext(locale, "Set up Soloist"), false).clicked()
         {
             app.actions.push(Action::EnableSoloist);
         }
@@ -963,14 +964,22 @@ pub(super) fn settings(
         }
     });
     if needle.is_empty() {
-        if theme::link(
-            ui,
-            gettext(locale, "Setup, privacy and limitations"),
-            theme::regular(13.0),
-            palette.secondary,
-        )
-        .clicked()
-        {
+        // Spindle: it reads as a link: full text colour and the arrow
+        // out, as the Connect panel's help links have.
+        let clicked = ui
+            .horizontal(|ui| {
+                ui.spacing_mut().item_spacing.x = 6.0;
+                let link = theme::link(
+                    ui,
+                    gettext(locale, "Setup, privacy and limitations"),
+                    theme::medium(13.0),
+                    palette.text,
+                );
+                theme::icon(ui, theme::Icon::ExternalLink, 13.0, palette.secondary);
+                link.clicked()
+            })
+            .inner;
+        if clicked {
             app.actions.push(Action::OpenUrl(GUIDE_URL.into()));
         }
         ui.add_space(10.0);

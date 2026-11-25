@@ -1970,7 +1970,8 @@ fn track_row_contents(
                 };
                 theme::paint_icon(ui, icon, cover_rect, 16.0, Color32::WHITE);
             } else if playing {
-                scrim(110);
+                // Spindle: dark enough that the bars hold on a pale cover.
+                scrim(150);
                 theme::paint_icon(ui, Icon::AudioLines, cover_rect, 16.0, palette.accent);
             }
         }
@@ -3519,7 +3520,7 @@ pub fn thin_slider(
         let track_color = if palette.dark {
             Color32::from_rgb(0x5a, 0x61, 0x6b)
         } else {
-            Color32::from_rgb(0x8a, 0x92, 0x9c)
+            Color32::from_rgb(0x6e, 0x76, 0x82)
         };
         ui.painter().rect_filled(bar, 2.0, track_color);
         let filled = Rect::from_min_max(
@@ -5301,3 +5302,5 @@ mod tests {
         assert_eq!(meta.options.mipmap_mode, Some(egui::TextureFilter::Linear));
     }
 }
+
+

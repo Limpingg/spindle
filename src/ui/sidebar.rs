@@ -3235,7 +3235,7 @@ fn active_row_fill(palette: &theme::Palette) -> egui::Color32 {
     if palette.dark {
         palette.surface
     } else {
-        egui::Color32::from_rgb(0xcd, 0xd3, 0xda)
+        egui::Color32::from_rgb(0xdd, 0xe2, 0xe8)
     }
 }
 

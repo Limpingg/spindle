@@ -293,7 +293,7 @@ fn contents(app: &mut App, ui: &mut egui::Ui) {
                 );
             }
             // Spindle: clear of the solid band at the top.
-            ui.add_space(22.0);
+            ui.add_space(26.0);
             for (index, line) in lyrics.lines.iter().enumerate() {
                 let is_active = active == Some(index);
                 let lit = ui.ctx().animate_bool_with_time(
@@ -390,7 +390,7 @@ fn contents(app: &mut App, ui: &mut egui::Ui) {
         let fill = lyrics_fill(&palette, None);
         let rect = scroll.inner_rect;
         let painter = ui.painter_at(rect);
-        let fade = 24.0_f32.min(rect.height() / 4.0);
+        let fade = 16.0_f32.min(rect.height() / 4.0);
         let mut mesh = egui::Mesh::default();
         let clear = egui::Color32::from_rgba_unmultiplied(fill.r(), fill.g(), fill.b(), 0);
         let mut band = |top: f32, bottom: f32, upper: egui::Color32, lower: egui::Color32| {
@@ -404,8 +404,8 @@ fn contents(app: &mut App, ui: &mut egui::Ui) {
         };
         // Solid for the first 14 px, so no ghost of a line hangs under
         // the song's row.
-        band(rect.top(), rect.top() + 20.0, fill, fill);
-        band(rect.top() + 20.0, rect.top() + 20.0 + fade, fill, clear);
+        band(rect.top(), rect.top() + 24.0, fill, fill);
+        band(rect.top() + 24.0, rect.top() + 24.0 + fade, fill, clear);
         band(rect.bottom() - fade, rect.bottom(), clear, fill);
         painter.add(mesh);
     }

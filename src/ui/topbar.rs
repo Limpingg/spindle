@@ -208,8 +208,11 @@ fn nav_button(
         // Spindle: raised like the Home button, not sunk into the pane.
         let fill = if response.hovered() && enabled {
             palette.surface_hover
-        } else {
+        } else if enabled {
             palette.surface
+        } else {
+            // Spindle: with nowhere to go the circle steps back too.
+            palette.surface.gamma_multiply(0.45)
         };
         ui.painter().circle_filled(rect.center(), 16.0, fill);
         let color = if !enabled {

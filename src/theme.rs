@@ -130,7 +130,7 @@ impl Palette {
         if self.dark {
             self.window
         } else {
-            Color32::from_rgb(0xe6, 0xe9, 0xed)
+            Color32::from_rgb(0xf4, 0xf6, 0xf8)
         }
     }
 
