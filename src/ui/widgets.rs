@@ -2098,7 +2098,12 @@ fn track_row_contents(
         child.set_clip_rect(title_rect.intersect(ui.clip_rect()));
         child.spacing_mut().item_spacing = vec2(6.0, 1.0);
         child.spacing_mut().interact_size.y = 16.0;
-        let vertical_pad = ((row_height - 37.0) / 2.0).max(4.0);
+        // Spindle: a song with nothing under its title (on its artist's
+        // own page) centres the title in the row.
+        let one_line = matches!(row.item, PlayableItem::Track(track)
+            if track.artists.is_empty() && !track.explicit);
+        let text_height = if one_line { 18.0 } else { 37.0 };
+        let vertical_pad = ((row_height - text_height) / 2.0).max(4.0);
         child.add_space(vertical_pad);
         child.horizontal(|ui| {
             ui.set_max_width(title_rect.width());

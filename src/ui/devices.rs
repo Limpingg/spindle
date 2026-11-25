@@ -250,7 +250,13 @@ fn output_picker(app: &mut App, ui: &mut egui::Ui) {
     let locale = app.locale;
     let open_id = ui.make_persistent_id("audio-output-open");
     let mut open = ui.data(|data| data.get_temp::<bool>(open_id).unwrap_or(false));
-    super::widgets::menu_separator(ui, &palette);
+    // Spindle: the panel's one hairline, full width, as its other dividers.
+    let (line, _) = ui.allocate_exact_size(egui::vec2(ui.available_width(), 9.0), Sense::hover());
+    ui.painter().hline(
+        line.x_range(),
+        line.center().y,
+        egui::Stroke::new(1.0, palette.rule()),
+    );
     let system_default = gettext(locale, "System default").into_owned();
     let label = gettext(locale, "Audio output");
     let current = app.settings.audio_device.clone();

@@ -42,8 +42,19 @@ pub fn show(app: &mut App, ui: &mut egui::Ui, id: &str) {
                         .collect::<Vec<_>>()
                         .into();
                     let context = RowContext::Uris(Arc::clone(&uris));
-                    let items: Vec<PlayableItem> =
-                        tracks.iter().cloned().map(PlayableItem::Track).collect();
+                    // Spindle: on the artist's own page a row names only the
+                    // other artists on the song, as Spotify does.
+                    let items: Vec<PlayableItem> = tracks
+                        .iter()
+                        .cloned()
+                        .map(|mut track| {
+                            track.artists.retain(|other| {
+                                other.uri.as_deref() != Some(artist.uri.as_str())
+                                    && other.name != artist.name
+                            });
+                            PlayableItem::Track(track)
+                        })
+                        .collect();
                     let limit = if page.show_all_top { items.len() } else { 5 };
                     let show_plays = app.has_play_counts(&artist.uri);
                     let render_top = |ui: &mut egui::Ui, app: &mut App| {
@@ -565,6 +576,32 @@ fn artist_actions(app: &mut App, ui: &mut egui::Ui, artist: &Artist) {
                 offset_uri: None,
                 offset_index: None,
             });
+        }
+        // Spindle: shuffle beside Play, as on playlists and albums.
+        let shuffle = app.playing_context_shuffle();
+        if theme::icon_button(
+            ui,
+            Icon::Shuffle,
+            26.0,
+            if shuffle {
+                palette.accent
+            } else {
+                palette.secondary
+            },
+            if shuffle {
+                palette.accent_hover
+            } else {
+                palette.text
+            },
+            &if shuffle {
+                gettext(locale, "Shuffle off")
+            } else {
+                gettext(locale, "Shuffle")
+            },
+        )
+        .clicked()
+        {
+            app.actions.push(Action::SetShuffle(!shuffle));
         }
         if theme::pill_button(
             ui,

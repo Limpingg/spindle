@@ -390,7 +390,7 @@ fn contents(app: &mut App, ui: &mut egui::Ui) {
         let fill = lyrics_fill(&palette, None);
         let rect = scroll.inner_rect;
         let painter = ui.painter_at(rect);
-        let fade = 40.0_f32.min(rect.height() / 4.0);
+        let fade = 24.0_f32.min(rect.height() / 4.0);
         let mut mesh = egui::Mesh::default();
         let clear = egui::Color32::from_rgba_unmultiplied(fill.r(), fill.g(), fill.b(), 0);
         let mut band = |top: f32, bottom: f32, upper: egui::Color32, lower: egui::Color32| {
