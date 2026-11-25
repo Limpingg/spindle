@@ -385,6 +385,11 @@ fn output_choices(app: &mut App, ui: &mut egui::Ui) {
 
 /// Every output the Connect panel offers, ranked, with this computer's id
 /// and the active output's id.
+/// Whether Soloist stands in for the built-in player as this computer.
+fn hide_builtin(app: &App) -> bool {
+    app.soloist_device_id.is_some() && !app.local.is_active()
+}
+
 fn output_rows(app: &App) -> (Vec<OutputRow>, Option<String>, Option<String>) {
     let local_id = app.local_device_id.clone();
     let mut devices: Vec<Device> = app.devices.clone();
@@ -445,6 +450,12 @@ fn output_rows(app: &App) -> (Vec<OutputRow>, Option<String>, Option<String>) {
         .map(OutputRow::Device)
         .chain(waiting.into_iter().map(OutputRow::Receiver))
         .collect();
+    // Offer one local destination once the managed player is ready. Keep
+    // an actually playing built-in engine visible; switching Soloist off in
+    // Settings restores its idle row.
+    if hide_builtin(app) {
+        rows.retain(|row| row.identity().is_none_or(|id| Some(id) != local_id.as_deref()));
+    }
     rank_outputs(
         &mut rows,
         &app.device_history,
@@ -466,8 +477,11 @@ fn device_row(
     let palette = app.palette;
     let locale = app.locale;
     let is_local = device.id.is_some() && device.id == *local_id;
+    let is_soloist = device.id.is_some() && device.id == app.soloist_device_id;
     let active = device.id.is_some() && device.id == *active_id;
-    let name = if is_local {
+    let name = if is_soloist {
+        gettext(locale, "This computer").into_owned()
+    } else if is_local {
         // Translators: {name} is the name this computer uses in Spotify Connect.
         gettext(locale, "{name} (this computer)")
             .replace("{name}", &device.name)
@@ -478,6 +492,7 @@ fn device_row(
         vec2(ui.available_width(), 52.0),
         Sense::click(),
     );
+    response.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, true, &name));
     if response.hovered() {
         ui.painter().rect_filled(
             rect,
@@ -485,13 +500,21 @@ fn device_row(
             palette.surface_hover,
         );
     }
-    let color = if active { palette.accent } else { palette.text };
+    let color = if active && !is_soloist {
+        palette.accent
+    } else {
+        palette.text
+    };
     let icon_rect = Rect::from_center_size(
         pos2(rect.left() + 24.0, rect.center().y),
         egui::Vec2::splat(22.0),
     );
-    device_icon(&device.kind)
-        .image(color, 22.0)
+    (if is_soloist {
+        Icon::Laptop
+    } else {
+        device_icon(&device.kind)
+    })
+    .image(color, 22.0)
         .paint_at(ui, icon_rect);
     let painter = ui.painter().with_clip_rect(rect);
     crate::bidi::paint_line(
@@ -503,7 +526,9 @@ fn device_row(
         theme::medium(14.0),
         color,
     );
-    let status = if active {
+    let status = if is_soloist {
+        "Soloist".to_owned()
+    } else if active {
         gettext(locale, "Listening on this device").into_owned()
     } else if device.is_restricted {
         gettext(locale, "Restricted").into_owned()
@@ -517,7 +542,7 @@ fn device_row(
         egui::Align2::LEFT_CENTER,
         status,
         theme::regular(12.0),
-        if active {
+        if active && !is_soloist {
             palette.accent
         } else {
             palette.secondary
@@ -525,7 +550,13 @@ fn device_row(
     );
     if active {
         let dot = pos2(rect.right() - 16.0, rect.center().y);
-        ui.painter().circle_filled(dot, 4.0, palette.accent);
+        if is_soloist {
+            Icon::Check
+                .image(palette.secondary, 16.0)
+                .paint_at(ui, Rect::from_center_size(dot, egui::Vec2::splat(16.0)));
+        } else {
+            ui.painter().circle_filled(dot, 4.0, palette.accent);
+        }
     }
     if response.clicked()
         && !active
@@ -604,7 +635,7 @@ pub fn side_panel(app: &mut App, ui: &mut egui::Ui) {
             .show(ui, |ui| {
                 current_card(app, ui, &rows, &local_id, &active_id);
                 ui.add_space(8.0);
-                if !app.local_ready {
+                if !app.local_ready && app.soloist_device_id.is_none() {
                     enable_playback_row(app, ui);
                 }
                 let others: Vec<&OutputRow> = rows
@@ -635,7 +666,7 @@ pub fn side_panel(app: &mut App, ui: &mut egui::Ui) {
                 }
                 // While another device plays, this computer's outputs stay
                 // a row away instead of behind the card's arrow.
-                if app.local_ready && !local_active {
+                if app.local_ready && !local_active && !hide_builtin(app) {
                     output_picker(app, ui);
                 }
             });

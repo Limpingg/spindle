@@ -186,6 +186,22 @@ impl fastframe_theme::Palette for Palette {
         }
         true
     }
+
+    /// Menus, tooltips and dialogs follow a file's window when it leaves
+    /// `overlay` out, as Omarchy's template and the shared palettes do:
+    /// otherwise they kept Spindle's own blue-grey on every other theme.
+    /// The proportions are the built-in palettes': a step above the window
+    /// toward the text in dark ones, the panel in light ones.
+    fn derive(&mut self, given: &std::collections::BTreeSet<&str>) {
+        if given.contains("overlay") || !given.contains("window") {
+            return;
+        }
+        self.overlay = if self.dark {
+            self.window.lerp_to_gamma(self.text, 0.08)
+        } else {
+            self.panel
+        };
+    }
 }
 
 impl fastframe_theme::PaletteBase for Palette {
@@ -205,8 +221,10 @@ pub fn enable_desktop_themes(catalog: &mut Catalog) {
     catalog.enable_desktop_themes(fastframe_theme::DesktopThemes {
         slug: "spindle",
         omarchy_template: include_str!("../contrib/omarchy/spindle.json.tpl"),
-        // The template has not changed since it first shipped.
-        omarchy_previous_templates: &[],
+        // The first template blended every shade from the background and
+        // foreground; an unchanged copy of it is upgraded to Omarchy's own
+        // semantic shades.
+        omarchy_previous_templates: &[include_str!("omarchy_template_v1.json.tpl")],
         presets: true,
     });
 }
@@ -1263,6 +1281,33 @@ mod tests {
         assert_eq!(light.window, Palette::light().window);
     }
 
+    /// Ristretto's brown window must not open blue-grey menus.
+    #[test]
+    fn menus_follow_a_palette_that_leaves_overlay_out() {
+        let shared: Palette = fastframe_theme::presets::themes()
+            .find(|theme: &CustomTheme| theme.filename == "Ristretto.json")
+            .unwrap()
+            .palette;
+        let [r, _, b, _] = shared.overlay.to_array();
+        assert!(r > b, "{:?}", shared.overlay);
+        assert_ne!(shared.overlay, Palette::dark().overlay);
+
+        let latte: Palette = fastframe_theme::parse_palette(
+            r##"{"base":"light","colors":{"window":"#eff1f5","panel":"#edeff3"}}"##,
+        )
+        .unwrap();
+        assert_eq!(latte.overlay, latte.panel);
+
+        let own: Palette = fastframe_theme::parse_palette(
+            r##"{"colors":{"window":"#2c2525","overlay":"#010203"}}"##,
+        )
+        .unwrap();
+        assert_eq!(own.overlay, Color32::from_rgb(1, 2, 3));
+        let accent_only: Palette =
+            fastframe_theme::parse_palette(r##"{"colors":{"accent":"#8c3fa5"}}"##).unwrap();
+        assert_eq!(accent_only.overlay, Palette::dark().overlay);
+    }
+
     /// Compared line by line: a Windows checkout may turn the files' line
     /// endings into CRLF, which no Linux package ships.
     #[test]
@@ -1272,10 +1317,36 @@ mod tests {
             lines(include_str!("../contrib/omarchy/spindle-theme")),
             lines(&fastframe_theme::omarchy::hook_script("spindle"))
         );
+        // The first template was the shared one, so an unchanged copy of it
+        // is recognised and upgraded.
         assert_eq!(
-            lines(include_str!("../contrib/omarchy/spindle.json.tpl")),
+            lines(include_str!("omarchy_template_v1.json.tpl")),
             lines(fastframe_theme::omarchy::BASE_TEMPLATE)
         );
+    }
+
+    /// Spindle's own template takes Omarchy's semantic shades: the panels
+    /// its darker background, selections its selection, outlines its muted
+    /// colour, menus its lighter background.
+    #[test]
+    fn the_omarchy_template_uses_the_themes_own_shades() {
+        let colors = "accent\t#7fbbb3\nbackground\t#2d353b\ndark_background\t#21272c\n\
+            darker_background\t#181d20\nlighter_background\t#343f44\nforeground\t#d3c6aa\n\
+            muted\t#475258\nselection\t#3d484d\nred\t#e67e80\nyellow\t#dbbc7f\nmode\tdark\n";
+        let text = fastframe_theme::omarchy::render_seed::<Palette>(
+            include_str!("../contrib/omarchy/spindle.json.tpl"),
+            colors,
+        )
+        .unwrap();
+        let palette: Palette = fastframe_theme::parse_palette(&text).unwrap();
+        assert!(palette.dark);
+        assert_eq!(palette.window, Color32::from_rgb(0x2d, 0x35, 0x3b));
+        assert_eq!(palette.panel, Color32::from_rgb(0x21, 0x27, 0x2c));
+        assert_eq!(palette.surface_active, Color32::from_rgb(0x3d, 0x48, 0x4d));
+        assert_eq!(palette.outline, Color32::from_rgb(0x3a, 0x44, 0x4a));
+        assert_eq!(palette.accent, Color32::from_rgb(0x7f, 0xbb, 0xb3));
+        assert!(palette.tint.a() > 0 && palette.tint.a() < 64);
+        assert!(palette.shadow.a() < 255);
     }
 
     #[test]

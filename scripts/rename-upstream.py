@@ -23,6 +23,8 @@ ROOT = Path(sys.argv[1] if len(sys.argv) > 1 else ".").resolve()
 RENAMES = [
     ("src/spotifast.rs", "src/spindle.rs"),
     ("assets/skins/spotifast.wsz", "assets/skins/spindle.wsz"),
+    ("assets/skins/spotifast-ribbon.wmz", "assets/skins/spindle-ribbon.wmz"),
+    ("assets/skins/spotifast-wide.wmz", "assets/skins/spindle-wide.wmz"),
     ("contrib/omarchy/spotifast-theme", "contrib/omarchy/spindle-theme"),
     ("contrib/omarchy/spotifast.json.tpl", "contrib/omarchy/spindle.json.tpl"),
     ("packaging/windows/spotifast.iss", "packaging/windows/spindle.iss"),
@@ -40,6 +42,7 @@ TEXT_ROOTS = [
     "src",
     "tests",
     "assets/i18n",
+    "assets/skins",
     "contrib/omarchy",
     "packaging/macos",
     "packaging/windows/spindle.iss",
@@ -51,7 +54,7 @@ TEXT_ROOTS = [
 ]
 TEXT_SUFFIXES = {
     ".rs", ".po", ".pot", ".toml", ".plist", ".sh", ".rb", ".iss",
-    ".tpl", ".txt", ".json", "",
+    ".tpl", ".txt", ".json", ".wms", "",
 }
 
 # Replacements that come before the general words, and Spotifast mentions
@@ -119,6 +122,42 @@ def rename_lock(path: Path) -> None:
 DROPPED = [".github/workflows"]
 
 
+# Skin archives whose text members (the skin's script and its name) carry
+# the brand; the code that loads them expects the renamed words.
+ARCHIVES = [
+    "assets/skins/spindle-ribbon.wmz",
+    "assets/skins/spindle-wide.wmz",
+]
+
+
+def rename_archive(path: Path) -> bool:
+    """Rewrites the text members of a skin archive, keeping each member's
+    order, date and compression so an unchanged member stays byte equal."""
+    import io
+    import zipfile
+
+    with zipfile.ZipFile(path) as source:
+        members = [(info, source.read(info)) for info in source.infolist()]
+    changed = False
+    out = io.BytesIO()
+    with zipfile.ZipFile(out, "w") as target:
+        for info, data in members:
+            if Path(info.filename).suffix.lower() in TEXT_SUFFIXES:
+                try:
+                    text = data.decode("utf-8")
+                except UnicodeDecodeError:
+                    text = None
+                if text is not None:
+                    renamed = rename_text(text)
+                    if renamed != text:
+                        data = renamed.encode("utf-8")
+                        changed = True
+            target.writestr(info, data)
+    if changed:
+        path.write_bytes(out.getvalue())
+    return changed
+
+
 def main() -> None:
     os.chdir(ROOT)
     for dropped in DROPPED:
@@ -149,6 +188,9 @@ def main() -> None:
         renamed = rename_text(text)
         if renamed != text:
             path.write_text(renamed, encoding="utf-8")
+            changed += 1
+    for archive in ARCHIVES:
+        if Path(archive).is_file() and rename_archive(Path(archive)):
             changed += 1
     if Path("Cargo.lock").is_file():
         rename_lock(Path("Cargo.lock"))

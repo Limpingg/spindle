@@ -327,6 +327,11 @@ pub fn paint_shadow(ui: &Ui, palette: &Palette, rect: Rect, radius: f32) {
 
 /// Fills `rect` with a vertical gradient from `top` to `bottom`.
 pub fn paint_vertical_gradient(ui: &Ui, rect: Rect, top: Color32, bottom: Color32) {
+    ui.painter().add(vertical_gradient(rect, top, bottom));
+}
+
+/// A gradient shape whose bounds can be set after laying out its content.
+pub fn vertical_gradient(rect: Rect, top: Color32, bottom: Color32) -> egui::Shape {
     let mut mesh = egui::Mesh::default();
     mesh.colored_vertex(rect.left_top(), top);
     mesh.colored_vertex(rect.right_top(), top);
@@ -334,7 +339,7 @@ pub fn paint_vertical_gradient(ui: &Ui, rect: Rect, top: Color32, bottom: Color3
     mesh.colored_vertex(rect.left_bottom(), bottom);
     mesh.add_triangle(0, 1, 2);
     mesh.add_triangle(0, 2, 3);
-    ui.painter().add(egui::Shape::mesh(mesh));
+    egui::Shape::mesh(mesh)
 }
 
 /// Lays out only the rows that intersect the visible area of the enclosing
@@ -784,7 +789,7 @@ fn add_to_playlist_menu(ui: &mut Ui, app: &mut App, items: &[PlayableItem]) {
                 .filter(|(last_frame, _)| frame.saturating_sub(*last_frame) <= 1);
             let fresh = previous.is_none();
             let mut query = previous.map(|(_, query)| query).unwrap_or_default();
-            let field = playlist_picker(ui, app, items, &mut query);
+            let field = playlist_picker(ui, app, items, &mut query, None);
             if fresh {
                 field.request_focus();
             }
@@ -796,13 +801,106 @@ fn add_to_playlist_menu(ui: &mut Ui, app: &mut App, items: &[PlayableItem]) {
     }
 }
 
+/// The heart's choices while its menu is open: whether the playing song
+/// stays in Liked Songs and which playlists should hold it. Nothing changes
+/// until Done.
+#[derive(Clone)]
+pub(crate) struct PlaylistChecks {
+    /// The song the menu opened for.
+    pub uri: String,
+    pub liked: bool,
+    /// The playlists known to hold the song when the menu opened.
+    holding: std::collections::BTreeSet<String>,
+    /// The playlists not read far enough to tell. Done never takes the song
+    /// out of one, and adding to one first looks for it there.
+    unread: std::collections::BTreeSet<String>,
+    chosen: std::collections::BTreeSet<String>,
+}
+
+/// The mark at the end of a checklist row.
+#[derive(Clone, Copy, PartialEq, Debug)]
+pub(crate) enum Mark {
+    Checked,
+    Unchecked,
+    /// Unchecked, though the playlist may already hold the song.
+    Unknown,
+}
+
+impl PlaylistChecks {
+    /// A liked song, with a check on each playlist known to hold it.
+    pub(crate) fn new(app: &App, item: &PlayableItem) -> Self {
+        let mut holding = std::collections::BTreeSet::new();
+        let mut unread = std::collections::BTreeSet::new();
+        for (id, _) in app.editable_playlists() {
+            match app.local_playlist_duplicates(&id, std::slice::from_ref(item)) {
+                Some(found) if found.is_empty() => {}
+                Some(_) => {
+                    holding.insert(id);
+                }
+                None => {
+                    unread.insert(id);
+                }
+            }
+        }
+        Self {
+            uri: item.uri().to_string(),
+            liked: true,
+            chosen: holding.clone(),
+            holding,
+            unread,
+        }
+    }
+
+    pub(crate) fn mark(&self, id: &str) -> Mark {
+        if self.chosen.contains(id) {
+            Mark::Checked
+        } else if self.unread.contains(id) {
+            Mark::Unknown
+        } else {
+            Mark::Unchecked
+        }
+    }
+
+    fn toggle(&mut self, id: &str) {
+        if !self.chosen.remove(id) {
+            self.chosen.insert(id.to_string());
+        }
+    }
+
+    /// What Done asks of the playlists, as one action: `item` added to each
+    /// newly checked one and taken out of each unchecked one that held it.
+    /// None when no playlist changes.
+    pub(crate) fn changes(&self, app: &App, item: &PlayableItem) -> Option<Action> {
+        let mut add = Vec::new();
+        let mut remove = Vec::new();
+        for (id, name) in app.editable_playlists() {
+            match (self.holding.contains(&id), self.chosen.contains(&id)) {
+                (false, true) => add.push((id, name)),
+                (true, false) => remove.push(id),
+                _ => {}
+            }
+        }
+        if add.is_empty() && remove.is_empty() {
+            return None;
+        }
+        Some(Action::UpdatePlaylists {
+            item: Box::new(item.clone()),
+            add,
+            remove,
+        })
+    }
+}
+
 /// Shared by single-item and selection menus. Filtering is local and keeps
-/// the existing playlist edit permissions and library order.
+/// the existing playlist edit permissions and library order. With `checks`,
+/// as the heart's menu, Liked Songs leads the list and a click or Enter
+/// checks a playlist instead of adding to it.
 pub(crate) fn playlist_picker(
     ui: &mut Ui,
     app: &mut App,
     items: &[PlayableItem],
     query: &mut String,
+    mut checks: Option<&mut PlaylistChecks>,
 ) -> egui::Response {
     let palette = app.palette;
     let locale = app.locale;
@@ -889,12 +987,33 @@ pub(crate) fn playlist_picker(
     highlighted = highlighted.filter(|index| *index < matches.len());
     ui.data_mut(|data| data.insert_temp(highlight_id, (frame, highlighted, query.clone())));
     if enter && let Some((id, name)) = highlighted.and_then(|index| matches.get(index)) {
-        app.actions.push(Action::AddToPlaylist {
-            playlist_id: id.clone(),
-            playlist_name: name.clone(),
-            items: items.to_vec(),
-        });
-        ui.close();
+        if let Some(checks) = checks.as_deref_mut() {
+            checks.toggle(id);
+        } else {
+            app.actions.push(Action::AddToPlaylist {
+                playlist_id: id.clone(),
+                playlist_name: name.clone(),
+                items: items.to_vec(),
+            });
+            ui.close();
+        }
+    }
+    if let Some(checks) = checks.as_deref_mut() {
+        let (_, clicked) = picker_row(
+            ui,
+            &palette,
+            |ui, rect| super::sidebar::liked_cover(ui, rect, 4.0),
+            &gettext(locale, "Liked Songs"),
+            false,
+            Some(if checks.liked {
+                Mark::Checked
+            } else {
+                Mark::Unchecked
+            }),
+        );
+        if clicked {
+            checks.liked = !checks.liked;
+        }
     }
     if matches.is_empty() {
         theme::subtle(
@@ -911,6 +1030,19 @@ pub(crate) fn playlist_picker(
     // shrunk would stay that short once the filter is cleared. Asking for
     // the full height lets it grow back; it still shrinks to fit its rows.
     let list_height = 320.0;
+    let art = app.backend.art().clone();
+    // Every row's cover, read in one pass over the library.
+    let covers: std::collections::HashMap<String, String> = app
+        .library
+        .playlists
+        .get()
+        .into_iter()
+        .flatten()
+        .filter_map(|playlist| {
+            let image = pick_image(&playlist.images, 64)?;
+            Some((playlist.id.clone(), image.to_string()))
+        })
+        .collect();
     crate::autoscroll::show(
         ui,
         egui::ScrollArea::vertical()
@@ -922,23 +1054,121 @@ pub(crate) fn playlist_picker(
             for (index, (id, name)) in matches.into_iter().enumerate() {
                 ui.push_id(id, |ui| {
                     let chosen = highlighted == Some(index);
-                    let (row, clicked) =
-                        menu_item_response(ui, &palette, Some(Icon::ListMusic), name, true, chosen);
+                    let image = covers.get(id).map(String::as_str);
+                    let (row, clicked) = picker_row(
+                        ui,
+                        &palette,
+                        |ui, rect| {
+                            paint_cover(ui, &palette, image, rect, 4.0, Icon::Music, Some(&art))
+                        },
+                        name,
+                        chosen,
+                        checks.as_deref().map(|checks| checks.mark(id)),
+                    );
                     if chosen && moved {
                         row.scroll_to_me(None);
                     }
                     if clicked {
-                        app.actions.push(Action::AddToPlaylist {
-                            playlist_id: id.clone(),
-                            playlist_name: name.clone(),
-                            items: items.to_vec(),
-                        });
+                        if let Some(checks) = checks.as_deref_mut() {
+                            checks.toggle(id);
+                        } else {
+                            app.actions.push(Action::AddToPlaylist {
+                                playlist_id: id.clone(),
+                                playlist_name: name.clone(),
+                                items: items.to_vec(),
+                            });
+                        }
                     }
                 });
             }
         },
     );
     field
+}
+
+/// A playlist in the picker, with its cover. A row with a `mark` shows a
+/// check that a click turns on or off, leaving the menu open; otherwise a
+/// click closes the menu.
+fn picker_row(
+    ui: &mut Ui,
+    palette: &Palette,
+    cover: impl FnOnce(&Ui, Rect),
+    label: &str,
+    highlighted: bool,
+    mark: Option<Mark>,
+) -> (egui::Response, bool) {
+    let width = ui.available_width();
+    let (rect, response) = ui.allocate_exact_size(vec2(width, 36.0), Sense::click());
+    if ui.is_rect_visible(rect) {
+        if response.hovered() || highlighted {
+            ui.painter()
+                .rect_filled(rect, CornerRadius::same(6), palette.surface_hover);
+        }
+        let cover_rect =
+            Rect::from_center_size(pos2(rect.left() + 20.0, rect.center().y), Vec2::splat(28.0));
+        cover(ui, cover_rect);
+        let x = cover_rect.right() + 10.0;
+        let right = rect.right() - if mark.is_some() { 36.0 } else { 10.0 };
+        let galley = crate::bidi::layout(
+            ui.painter(),
+            label,
+            theme::regular(13.5),
+            palette.text,
+            (right - x).max(0.0),
+            1,
+            Some(crate::bidi::ELLIPSIS),
+        );
+        let text_rect = Rect::from_min_max(
+            pos2(x, rect.center().y - galley.size().y / 2.0),
+            pos2(right, rect.center().y + galley.size().y / 2.0),
+        );
+        ui.painter().galley(
+            crate::bidi::galley_pos(text_rect, &galley),
+            galley,
+            palette.text,
+        );
+        if let Some(mark) = mark {
+            let center = pos2(rect.right() - 20.0, rect.center().y);
+            match mark {
+                Mark::Checked => {
+                    ui.painter().circle_filled(center, 9.0, palette.accent);
+                    Icon::Check
+                        .image(palette.on_accent, 12.0)
+                        .paint_at(ui, Rect::from_center_size(center, Vec2::splat(12.0)));
+                }
+                Mark::Unchecked => {
+                    ui.painter()
+                        .circle_stroke(center, 8.5, Stroke::new(1.5, palette.secondary));
+                }
+                Mark::Unknown => {
+                    let faint = palette.secondary.gamma_multiply(0.4);
+                    ui.painter()
+                        .circle_stroke(center, 8.5, Stroke::new(1.5, faint));
+                }
+            }
+        }
+    }
+    response.widget_info(|| match mark {
+        Some(mark) => {
+            let checked = mark == Mark::Checked;
+            egui::WidgetInfo::selected(egui::WidgetType::Checkbox, ui.is_enabled(), checked, label)
+        }
+        None => {
+            let mut info =
+                egui::WidgetInfo::labeled(egui::WidgetType::Button, ui.is_enabled(), label);
+            if highlighted {
+                info.selected = Some(true);
+            }
+            info
+        }
+    });
+    theme::focus_ring(ui, &response);
+    crate::autoscroll::row(ui, &response);
+    let clicked = response.clicked();
+    if clicked && mark.is_none() {
+        ui.close();
+    }
+    (response, clicked)
 }
 
 pub fn item_menu(
@@ -1186,6 +1416,41 @@ fn item_menu_at(
         &gettext(locale, "Copy link"),
     ) {
         app.actions.push(Action::CopyLink(uri.clone()));
+    }
+    if let PlayableItem::Track(track) = item {
+        let artists = track.artist_names();
+        let has_title = !track.name.is_empty();
+        let has_artists = !artists.is_empty();
+        if has_title || has_artists {
+            menu_submenu(
+                ui,
+                &palette,
+                Some(Icon::Copy),
+                &gettext(locale, "Copy details"),
+                |ui| {
+                    ui.set_min_width(200.0);
+                    ui.set_max_width(300.0);
+                    if has_title && menu_item(ui, &palette, None, &gettext(locale, "Song title")) {
+                        app.actions.push(Action::CopyText(track.name.clone()));
+                    }
+                    if has_artists && menu_item(ui, &palette, None, &gettext(locale, "Artist")) {
+                        app.actions.push(Action::CopyText(artists.clone()));
+                    }
+                    if has_title
+                        && has_artists
+                        && menu_item(
+                            ui,
+                            &palette,
+                            None,
+                            &gettext(locale, "Artist and song title"),
+                        )
+                    {
+                        app.actions
+                            .push(Action::CopyText(format!("{artists} - {}", track.name)));
+                    }
+                },
+            );
+        }
     }
     if menu_item(
         ui,
@@ -2492,14 +2757,12 @@ pub fn table_header(
         );
         cx += added_width;
     }
-    // Spotify's own lists do not sort by plays, and neither does this one.
     if plays_width > 0.0 {
-        ui.painter().text(
-            pos2(cx, rect.center().y),
-            egui::Align2::LEFT_CENTER,
-            pgettext(locale, "column heading", "PLAYS"),
-            font.clone(),
-            color,
+        heading(
+            ui,
+            cx,
+            &pgettext(locale, "column heading", "PLAYS"),
+            SortColumn::Plays,
         );
     }
     if number_clicked {
@@ -2974,9 +3237,43 @@ pub fn skeleton_rows(ui: &mut Ui, palette: &Palette, locale: Locale, count: usiz
 /// Placeholder cards for a shelf that is loading, the size of the cards it
 /// will show, round for artists. Like [`skeleton_rows`], they do not move.
 pub fn skeleton_cards(ui: &mut Ui, palette: &Palette, locale: Locale, count: usize, round: bool) {
-    let fill = skeleton_fill(palette);
     const PAD: f32 = 12.0;
     let height = PAD + CARD_ART + 10.0 + 14.0 + 6.0 + 10.0 + PAD;
+    skeleton_cards_sized(ui, palette, locale, count, round, height);
+}
+
+/// Fills a previous card grid's height with placeholders. Each row uses at
+/// least the loaded card height, including its two subtitle lines, and shares
+/// any extra room (such as the old Load more button) across the rows.
+pub fn skeleton_cards_filling(
+    ui: &mut Ui,
+    palette: &Palette,
+    locale: Locale,
+    count: usize,
+    round: bool,
+    min_height: f32,
+) {
+    let spacing = CARD_GAP / 2.0;
+    let columns = ((ui.available_width() + spacing) / (CARD_WIDTH + spacing))
+        .floor()
+        .max(1.0) as usize;
+    let rows = count.max(1).div_ceil(columns);
+    let height = ((min_height - CARD_GAP * rows.saturating_sub(1) as f32) / rows as f32)
+        .max(card_row_height(ui));
+    skeleton_cards_sized(ui, palette, locale, count, round, height);
+}
+
+/// Draws skeleton covers and text at an explicitly chosen row height.
+fn skeleton_cards_sized(
+    ui: &mut Ui,
+    palette: &Palette,
+    locale: Locale,
+    count: usize,
+    round: bool,
+    height: f32,
+) {
+    let fill = skeleton_fill(palette);
+    const PAD: f32 = 12.0;
     for index in 0..count {
         let (rect, response) = ui.allocate_exact_size(vec2(CARD_WIDTH, height), Sense::hover());
         if index == 0 {
@@ -3248,6 +3545,29 @@ pub fn chips<T: PartialEq + Copy>(
     current: T,
 ) -> Option<T> {
     let mut selected = None;
+    let id = ui.next_auto_id();
+    chip_row(ui, id, palette.window, |ui| {
+        ui.spacing_mut().item_spacing.x = 8.0;
+        for (value, label) in options {
+            let chip = theme::soft_button(ui, palette, None, label, *value == current);
+            if chip.clicked() {
+                chip.scroll_to_me(None);
+                selected = Some(*value);
+            }
+        }
+    });
+    selected
+}
+
+/// Chips for a list of any length, such as installed skins: they wrap onto as
+/// many rows as they need, so every choice is in sight.
+pub fn wrapped_chips<T: PartialEq + Copy>(
+    ui: &mut Ui,
+    palette: &Palette,
+    options: &[(T, &str)],
+    current: T,
+) -> Option<T> {
+    let mut selected = None;
     ui.horizontal_wrapped(|ui| {
         ui.spacing_mut().item_spacing.x = 8.0;
         for (value, label) in options {
@@ -3257,6 +3577,47 @@ pub fn chips<T: PartialEq + Copy>(
         }
     });
     selected
+}
+
+/// How wide the fade over a chip row's clipped edge is.
+const CHIP_FADE: f32 = 24.0;
+
+/// One row of chips that scrolls when it overflows. It draws no scroll bar,
+/// which has no room of its own and would lie over the chips: the clipped
+/// chip and a fade into `fill` say there is more. A plain mouse wheel scrolls
+/// the row, since most mice have no sideways wheel.
+pub fn chip_row(
+    ui: &mut Ui,
+    id: egui::Id,
+    fill: egui::Color32,
+    add_contents: impl FnOnce(&mut Ui),
+) {
+    let row = ui
+        .scope(|ui| {
+            ui.style_mut().always_scroll_the_only_direction = true;
+            egui::ScrollArea::horizontal()
+                .id_salt(id)
+                .animated(false)
+                .auto_shrink([false, true])
+                .scroll_bar_visibility(egui::scroll_area::ScrollBarVisibility::AlwaysHidden)
+                .show(ui, |ui| {
+                    ui.horizontal(add_contents);
+                })
+        })
+        .inner;
+    let rect = row.inner_rect;
+    let hidden = row.content_size.x - row.state.offset.x - rect.width();
+    if hidden > 0.5 {
+        let fade = Rect::from_min_max(pos2(rect.right() - CHIP_FADE, rect.top()), rect.max);
+        let mut mesh = egui::Mesh::default();
+        mesh.colored_vertex(fade.left_top(), egui::Color32::TRANSPARENT);
+        mesh.colored_vertex(fade.right_top(), fill);
+        mesh.colored_vertex(fade.right_bottom(), fill);
+        mesh.colored_vertex(fade.left_bottom(), egui::Color32::TRANSPARENT);
+        mesh.add_triangle(0, 1, 2);
+        mesh.add_triangle(0, 2, 3);
+        ui.painter().add(egui::Shape::mesh(mesh));
+    }
 }
 
 /// A text input with the native clipboard actions and a selection-aware menu.
@@ -3530,6 +3891,21 @@ pub fn setting_row(
     setting_row_sized(ui, palette, label, description, 0.0, control);
 }
 
+/// A settings row that only says something: with nothing to lay out beside
+/// or under the text, a narrow window leaves no gap where a control would go.
+pub fn setting_note(ui: &mut Ui, palette: &Palette, label: &str, description: &str) {
+    theme::text(ui, label, theme::medium(14.0), palette.text);
+    ui.add(
+        egui::Label::new(
+            egui::RichText::new(description)
+                .font(theme::regular(12.5))
+                .color(palette.secondary),
+        )
+        .wrap(),
+    );
+    ui.add_space(10.0);
+}
+
 /// A settings row whose control needs `control_width` points, such as a
 /// row of choices. Its text wraps before a control wider than usual, and
 /// in a window too narrow for both, any control goes on its own line below
@@ -3754,6 +4130,106 @@ mod playing_cover_tests {
             "too late"
         );
         assert_eq!(stand_in(None, next, 10.5), None);
+    }
+}
+
+/// How [`copyable_text`] fits text wider than its row.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum CopyFit {
+    /// The text wraps, and a narrow column puts the button under it, so
+    /// all of it stays readable (a redirect address to type elsewhere).
+    Wrap,
+    /// One line, cut off with an ellipsis and shown whole on hover, with
+    /// the button always beside it (a command to paste).
+    OneLine,
+}
+
+/// Text to paste somewhere else, such as a redirect address or a command,
+/// in monospace, with a Copy button that says Copied for a moment. `fit`
+/// says what happens when it is wider than the row; Copy always copies all
+/// of it.
+pub fn copyable_text(
+    ui: &mut egui::Ui,
+    palette: &Palette,
+    locale: Locale,
+    id: egui::Id,
+    text: &str,
+    size: f32,
+    fit: CopyFit,
+) {
+    const GAP: f32 = 8.0;
+    // The Frame's inner margin, on both sides.
+    const MARGIN: f32 = 20.0;
+    let now = ui.input(|input| input.time);
+    let copied = ui
+        .data(|data| data.get_temp::<f64>(id))
+        .is_some_and(|at| now - at < 2.0);
+    let copy = gettext(locale, "Copy");
+    // Translators: shown on the Copy button for a moment after it copied.
+    let copied_label = gettext(locale, "Copied");
+    let body = |ui: &mut egui::Ui, room: Option<f32>| {
+        Frame::new()
+            .fill(palette.surface)
+            .corner_radius(CornerRadius::same(6))
+            .inner_margin(Margin::symmetric(10, 6))
+            .show(ui, |ui| {
+                let label = egui::Label::new(
+                    egui::RichText::new(text)
+                        .font(egui::FontId::monospace(size))
+                        .color(palette.text),
+                )
+                .selectable(true);
+                match room {
+                    Some(room) => {
+                        ui.set_max_width(room);
+                        ui.add(label.truncate());
+                    }
+                    None => {
+                        ui.add(label);
+                    }
+                }
+            });
+        let label = if copied {
+            copied_label.clone()
+        } else {
+            copy.clone()
+        };
+        if theme::pill_button(ui, palette, &label, false).clicked() {
+            ui.ctx().copy_text(text.to_owned());
+            ui.data_mut(|data| data.insert_temp(id, now));
+        }
+    };
+    match fit {
+        CopyFit::Wrap => {
+            ui.horizontal_wrapped(|ui| {
+                ui.spacing_mut().item_spacing = Vec2::new(GAP, 6.0);
+                body(ui, None);
+            });
+        }
+        CopyFit::OneLine => {
+            // Room for the wider of the two labels, so the text keeps its
+            // width when the button says Copied. pill_button pads 18 points
+            // a side.
+            let button = [&copy, &copied_label]
+                .iter()
+                .map(|label| {
+                    ui.painter()
+                        .layout_no_wrap(label.to_string(), theme::semibold(13.0), palette.text)
+                        .size()
+                        .x
+                })
+                .fold(0.0, f32::max)
+                + 36.0;
+            ui.horizontal(|ui| {
+                ui.spacing_mut().item_spacing = Vec2::new(GAP, 6.0);
+                let room = (ui.available_width() - button - GAP - MARGIN).max(40.0);
+                body(ui, Some(room));
+            });
+        }
+    }
+    if copied {
+        ui.ctx()
+            .request_repaint_after(std::time::Duration::from_millis(500));
     }
 }
 

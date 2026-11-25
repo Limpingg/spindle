@@ -57,7 +57,9 @@ struct Cli {
     /// `library-list-narrow`, `library-list-wide`, `library-grid`, `library-grid-narrow`,
     /// `library-grid-wide`, `waiting-for-browser`, `sign-in-returning`, `sign-in-malformed`,
     /// `sign-in-shared-retired`, `sign-in-unknown-client`, `sign-in-not-allowed`,
-    /// `shared-grant`, or `own-app`.
+    /// `shared-grant`, or `own-app`. `wmp-skin=PATH` wears a Windows Media
+    /// Player skin, and `wmp-run=SCRIPT` runs script in it once it starts
+    /// (`|` for a comma), to open a drawer or view for a capture.
     #[cfg(feature = "demo")]
     #[arg(long)]
     demo_show: Option<String>,
@@ -457,6 +459,7 @@ pub(crate) fn run() -> eframe::Result<()> {
         None => paths::AppDirs::discover(),
     };
     let dirs = folders.dirs.clone();
+    let window_file = folders.window_file();
     let dirs_ready = dirs.ensure();
     // Launched from a desktop, stderr goes nowhere; keep the run's log where
     // a bug report can find it, and a line per panic in the panic log (with
@@ -484,6 +487,26 @@ pub(crate) fn run() -> eframe::Result<()> {
         log::warn!("unable to set the Dock icon: {error}");
     }
     let mut settings = settings::Settings::load(&dirs.settings_file());
+    // An update an earlier run downloaded installs now, before anything
+    // opens, when it installs on its own. The helper relaunches the new
+    // version with this launch's link and options; it shows the window,
+    // as every restart after an update does, to confirm it started.
+    if guarded {
+        let newest_run = spindle::updates::policy::newest_run(
+            spindle::updates::VERSION,
+            settings.newest_run.as_deref(),
+        );
+        let relaunch =
+            relaunch_arguments(cli.link.as_deref(), cli.device_name.as_deref(), cli.verbose);
+        if spindle::updates::install_kept(
+            settings.update_automatically,
+            Some(&newest_run),
+            relaunch,
+        ) {
+            drop(instance);
+            return Ok(());
+        }
+    }
     if let Some(name) = cli.device_name {
         settings.device_name = name;
     }
@@ -532,6 +555,7 @@ pub(crate) fn run() -> eframe::Result<()> {
     #[allow(unused_mut)]
     let mut app = app::App::new(&waker, dirs, settings, options);
     if guarded {
+        app.remember_newest_run();
         app.enable_desktop_themes();
     }
     #[cfg(feature = "demo")]
@@ -622,6 +646,9 @@ pub(crate) fn run() -> eframe::Result<()> {
     let start_hidden = start_hidden(cli.start_hidden, link_given, demo, receipt_shown);
     #[cfg(not(feature = "demo"))]
     let start_hidden = start_hidden(cli.start_hidden, link_given, false, receipt_shown);
+    // From here a polite SIGTERM quits like Quit, stopping Soloist and
+    // saving the state, rather than ending the process where it stands.
+    spindle::terminate::listen(waker.clone());
     let shell = fastframe_shell::Shell::new(app, &waker).start_hidden(start_hidden);
     // The menu-bar item answers only while AppKit's loop runs. Elsewhere
     // nothing needs the main thread between headless ticks, so the shell
@@ -635,7 +662,6 @@ pub(crate) fn run() -> eframe::Result<()> {
         let creator_shot = shot.clone();
         let mini = lease.peek(MiniWindow::wanted);
         let geometry = lease.peek(main_geometry);
-        #[cfg(windows)]
         let locale = lease.peek(|app| app.locale);
         #[cfg(feature = "demo")]
         let options = {
@@ -653,116 +679,115 @@ pub(crate) fn run() -> eframe::Result<()> {
         };
         #[cfg(not(feature = "demo"))]
         let options = native_options(false, mini, None, geometry);
-        let options = profile_options(options);
+        let options = profile_options(options, window_file.clone());
         #[cfg(windows)]
         let thumbbar_enabled = desktop_surfaces && options.viewport.taskbar != Some(false);
         #[cfg(target_os = "linux")]
         let hide_from_taskbar = options.viewport.taskbar == Some(false);
-        eframe::run_native(
-            "Spindle",
-            options,
-            Box::new(move |cc| {
-                if let Some(gl) = &cc.gl {
-                    use eframe::glow::HasContext;
-                    // eframe has made this window's GL context current
-                    // before calling the app creator. These identify the
-                    // renderer actually selected, which may differ from
-                    // the listed GPU.
-                    unsafe {
-                        log::info!(
-                            "OpenGL renderer: {}; vendor: {}; version: {}",
-                            gl.get_parameter_string(eframe::glow::RENDERER),
-                            gl.get_parameter_string(eframe::glow::VENDOR),
-                            gl.get_parameter_string(eframe::glow::VERSION)
-                        );
-                    }
+        // Without the wgpu feature OpenGL is the only renderer, so there is
+        // one try and each of these is asked for once. When it cannot draw,
+        // fastframe-graphics says why in a native dialog rather than letting
+        // the app quit without a word.
+        let mut options = Some(options);
+        let mut creator: Option<eframe::AppCreator<'_>> = Some(Box::new(move |cc| {
+            if let Some(gl) = &cc.gl {
+                use eframe::glow::HasContext;
+                // eframe has made this window's GL context current
+                // before calling the app creator. These identify the
+                // renderer actually selected, which may differ from
+                // the listed GPU.
+                unsafe {
+                    log::info!(
+                        "OpenGL renderer: {}; vendor: {}; version: {}",
+                        gl.get_parameter_string(eframe::glow::RENDERER),
+                        gl.get_parameter_string(eframe::glow::VENDOR),
+                        gl.get_parameter_string(eframe::glow::VERSION)
+                    );
                 }
-                let mut app = lease.take(&cc.egui_ctx);
-                // Built once per window, before the first frame; the
-                // handler wakes the loop so a menu pick is not held until
-                // the next repaint.
-                #[cfg(target_os = "macos")]
-                {
-                    spindle::mac_touchbar_crash_guard::install();
-                    spindle::mac_menu::init();
-                    let ctx = cc.egui_ctx.clone();
-                    spindle::mac_menu::set_waker(move || ctx.request_repaint());
-
-                    spindle::notch::init();
-                    let ctx_notch = cc.egui_ctx.clone();
-                    spindle::notch::set_waker(move || ctx_notch.request_repaint());
-                }
-                {
-                    use raw_window_handle::HasDisplayHandle;
-                    if let Ok(display) = cc.display_handle() {
-                        app.window_level_supported =
-                            spindle::window::supports_window_level(display.as_raw());
-                        app.taskbar_hiding_supported =
-                            spindle::window::supports_hiding_from_taskbar(display.as_raw());
-                    }
-                }
-                // winit hides a taskbar button on Windows only; X11 is
-                // asked here, while the window is still unmapped.
-                #[cfg(target_os = "linux")]
-                if hide_from_taskbar {
-                    use raw_window_handle::HasWindowHandle;
-                    if let Ok(handle) = cc.window_handle() {
-                        spindle::window::skip_x11_taskbar(handle.as_raw());
-                    }
-                }
-                app.attach(&cc.egui_ctx);
-                #[cfg(windows)]
-                {
-                    use raw_window_handle::{HasWindowHandle, RawWindowHandle};
-                    if let Ok(handle) = cc.window_handle()
-                        && let RawWindowHandle::Win32(window) = handle.as_raw()
-                    {
-                        // SAFETY: the window was just created on this thread.
-                        unsafe { spindle::window::use_exe_icons(window.hwnd.get()) };
-                    }
-                }
-                #[cfg(windows)]
-                let thumbbar = {
-                    use raw_window_handle::{HasWindowHandle, RawWindowHandle};
-                    let mut toolbar = spindle::thumbbar::ThumbBar::new();
-                    if thumbbar_enabled
-                        && let Ok(handle) = cc.window_handle()
-                        && let RawWindowHandle::Win32(window) = handle.as_raw()
-                    {
-                        let wake = creator_waker.clone();
-                        // The shell and toolbar share this window's thread
-                        // and lifetime; the toolbar is detached on shell
-                        // drop.
-                        unsafe { toolbar.attach(window.hwnd.get(), move || wake.wake()) };
-                    }
-                    toolbar
-                };
-                Ok(Box::new(Shell {
-                    app,
-                    recovery_checked: false,
-                    #[cfg(windows)]
-                    thumbbar,
-                    #[cfg(feature = "demo")]
-                    shot: creator_shot.clone(),
-                    #[cfg(feature = "demo")]
-                    drag: demo_drag,
-                    stalls: fastframe_shell::StallWatch::default(),
-                    screen_asked: None,
-                }))
-            }),
-        )
-        .inspect_err(|error| {
-            log::error!("Native window failed: {error}");
-            #[cfg(windows)]
-            if matches!(
-                error,
-                eframe::Error::Glutin(_)
-                    | eframe::Error::NoGlutinConfigs(..)
-                    | eframe::Error::OpenGL(_)
-            ) {
-                spindle::window::report_missing_opengl(locale);
             }
-        })
+            let mut app = lease.take(&cc.egui_ctx);
+            // Built once per window, before the first frame; the
+            // handler wakes the loop so a menu pick is not held until
+            // the next repaint.
+            #[cfg(target_os = "macos")]
+            {
+                spindle::mac_touchbar_crash_guard::install();
+                spindle::mac_menu::init();
+                let ctx = cc.egui_ctx.clone();
+                spindle::mac_menu::set_waker(move || ctx.request_repaint());
+
+                spindle::notch::init();
+                let ctx_notch = cc.egui_ctx.clone();
+                spindle::notch::set_waker(move || ctx_notch.request_repaint());
+            }
+            {
+                use raw_window_handle::HasDisplayHandle;
+                if let Ok(display) = cc.display_handle() {
+                    app.window_level_supported =
+                        spindle::window::supports_window_level(display.as_raw());
+                    app.taskbar_hiding_supported =
+                        spindle::window::supports_hiding_from_taskbar(display.as_raw());
+                }
+            }
+            // winit hides a taskbar button on Windows only; X11 is
+            // asked here, while the window is still unmapped.
+            #[cfg(target_os = "linux")]
+            if hide_from_taskbar {
+                use raw_window_handle::HasWindowHandle;
+                if let Ok(handle) = cc.window_handle() {
+                    spindle::window::skip_x11_taskbar(handle.as_raw());
+                }
+            }
+            app.attach(&cc.egui_ctx);
+            // Spindle: the window's small and large icons from the exe at
+            // the display's sizes; winit hands Windows only one picture.
+            #[cfg(windows)]
+            {
+                use raw_window_handle::{HasWindowHandle, RawWindowHandle};
+                if let Ok(handle) = cc.window_handle()
+                    && let RawWindowHandle::Win32(window) = handle.as_raw()
+                {
+                    // SAFETY: the window was just created on this thread.
+                    unsafe { spindle::window::use_exe_icons(window.hwnd.get()) };
+                }
+            }
+            #[cfg(windows)]
+            let thumbbar = {
+                use raw_window_handle::{HasWindowHandle, RawWindowHandle};
+                let mut toolbar = spindle::thumbbar::ThumbBar::new();
+                if thumbbar_enabled
+                    && let Ok(handle) = cc.window_handle()
+                    && let RawWindowHandle::Win32(window) = handle.as_raw()
+                {
+                    let wake = creator_waker.clone();
+                    // The shell and toolbar share this window's thread
+                    // and lifetime; the toolbar is detached on shell
+                    // drop.
+                    unsafe { toolbar.attach(window.hwnd.get(), move || wake.wake()) };
+                }
+                toolbar
+            };
+            Ok(Box::new(Shell {
+                app,
+                recovery_checked: false,
+                #[cfg(windows)]
+                thumbbar,
+                #[cfg(feature = "demo")]
+                shot: creator_shot.clone(),
+                #[cfg(feature = "demo")]
+                drag: demo_drag,
+                stalls: fastframe_shell::StallWatch::default(),
+                screen_asked: None,
+            }))
+        }));
+        fastframe_graphics::Graphics::new("Spindle")
+            .help(spindle::window::DOWNLOAD_PAGE)
+            .dialog(move |trouble| spindle::window::no_window_dialog(locale, trouble))
+            .run_native(
+                || options.take().expect("one try opens the window"),
+                || creator.take().expect("one try opens the window"),
+            )
+            .inspect_err(|error| log::error!("Native window failed: {error}"))
     })
 }
 
@@ -781,7 +806,7 @@ struct MiniWindow {
 impl MiniWindow {
     fn wanted(app: &app::App) -> Option<Self> {
         app.settings.winamp_window.then(|| Self {
-            size: spindle::ui::winamp::initial_size(&app.settings),
+            size: spindle::ui::winamp::initial_size(&app.settings, &app.winamp.skin),
             geometry: Geometry {
                 position: app.winamp.geometry.position,
                 ..Geometry::default()
@@ -791,6 +816,25 @@ impl MiniWindow {
             storage_path: app.dirs.cache.join("winamp.ron"),
         })
     }
+}
+
+/// What the new version starts with after an update installed at start:
+/// the link this launch opens and the options that change the session.
+fn relaunch_arguments(link: Option<&str>, device_name: Option<&str>, verbose: bool) -> Vec<String> {
+    let mut arguments = Vec::new();
+    if let Some(name) = device_name {
+        arguments.extend(["--device-name".to_owned(), name.to_owned()]);
+    }
+    if verbose {
+        arguments.push("--verbose".to_owned());
+    }
+    // Never after `--`: the helper adds `--update-receipt` after these, and
+    // `fastframe_update::intercept` reads no flag past `--`. A link given
+    // here already parsed as a link, so it can't be taken for a flag.
+    if let Some(link) = link {
+        arguments.push(link.to_owned());
+    }
+    arguments
 }
 
 /// The main window's remembered geometry. A demo run opens at its default
@@ -873,10 +917,8 @@ fn native_options(
     // so it neither reads the main window's geometry nor creates a state file.
     let persistence_path = mini.as_ref().map(|mini| mini.storage_path.clone());
     #[cfg(target_os = "linux")]
-    let persistence_path = persistence_path.or_else(|| {
-        // Keep the native profile path even when Flatpak supplies its app ID.
-        eframe::storage_dir("spindle").map(|dir| dir.join("app.ron"))
-    });
+    // Keep the native profile path even when Flatpak supplies its app ID.
+    let persistence_path = persistence_path.or_else(paths::installed_window_file);
     #[cfg(target_os = "linux")]
     let app_id = desktop_entry();
     #[cfg(not(target_os = "linux"))]
@@ -955,9 +997,14 @@ fn native_options(
     }
 }
 
-fn profile_options(mut options: eframe::NativeOptions) -> eframe::NativeOptions {
+/// Points the main window at `window_file`, which a portable copy keeps in
+/// its own folder.
+fn profile_options(
+    mut options: eframe::NativeOptions,
+    window_file: Option<std::path::PathBuf>,
+) -> eframe::NativeOptions {
     if options.persist_window {
-        options.persistence_path = eframe::storage_dir("spindle").map(|dir| dir.join("app.ron"));
+        options.persistence_path = window_file;
     }
     options
 }
@@ -998,16 +1045,20 @@ mod native_window_tests {
 
     #[test]
     fn window_geometry_is_kept_without_touching_demo_storage() {
-        let main = profile_options(native_options(false, None, None, Geometry::default()));
-        assert_eq!(
-            main.persistence_path,
-            eframe::storage_dir("spindle").map(|dir| dir.join("app.ron"))
-        );
-        let demo_path = std::path::PathBuf::from("temporary/demo.ron");
-        let demo = profile_options(demo_native_options(
+        let window_file = std::path::PathBuf::from("spindle-data/state/app.ron");
+        let main = profile_options(
             native_options(false, None, None, Geometry::default()),
-            demo_path.clone(),
-        ));
+            Some(window_file.clone()),
+        );
+        assert_eq!(main.persistence_path, Some(window_file.clone()));
+        let demo_path = std::path::PathBuf::from("temporary/demo.ron");
+        let demo = profile_options(
+            demo_native_options(
+                native_options(false, None, None, Geometry::default()),
+                demo_path.clone(),
+            ),
+            Some(window_file),
+        );
         assert_eq!(demo.persistence_path, Some(demo_path));
     }
 
@@ -1032,10 +1083,7 @@ mod native_window_tests {
             let id = desktop_entry();
             assert_eq!(main.viewport.app_id.as_deref(), Some(id.as_str()));
             assert_eq!(mini.viewport.app_id, main.viewport.app_id);
-            assert_eq!(
-                main.persistence_path,
-                eframe::storage_dir("spindle").map(|dir| dir.join("app.ron"))
-            );
+            assert_eq!(main.persistence_path, paths::installed_window_file());
         }
         #[cfg(not(target_os = "linux"))]
         {
@@ -1103,7 +1151,8 @@ mod native_window_tests {
                 skin_scale: Some(2),
                 ..Default::default()
             };
-            let size = spindle::ui::winamp::initial_size(&settings);
+            let size =
+                spindle::ui::winamp::initial_size(&settings, &spindle::skin::Skin::builtin());
             let options = native_options(
                 false,
                 Some(MiniWindow {
@@ -1212,7 +1261,7 @@ mod native_window_tests {
             click: false,
             hover: false,
         };
-        let frames: Vec<_> = (0..=DemoDrag::REST + DemoDrag::GLIDE + 5)
+        let frames: Vec<_> = (0..=DemoDrag::rest() + DemoDrag::GLIDE + 5)
             .map(|_| drag.events())
             .collect();
         let presses = frames
@@ -1244,7 +1293,7 @@ mod native_window_tests {
             click: true,
             hover: false,
         };
-        let events: Vec<_> = (0..=DemoDrag::REST + DemoDrag::GLIDE + 5)
+        let events: Vec<_> = (0..=DemoDrag::rest() + DemoDrag::GLIDE + 5)
             .flat_map(|_| click.events())
             .collect();
         let buttons: Vec<bool> = events
@@ -1471,29 +1520,36 @@ struct DemoDrag {
 
 #[cfg(feature = "demo")]
 impl DemoDrag {
-    /// Frames to rest before pressing, so the rows under `from` are laid out.
-    const REST: u32 = 20;
+    /// Frames to rest before pressing, so the rows under `from` are laid
+    /// out. `SPINDLE_DEMO_REST` asks for longer, for a skin still loading.
+    fn rest() -> u32 {
+        std::env::var("SPINDLE_DEMO_REST")
+            .ok()
+            .and_then(|frames| frames.parse().ok())
+            .unwrap_or(20)
+    }
     /// Frames the glide from `from` to `to` takes.
     const GLIDE: u32 = 20;
 
     fn events(&mut self) -> Vec<egui::Event> {
         let frame = self.frame;
         self.frame = self.frame.saturating_add(1);
-        let pos = if frame <= Self::REST {
+        let rest = Self::rest();
+        let pos = if frame <= rest {
             self.from
         } else {
-            let t = ((frame - Self::REST) as f32 / Self::GLIDE as f32).min(1.0);
+            let t = ((frame - rest) as f32 / Self::GLIDE as f32).min(1.0);
             self.from.lerp(self.to, t)
         };
         let mut events = vec![egui::Event::PointerMoved(pos)];
         if self.hover {
             return events;
         }
-        if frame == Self::REST || (self.click && frame == Self::REST + 1) {
+        if frame == rest || (self.click && frame == rest + 1) {
             events.push(egui::Event::PointerButton {
                 pos,
                 button: egui::PointerButton::Primary,
-                pressed: frame == Self::REST,
+                pressed: frame == rest,
                 modifiers: egui::Modifiers::NONE,
             });
         }
@@ -1635,6 +1691,24 @@ fn app_icon() -> egui::IconData {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// An update installed at start relaunches with this launch's link and
+    /// options, and no `--` that would hide the receipt flag the helper adds.
+    #[test]
+    fn an_update_installed_at_start_relaunches_with_the_launchs_link() {
+        let link = "https://open.spotify.com/track/4uLU6hMCjMI75M1A2tKUQC";
+        let arguments = relaunch_arguments(Some(link), Some("Desk"), true);
+        // fastframe_update::intercept reads no flag past `--`, and the
+        // helper puts its receipt flag after these.
+        assert!(!arguments.iter().any(|argument| argument == "--"));
+        let mut relaunched = vec!["spindle".to_owned()];
+        relaunched.extend(arguments);
+        let cli = Cli::try_parse_from(&relaunched).expect("it parses");
+        assert_eq!(cli.link.as_deref(), Some(link));
+        assert_eq!(cli.device_name.as_deref(), Some("Desk"));
+        assert!(cli.verbose);
+        assert!(relaunch_arguments(None, None, false).is_empty());
+    }
 
     /// The login entry's `--start-hidden` starts in the tray, unless the
     /// launch has something to show.
