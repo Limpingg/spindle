@@ -68,16 +68,18 @@ fn strip_colors(palette: &theme::Palette) -> (egui::Color32, egui::Color32) {
     if palette.dark {
         // Spindle: a calm band for long sessions, light green words.
         let _ = fill;
+        // One green family: the Connect card's surface and the brand
+        // green for words and icon.
         (
-            egui::Color32::from_rgb(0x0d, 0x1f, 0x14),
-            egui::Color32::from_rgb(0x7f, 0xdc, 0xa0),
+            egui::Color32::from_rgb(0x13, 0x26, 0x1b),
+            palette.accent,
         )
     } else {
         // A clear green band with deep green words (6.6:1) on the light
         // theme, where a mix into the grey bar came out grey.
         (
             egui::Color32::from_rgb(0xe2, 0xee, 0xe6),
-            egui::Color32::from_rgb(0x0b, 0x5c, 0x2a),
+            palette.accent,
         )
     }
 }

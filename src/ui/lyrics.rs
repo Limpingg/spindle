@@ -262,7 +262,7 @@ fn contents(app: &mut App, ui: &mut egui::Ui) {
     // Spindle: sung lines step back further than the ones to come, so
     // the place in the song shows at a glance.
     let sung = if palette.dark {
-        egui::Color32::from_rgb(0x5f, 0x66, 0x70)
+        egui::Color32::from_rgb(0x6a, 0x72, 0x7d)
     } else {
         egui::Color32::from_rgb(0x8a, 0x92, 0x9c)
     };

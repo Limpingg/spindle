@@ -42,19 +42,10 @@ pub fn show(app: &mut App, ui: &mut egui::Ui, id: &str) {
                         .collect::<Vec<_>>()
                         .into();
                     let context = RowContext::Uris(Arc::clone(&uris));
-                    // Spindle: on the artist's own page a row names only the
-                    // other artists on the song, as Spotify does.
-                    let items: Vec<PlayableItem> = tracks
-                        .iter()
-                        .cloned()
-                        .map(|mut track| {
-                            track.artists.retain(|other| {
-                                other.uri.as_deref() != Some(artist.uri.as_str())
-                                    && other.name != artist.name
-                            });
-                            PlayableItem::Track(track)
-                        })
-                        .collect();
+                    // Spindle: every row keeps its artist line, so the list
+                    // has one rhythm.
+                    let items: Vec<PlayableItem> =
+                        tracks.iter().cloned().map(PlayableItem::Track).collect();
                     let limit = if page.show_all_top { items.len() } else { 5 };
                     let show_plays = app.has_play_counts(&artist.uri);
                     let render_top = |ui: &mut egui::Ui, app: &mut App| {

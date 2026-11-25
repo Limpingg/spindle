@@ -972,8 +972,8 @@ pub(super) fn settings(
                 let link = theme::link(
                     ui,
                     gettext(locale, "Setup, privacy and limitations"),
-                    theme::medium(13.0),
-                    palette.text,
+                    theme::regular(13.0),
+                    palette.secondary,
                 );
                 theme::icon(ui, theme::Icon::ExternalLink, 13.0, palette.secondary);
                 link.clicked()

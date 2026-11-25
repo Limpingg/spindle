@@ -74,9 +74,9 @@ impl Palette {
             surface_hover: Color32::from_rgb(0xd8, 0xdd, 0xe4),
             surface_active: Color32::from_rgb(0xd7, 0xdb, 0xe1),
             // Spindle: field and pill edges that show on the pale panes.
-            outline: Color32::from_rgb(0x8a, 0x92, 0x9c),
+            outline: Color32::from_rgb(0x76, 0x7e, 0x88),
             text: Color32::from_rgb(0x14, 0x17, 0x1a),
-            secondary: Color32::from_rgb(0x53, 0x5b, 0x66),
+            secondary: Color32::from_rgb(0x43, 0x4a, 0x54),
             // Spindle: green that reads as text on white (5:1); #15a64a was 3:1.
             dim: Color32::from_rgb(0x5c, 0x64, 0x70),
             accent: Color32::from_rgb(0x11, 0x6b, 0x34),
@@ -151,6 +151,25 @@ impl Palette {
                 (b * scale).min(1.0),
             )
         };
+        // Spindle: a muted wash. Strong colour is pulled toward grey, and
+        // the khaki and olive of warm photos most of all, so a header stays
+        // in the app's cool family.
+        let (hi, lo) = (r.max(g).max(b), r.min(g).min(b));
+        let grey = (r + g + b) / 3.0;
+        let hue = if hi - lo < 1e-3 {
+            0.0
+        } else if hi == r {
+            60.0 * (((g - b) / (hi - lo)).rem_euclid(6.0))
+        } else if hi == g {
+            60.0 * ((b - r) / (hi - lo) + 2.0)
+        } else {
+            60.0 * ((r - g) / (hi - lo) + 4.0)
+        };
+        let olive = (35.0..=75.0).contains(&hue);
+        let cap = if olive { 0.06 } else { 0.18 };
+        let keep = if hi - lo > cap { cap / (hi - lo) } else { 1.0 };
+        let pull = |c: f32| grey + (c - grey) * keep;
+        let (r, g, b) = (pull(r), pull(g), pull(b));
         Color32::from_rgb((r * 255.0) as u8, (g * 255.0) as u8, (b * 255.0) as u8)
     }
 }

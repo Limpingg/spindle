@@ -374,7 +374,7 @@ fn section(
     ui.add_space(8.0);
     Frame::new()
         .fill(if palette.dark {
-            egui::Color32::from_rgb(0x1a, 0x1e, 0x24)
+            egui::Color32::from_rgb(0x17, 0x1a, 0x1f)
         } else {
             palette.surface
         })
@@ -523,18 +523,6 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
         &soloist,
         &gettext(locale, "Playback lossless setup key download updates"),
     );
-    if soloist_keywords || section_matches(&needle, &soloist, &soloist_rows) {
-        any_visible = true;
-        // A word only the section knows shows it whole.
-        let rows_needle = if soloist_keywords {
-            ""
-        } else {
-            needle.as_str()
-        };
-        section(ui, &palette, &soloist, |ui| {
-            super::soloist::settings(app, ui, rows_needle, &soloist, &soloist_rows);
-        });
-    }
 
     let open_folder = gettext(locale, "Open folder");
 
@@ -1239,6 +1227,21 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
                     }
                 });
             }
+        });
+    }
+
+    // Spindle: Soloist after the account and this computer's playback,
+    // which are what a signed in listener looks for first.
+    if soloist_keywords || section_matches(&needle, &soloist, &soloist_rows) {
+        any_visible = true;
+        // A word only the section knows shows it whole.
+        let rows_needle = if soloist_keywords {
+            ""
+        } else {
+            needle.as_str()
+        };
+        section(ui, &palette, &soloist, |ui| {
+            super::soloist::settings(app, ui, rows_needle, &soloist, &soloist_rows);
         });
     }
 

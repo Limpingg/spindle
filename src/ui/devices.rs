@@ -899,8 +899,9 @@ fn jam_line(app: &mut App, ui: &mut egui::Ui) {
         ui.painter()
             .rect_filled(rect, CornerRadius::same(6), palette.surface_hover);
     }
+    // Spindle: an action in full text colour, not a faded caption.
     Icon::Users
-        .image(if live { palette.text } else { palette.secondary }, 16.0)
+        .image(palette.text, 16.0)
         .paint_at(
             ui,
             Rect::from_center_size(pos2(rect.left() + 12.0, rect.center().y), egui::Vec2::splat(16.0)),
@@ -909,12 +910,8 @@ fn jam_line(app: &mut App, ui: &mut egui::Ui) {
         pos2(rect.left() + 36.0, rect.center().y),
         egui::Align2::LEFT_CENTER,
         label,
-        if live {
-            theme::semibold(13.0)
-        } else {
-            theme::regular(13.0)
-        },
-        if live { palette.text } else { palette.secondary },
+        theme::semibold(13.0),
+        palette.text,
     );
     if response
         .on_hover_cursor(egui::CursorIcon::PointingHand)

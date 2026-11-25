@@ -3529,7 +3529,7 @@ pub fn thin_slider(
         );
         // Spindle: a softer white at rest, so the bar does not glow.
         let rest = if palette.dark {
-            palette.text
+            Color32::from_rgb(0xc9, 0xce, 0xd6)
         } else {
             palette.text
         };
