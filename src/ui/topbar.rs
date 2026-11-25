@@ -212,7 +212,7 @@ fn nav_button(
             palette.surface
         } else {
             // Spindle: with nowhere to go the circle steps back too.
-            palette.surface.gamma_multiply(0.45)
+            palette.surface.gamma_multiply(0.3)
         };
         ui.painter().circle_filled(rect.center(), 16.0, fill);
         let color = if !enabled {

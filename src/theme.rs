@@ -106,10 +106,12 @@ impl Palette {
         if self.dark {
             (self.accent, self.accent_hover, self.on_accent)
         } else {
+            // A deeper green with a white glyph, so the disc holds 3:1
+            // against a pale header.
             (
-                Color32::from_rgb(0x1e, 0xd7, 0x60),
-                Color32::from_rgb(0x3c, 0xe8, 0x7a),
-                Color32::from_rgb(0x0a, 0x14, 0x0e),
+                Color32::from_rgb(0x14, 0x83, 0x3c),
+                Color32::from_rgb(0x11, 0x70, 0x33),
+                Color32::WHITE,
             )
         }
     }
@@ -981,6 +983,8 @@ fn soft_button_inner(
     };
     let color = if active && segment && palette.dark {
         palette.text
+    } else if active && !palette.dark {
+        palette.text
     } else if active {
         palette.window
     } else if segment {
@@ -1033,7 +1037,9 @@ fn soft_button_inner(
             if palette.dark {
                 Color32::from_rgb(0xc9, 0xce, 0xd6)
             } else {
-                palette.text
+                // Spindle: a mid grey, the light theme's mirror of the
+                // dark one's pale chip, not a solid black block.
+                Color32::from_rgb(0xd5, 0xd9, 0xdf)
             }
         } else if hovered {
             palette.surface_hover

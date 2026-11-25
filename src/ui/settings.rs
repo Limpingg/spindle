@@ -398,7 +398,8 @@ fn section(
         })
         .show(ui, |ui| {
             // Spindle: a readable column; labels and controls stay near.
-            ui.set_width(ui.available_width().min(880.0));
+            // Spindle: the cards share the right edge of the song lists.
+            ui.set_width(ui.available_width());
             add_contents(ui);
         });
     ui.add_space(8.0);

@@ -1675,7 +1675,7 @@ fn plays_column(width: f32, others: f32) -> f32 {
         return PLAYS_WIDTH;
     }
     let right_fixed = 36.0 + 56.0 + 36.0 + 8.0;
-    (width * 0.45 - right_fixed).max(PLAYS_WIDTH)
+    (width * 0.55 - right_fixed).max(PLAYS_WIDTH)
 }
 
 /// Whether a list `width` wide has room for play counts.
@@ -1969,11 +1969,9 @@ fn track_row_contents(
                     Icon::PlayFilled
                 };
                 theme::paint_icon(ui, icon, cover_rect, 16.0, Color32::WHITE);
-            } else if playing {
-                // Spindle: dark enough that the bars hold on a pale cover.
-                scrim(150);
-                theme::paint_icon(ui, Icon::AudioLines, cover_rect, 16.0, palette.accent);
             }
+            // Spindle: the playing row keeps its cover clean; the green
+            // title marks it, as in the song lists.
         }
         x += cols.cover;
     }

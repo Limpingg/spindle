@@ -336,7 +336,7 @@ fn contents(app: &mut App, ui: &mut egui::Ui) {
                 } else {
                     // Spindle: a line that needs two rows breaks near its
                     // middle, so no word is left alone on the second.
-                    let width = balanced_width(ui, text, &font, ui.available_width());
+                    let width = ui.available_width();
                     ui.scope(|ui| {
                         ui.set_max_width(width);
                         ui.add(
