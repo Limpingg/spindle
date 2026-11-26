@@ -183,6 +183,23 @@ jobs:
           cd dist
           sha256sum * > checksums.txt
           cat checksums.txt
+      - name: Sign checksums.txt
+        env:
+          SPINDLE_UPDATE_KEY: ${{ secrets.SPINDLE_UPDATE_KEY }}
+        run: |
+          set -euo pipefail
+          # The updater refuses a release without checksums.txt.sig: a raw
+          # 64 byte Ed25519 signature over the file's exact bytes, checked
+          # with assets/update-public-key.hex.
+          test -n "$SPINDLE_UPDATE_KEY" || { echo "The SPINDLE_UPDATE_KEY secret is missing"; exit 1; }
+          key=$(mktemp)
+          printf '%s\n' "$SPINDLE_UPDATE_KEY" > "$key"
+          openssl pkeyutl -sign -inkey "$key" -rawin -in dist/checksums.txt -out dist/checksums.txt.sig
+          rm -f "$key"
+          test "$(wc -c < dist/checksums.txt.sig)" -eq 64
+          expected=$(tr -d '[:space:]' < assets/update-public-key.hex)
+          actual=$(openssl pkey -in <(printf '%s\n' "$SPINDLE_UPDATE_KEY") -pubout -outform DER | tail -c 32 | od -An -tx1 | tr -d ' \n')
+          test "$expected" = "$actual" || { echo "SPINDLE_UPDATE_KEY does not match assets/update-public-key.hex"; exit 1; }
       - name: Write the release notes
         env:
           VERSION: ${{ needs.tag.outputs.version }}
@@ -211,7 +228,7 @@ jobs:
             echo "- **Mac:** drag Spindle into Applications. On first open macOS blocks it because it is not notarized yet: open **System Settings > Privacy & Security**, scroll down and choose **Open Anyway**. If macOS says Spindle is damaged, run \`xattr -dr com.apple.quarantine /Applications/Spindle.app\` in Terminal, then open it again."
             echo "- Spindle updates itself: it checks when it starts and offers the new version."
             echo
-            echo "The files named \`spindle-v$VERSION-...\` and checksums.txt are what Spindle's built in updater downloads. You do not need them."
+            echo "The files named \`spindle-v$VERSION-...\`, checksums.txt and checksums.txt.sig are what Spindle's built in updater downloads. You do not need them."
             echo
             echo "Spindle is not affiliated with Spotify."
           } > notes.md
@@ -234,6 +251,7 @@ jobs:
               *.zip) label="Updater file: Windows portable";;
               *.dmg) label="Updater file: Mac";;
               checksums.txt) label="Updater file: checksums";;
+              checksums.txt.sig) label="Updater file: signature";;
               *) label="$name";;
             esac
             files+=("$f#$label")

@@ -44,11 +44,11 @@ pub const CONFIG: UpdateConfig = UpdateConfig {
         executable_names: &["Spindle"],
         legacy_bundle_names: &[],
     },
-    // Spindle's own releases live in Nick's repository. They are not signed
-    // yet, so no publisher key: once a release workflow signs checksums.txt,
-    // put its public key in assets/update-public-key.hex and require it here.
+    // Spindle's own releases live in Nick's repository. The Release workflow
+    // signs checksums.txt with the SPINDLE_UPDATE_KEY secret (Ed25519); this
+    // is its public half. fastframe-update refuses unsigned releases.
     // Spotifast's releases must never be offered: they would replace Spindle.
-    publisher_key: None,
+    publisher_key: Some(include_str!("../assets/update-public-key.hex")),
     // Spindle does not ship AppImages, and its Mac build is Apple silicon
     // only: the release carries spindle-v<version>-macos-arm64.dmg.
     appimage: false,

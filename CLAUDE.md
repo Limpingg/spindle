@@ -59,9 +59,14 @@ conflict only where Spindle's own changes meet Spotifast's.
 
 ## Self updates
 
-`updates.rs` points at Limpingg/spindle with no publisher key (the
-releases are not signed yet; sign checksums.txt in the Release workflow and
-put the public key in assets/update-public-key.hex to require it).
+`updates.rs` points at Limpingg/spindle and requires a publisher key:
+fastframe-update v0.16.1 (the Spotifast 0.17 merge) refuses unsigned
+releases, so 0.17.201 and 0.17.202 could not update at all and need one
+manual install. Since 0.17.203 the Release workflow signs checksums.txt
+with the SPINDLE_UPDATE_KEY secret (Ed25519 PEM, raw 64 byte signature in
+checksums.txt.sig) and assets/update-public-key.hex holds its public half;
+the step fails if the two do not match. To rotate, follow fastframe's
+`additional_publisher_keys` steps.
 Settings default `check_for_updates: true`. Never point the updater back at
 crmne/spotifast: with the PC's "download automatically" on, the app offered
 "Update to 0.14.1", which would have installed Spotifast over Spindle.
